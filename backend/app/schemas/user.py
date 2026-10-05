@@ -1,14 +1,13 @@
 import uuid
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr
-
-Email = Annotated[EmailStr, AfterValidator(str.lower)]
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 
 class LoginRequest(BaseModel):
-    email: Email
-    password: str
+    # Формат не проверяем: при входе email только ищется (валидируется при создании)
+    email: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1)]
+    password: Annotated[str, StringConstraints(min_length=1)]
 
 
 class UserRead(BaseModel):

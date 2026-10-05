@@ -1,11 +1,45 @@
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Placeholder } from '@/components/layout/Placeholder'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AccountSection } from '@/features/settings/sections/AccountSection'
+import { DayModeSection } from '@/features/settings/sections/DayModeSection'
+import { RemindersSection } from '@/features/settings/sections/RemindersSection'
+import { RestSection } from '@/features/settings/sections/RestSection'
+import { ScheduleSection } from '@/features/settings/sections/ScheduleSection'
+import { StudySection } from '@/features/settings/sections/StudySection'
+import { useSettings } from '@/features/settings/useSettings'
+import { errorMessage } from '@/lib/errors'
 
 export function SettingsPage() {
+  const { data: settings, isPending, isError, error, refetch } = useSettings()
+
   return (
     <>
       <PageHeader title="Настройки" />
-      <Placeholder text="Рабочие часы, сон, напоминания и Telegram." />
+      {isPending && (
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-48" />
+        </div>
+      )}
+      {isError && (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+          <Button variant="outline" onClick={() => refetch()}>
+            Повторить
+          </Button>
+        </div>
+      )}
+      {settings && (
+        <div className="flex flex-col gap-4">
+          <DayModeSection settings={settings} />
+          <StudySection settings={settings} />
+          <RestSection settings={settings} />
+          <ScheduleSection settings={settings} />
+          <RemindersSection settings={settings} />
+          <AccountSection />
+        </div>
+      )}
     </>
   )
 }

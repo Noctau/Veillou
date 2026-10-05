@@ -1,5 +1,23 @@
+from typing import Any
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
+
+
+# Подключается к роутеру API, чтобы формат ошибок попал в OpenAPI (и в TS-типы)
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    code: {"model": ErrorResponse} for code in (400, 401, 403, 404, 409)
+}
 
 
 class AppError(Exception):

@@ -73,8 +73,11 @@ async def test_login_wrong_password_or_unknown_email(client: AsyncClient, user: 
 
 
 async def test_login_validation(client: AsyncClient):
-    resp = await client.post(f"{API}/auth/login", json={"email": "not-an-email", "password": "x"})
+    resp = await client.post(f"{API}/auth/login", json={"email": "", "password": "x"})
     assert resp.status_code == 422
+    # Произвольная строка — просто «неверный логин», без подсказок о формате
+    resp = await client.post(f"{API}/auth/login", json={"email": "not-an-email", "password": "x"})
+    assert resp.status_code == 401
 
 
 async def test_me_with_session(auth_client: AsyncClient):
@@ -136,6 +139,8 @@ async def test_create_user_rules(session: AsyncSession, user: User):
         await users.create_user(session, email="student@EXAMPLE.com", password=PASSWORD)
     with pytest.raises(ValueError, match="короче"):
         await users.create_user(session, email="b@example.com", password="short")
+    with pytest.raises(ValueError, match="Некорректный email"):
+        await users.create_user(session, email="dev@veillou.test", password=PASSWORD)
     with pytest.raises(ValueError, match="часовой пояс"):
         await users.create_user(
             session, email="b@example.com", password=PASSWORD, timezone="Nope/Nope"

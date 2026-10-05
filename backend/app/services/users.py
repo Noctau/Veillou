@@ -1,5 +1,6 @@
 import uuid
 
+from email_validator import EmailNotValidError, validate_email
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,13 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     )
 
 
+def normalize_email(email: str) -> str:
+    try:
+        return validate_email(email.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError as exc:
+        raise ValueError(f"Некорректный email: {exc}") from exc
+
+
 def validate_password(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов")
@@ -34,7 +42,7 @@ async def create_user(
     password: str,
     timezone: str = settings.DEFAULT_TIMEZONE,
 ) -> User:
-    email = email.strip().lower()
+    email = normalize_email(email)
     validate_password(password)
     if not is_valid_tz(timezone):
         raise ValueError(f"Неизвестный часовой пояс: {timezone}")

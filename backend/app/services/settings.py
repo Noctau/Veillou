@@ -9,7 +9,7 @@ from app.schemas.settings import UserSettings, deep_merge
 
 
 class InvalidSettingsError(AppError):
-    status_code = 422
+    status_code = 400
     code = "invalid_settings"
 
 

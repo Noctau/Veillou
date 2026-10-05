@@ -97,7 +97,7 @@ async def test_overnight_ranges_allowed_for_sleep(auth_client: AsyncClient):
 async def test_invalid_merged_result_rejected_and_not_saved(auth_client: AsyncClient):
     # Только конец обеда раньше дефолтного начала 13:00 -> итог невалиден
     resp = await auth_client.patch(URL, json={"lunch": {"end": "12:00"}})
-    assert resp.status_code == 422
+    assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "invalid_settings"
     assert (await auth_client.get(URL)).json()["lunch"]["end"] == "14:00"
 
