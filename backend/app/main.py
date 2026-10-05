@@ -7,6 +7,7 @@ from fastapi.routing import APIRoute
 from app.api import health
 from app.core.config import settings
 from app.core.db import engine
+from app.core.exceptions import register_exception_handlers
 
 
 @asynccontextmanager
@@ -27,6 +28,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         generate_unique_id_function=_operation_id,
     )
+
+    register_exception_handlers(app)
 
     api = APIRouter(prefix=settings.API_PREFIX)
     api.include_router(health.router)

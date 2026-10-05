@@ -11,7 +11,7 @@
 ### M0. Скелет
 - [x] **M0.1 Монорепо + backend.** uv, FastAPI `/api/v1/health`, pydantic-settings, async engine, Alembic, `docker-compose.dev.yml` (Postgres 16). Makefile: `dev`, `migrate`, `test`, `lint`, `gen-api`.
   DoD: `make dev` → `/health` 200; `make test` зелёный.
-- [ ] **M0.2 Базовая модель.** Миксин `id/user_id/created_at/updated_at/deleted_at`, `core/time.py` (now_utc, local↔UTC, «настенное время + дата → UTC»), базовый репозиторий (фильтр user_id + soft delete).
+- [x] **M0.2 Базовая модель.** Миксин `id/user_id/created_at/updated_at/deleted_at`, `core/time.py` (now_utc, local↔UTC, «настенное время + дата → UTC»), базовый репозиторий (фильтр user_id + soft delete).
   DoD: тесты time-хелперов и soft delete.
 - [ ] **M0.3 Frontend.** Vite + React + TS, Tailwind, shadcn init, Router, TanStack Query, layout (нижняя панель / сайдбар), тёмная тема, заглушки разделов, типизированный клиент из `gen-api`, proxy `/api`.
   DoD: открывается с телефона по LAN, health через клиент.
