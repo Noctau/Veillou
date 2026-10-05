@@ -64,3 +64,22 @@ async def session() -> AsyncIterator[AsyncSession]:
 async def client() -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+PASSWORD = "correct-horse-battery"
+
+
+@pytest.fixture
+async def user(session: AsyncSession):
+    from app.services.users import create_user
+
+    return await create_user(session, email="Student@Example.com", password=PASSWORD)
+
+
+@pytest.fixture
+async def auth_client(client: AsyncClient, user) -> AsyncClient:
+    resp = await client.post(
+        "/api/v1/auth/login", json={"email": "student@example.com", "password": PASSWORD}
+    )
+    assert resp.status_code == 200, resp.text
+    return client

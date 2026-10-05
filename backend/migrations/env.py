@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 import app.models  # noqa: F401  — регистрирует все модели в Base.metadata
 from app.core.config import settings
 from app.core.db import Base
+from app.models.base import UTCDateTime
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,6 +25,15 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    # Кастомные типы рендерим их SQL-эквивалентом, чтобы миграции не импортировали app.*
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
+
+
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
@@ -50,6 +60,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_item=render_item,
     )
 
     with context.begin_transaction():
@@ -58,7 +69,10 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
-        connection=connection, target_metadata=target_metadata, compare_server_default=True
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_server_default=True,
+        render_item=render_item,
     )
 
     with context.begin_transaction():
