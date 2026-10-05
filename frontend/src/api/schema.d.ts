@@ -72,10 +72,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Settings
+         * @description Глубокий мёрж: переданные поля меняются, остальные остаются. null — вернуть дефолт.
+         */
+        patch: operations["update_settings"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BeforeClassRule */
+        BeforeClassRule: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Channels */
+            channels: components["schemas"]["Channel"][];
+            /**
+             * Minutes Before
+             * @default 15
+             */
+            minutes_before: number;
+        };
+        /** BeforeClassRulePatch */
+        BeforeClassRulePatch: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Channels */
+            channels?: components["schemas"]["Channel"][] | null;
+            /** Minutes Before */
+            minutes_before?: number | null;
+        };
+        /**
+         * Channel
+         * @enum {string}
+         */
+        Channel: "push" | "telegram";
+        /**
+         * DayRange
+         * @description Интервал, который не переходит через полночь.
+         */
+        DayRange: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+        };
+        /** DayRangePatch */
+        DayRangePatch: {
+            /** Start */
+            start?: string | null;
+            /** End */
+            end?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -98,6 +165,177 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** ReminderRule */
+        ReminderRule: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Channels */
+            channels: components["schemas"]["Channel"][];
+        };
+        /** ReminderRulePatch */
+        ReminderRulePatch: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Channels */
+            channels?: components["schemas"]["Channel"][] | null;
+        };
+        /** Reminders */
+        Reminders: {
+            /**
+             * @default {
+             *       "enabled": true,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ]
+             *     }
+             */
+            morning_digest: components["schemas"]["ReminderRule"];
+            /**
+             * @default {
+             *       "enabled": true,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ],
+             *       "minutes_before": 15
+             *     }
+             */
+            before_class: components["schemas"]["BeforeClassRule"];
+            /**
+             * @default {
+             *       "enabled": true,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ]
+             *     }
+             */
+            deadlines: components["schemas"]["ReminderRule"];
+            /**
+             * @default {
+             *       "enabled": true,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ]
+             *     }
+             */
+            evening_review: components["schemas"]["ReminderRule"];
+            /**
+             * @default {
+             *       "enabled": true,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ]
+             *     }
+             */
+            weekly_review: components["schemas"]["ReminderRule"];
+            /**
+             * @default {
+             *       "enabled": false,
+             *       "channels": [
+             *         "push",
+             *         "telegram"
+             *       ]
+             *     }
+             */
+            subtask_start: components["schemas"]["ReminderRule"];
+        };
+        /** RemindersPatch */
+        RemindersPatch: {
+            morning_digest?: components["schemas"]["ReminderRulePatch"] | null;
+            before_class?: components["schemas"]["BeforeClassRulePatch"] | null;
+            deadlines?: components["schemas"]["ReminderRulePatch"] | null;
+            evening_review?: components["schemas"]["ReminderRulePatch"] | null;
+            weekly_review?: components["schemas"]["ReminderRulePatch"] | null;
+            subtask_start?: components["schemas"]["ReminderRulePatch"] | null;
+        };
+        /**
+         * Rest
+         * @description Минимум отдыха в неделю: планировщик не ставит сюда гибкие блоки.
+         */
+        Rest: {
+            /**
+             * Free Evenings Per Week
+             * @default 2
+             */
+            free_evenings_per_week: number;
+            /**
+             * Weekend Half Days
+             * @default 1
+             */
+            weekend_half_days: number;
+        };
+        /** RestPatch */
+        RestPatch: {
+            /** Free Evenings Per Week */
+            free_evenings_per_week?: number | null;
+            /** Weekend Half Days */
+            weekend_half_days?: number | null;
+        };
+        /**
+         * Schedule
+         * @description Когда приходят сводка и разборы.
+         */
+        Schedule: {
+            /**
+             * Morning Digest
+             * @default 08:00
+             */
+            morning_digest: string;
+            /**
+             * Evening Review
+             * @default 21:30
+             */
+            evening_review: string;
+            /**
+             * Weekly Review Weekday
+             * @description ISO: 1 = Пн, 7 = Вс
+             * @default 7
+             */
+            weekly_review_weekday: number;
+            /**
+             * Weekly Review
+             * @default 19:00
+             */
+            weekly_review: string;
+        };
+        /** SchedulePatch */
+        SchedulePatch: {
+            /** Morning Digest */
+            morning_digest?: string | null;
+            /** Evening Review */
+            evening_review?: string | null;
+            /**
+             * Weekly Review Weekday
+             * @description ISO: 1 = Пн, 7 = Вс
+             */
+            weekly_review_weekday?: number | null;
+            /** Weekly Review */
+            weekly_review?: string | null;
+        };
+        /**
+         * TimeRange
+         * @description Интервал внутри дня. end < start означает переход через полночь (сон, тихие часы).
+         */
+        TimeRange: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+        };
+        /** TimeRangePatch */
+        TimeRangePatch: {
+            /** Start */
+            start?: string | null;
+            /** End */
+            end?: string | null;
+        };
         /** UserRead */
         UserRead: {
             /**
@@ -109,6 +347,146 @@ export interface components {
             email: string;
             /** Timezone */
             timezone: string;
+        };
+        /** UserSettings */
+        UserSettings: {
+            /**
+             * @default {
+             *       "weekdays": {
+             *         "end": "21:00",
+             *         "start": "09:00"
+             *       },
+             *       "weekends": {
+             *         "end": "19:00",
+             *         "start": "11:00"
+             *       }
+             *     }
+             */
+            work_hours: components["schemas"]["WorkHours"];
+            /**
+             * @default {
+             *       "start": "23:30",
+             *       "end": "07:30"
+             *     }
+             */
+            sleep: components["schemas"]["TimeRange"];
+            /**
+             * @default {
+             *       "start": "13:00",
+             *       "end": "14:00"
+             *     }
+             */
+            lunch: components["schemas"]["DayRange"];
+            /**
+             * Travel Buffer Min
+             * @description Дорога до университета и обратно, мин
+             * @default 60
+             */
+            travel_buffer_min: number;
+            /**
+             * Study Limit Min Per Day
+             * @default 360
+             */
+            study_limit_min_per_day: number;
+            /**
+             * Deadline Buffer Days
+             * @description Закончить за N дней до дедлайна
+             * @default 1
+             */
+            deadline_buffer_days: number;
+            /**
+             * @default {
+             *       "start": "22:30",
+             *       "end": "08:00"
+             *     }
+             */
+            quiet_hours: components["schemas"]["TimeRange"];
+            /**
+             * @default {
+             *       "morning_digest": "08:00",
+             *       "evening_review": "21:30",
+             *       "weekly_review_weekday": 7,
+             *       "weekly_review": "19:00"
+             *     }
+             */
+            schedule: components["schemas"]["Schedule"];
+            /**
+             * @default {
+             *       "morning_digest": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": true
+             *       },
+             *       "before_class": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": true,
+             *         "minutes_before": 15
+             *       },
+             *       "deadlines": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": true
+             *       },
+             *       "evening_review": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": true
+             *       },
+             *       "weekly_review": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": true
+             *       },
+             *       "subtask_start": {
+             *         "channels": [
+             *           "push",
+             *           "telegram"
+             *         ],
+             *         "enabled": false
+             *       }
+             *     }
+             */
+            reminders: components["schemas"]["Reminders"];
+            /**
+             * @default {
+             *       "free_evenings_per_week": 2,
+             *       "weekend_half_days": 1
+             *     }
+             */
+            rest: components["schemas"]["Rest"];
+        };
+        /** UserSettingsPatch */
+        UserSettingsPatch: {
+            work_hours?: components["schemas"]["WorkHoursPatch"] | null;
+            sleep?: components["schemas"]["TimeRangePatch"] | null;
+            lunch?: components["schemas"]["DayRangePatch"] | null;
+            /**
+             * Travel Buffer Min
+             * @description Дорога до университета и обратно, мин
+             */
+            travel_buffer_min?: number | null;
+            /** Study Limit Min Per Day */
+            study_limit_min_per_day?: number | null;
+            /**
+             * Deadline Buffer Days
+             * @description Закончить за N дней до дедлайна
+             */
+            deadline_buffer_days?: number | null;
+            quiet_hours?: components["schemas"]["TimeRangePatch"] | null;
+            schedule?: components["schemas"]["SchedulePatch"] | null;
+            reminders?: components["schemas"]["RemindersPatch"] | null;
+            rest?: components["schemas"]["RestPatch"] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -122,6 +500,28 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkHours */
+        WorkHours: {
+            /**
+             * @default {
+             *       "start": "09:00",
+             *       "end": "21:00"
+             *     }
+             */
+            weekdays: components["schemas"]["DayRange"];
+            /**
+             * @default {
+             *       "start": "11:00",
+             *       "end": "19:00"
+             *     }
+             */
+            weekends: components["schemas"]["DayRange"];
+        };
+        /** WorkHoursPatch */
+        WorkHoursPatch: {
+            weekdays?: components["schemas"]["DayRangePatch"] | null;
+            weekends?: components["schemas"]["DayRangePatch"] | null;
         };
     };
     responses: never;
@@ -228,6 +628,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSettings"];
                 };
             };
             /** @description Validation Error */
