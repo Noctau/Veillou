@@ -15,7 +15,7 @@
   DoD: тесты time-хелперов и soft delete.
 - [x] **M0.3 Frontend.** Vite + React + TS, Tailwind, shadcn init, Router, TanStack Query, layout (нижняя панель / сайдбар), тёмная тема, заглушки разделов, типизированный клиент из `gen-api`, proxy `/api`.
   DoD: открывается с телефона по LAN, health через клиент.
-- [ ] **M0.4 CI.** GitHub Actions: ruff, pytest (Postgres service), `tsc --noEmit`, `vite build`.
+- [x] **M0.4 CI.** GitHub Actions: ruff, pytest (Postgres service), `tsc --noEmit`, `vite build`.
 
 ### M1. Пользователь, настройки, Telegram
 - [ ] **M1.1 Auth.** `User` (email, argon2, timezone, settings JSONB), `sessions`, login/logout/me, `current_user`; юзер создаётся CLI-командой.
