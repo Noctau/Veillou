@@ -19,3 +19,8 @@ make dev          # Postgres 16 (docker, :5433) + миграции + API :8000 +
 | `make test` | pytest (БД `veillou_test` в том же контейнере) |
 | `make lint` / `make fmt` | ruff + tsc / автоформат |
 | `make gen-api` | OpenAPI бэкенда → `frontend/src/api/schema.d.ts` |
+| `make create-user email=...` | создать пользователя (пароль спросит; регистрации в приложении нет) |
+| `make bot` | Telegram-бот (long polling), нужен `TELEGRAM_BOT_TOKEN` в `.env` |
+
+Telegram: создать бота у @BotFather, вписать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_BOT_USERNAME`
+в `.env`, запустить `make bot`, затем «Настройки → Telegram → Привязать».

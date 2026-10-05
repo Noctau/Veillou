@@ -8,6 +8,7 @@ import { RestSection } from '@/features/settings/sections/RestSection'
 import { ScheduleSection } from '@/features/settings/sections/ScheduleSection'
 import { StudySection } from '@/features/settings/sections/StudySection'
 import { useSettings } from '@/features/settings/useSettings'
+import { TelegramSection } from '@/features/telegram/TelegramSection'
 import { errorMessage } from '@/lib/errors'
 
 export function SettingsPage() {
@@ -37,6 +38,7 @@ export function SettingsPage() {
           <RestSection settings={settings} />
           <ScheduleSection settings={settings} />
           <RemindersSection settings={settings} />
+          <TelegramSection />
           <AccountSection />
         </div>
       )}

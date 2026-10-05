@@ -22,7 +22,7 @@
   DoD: тесты, без сессии → 401.
 - [x] **M1.2 UserSettings.** Pydantic-схема со стартовыми значениями: рабочие часы будни/выходные, сон, обед, буфер дороги, лимит учёбы/день, «закончить за N дней до дедлайна», тихие часы, время сводки и разборов, каналы по типам напоминаний, минимум отдыха в неделю. `GET/PATCH /me/settings` с глубоким мёржем.
 - [x] **M1.3 Фронт: логин + Настройки** (секции, rhf + zod).
-- [ ] **M1.4 Бот: каркас + привязка.** aiogram 3 polling, одноразовый код (10 мин), `/start <код>`, middleware: чужие `tg_user_id` игнорируются.
+- [x] **M1.4 Бот: каркас + привязка.** aiogram 3 polling, одноразовый код (10 мин), `/start <код>`, middleware: чужие `tg_user_id` игнорируются.
 
 ### M2. Расписание (шаблоны → вхождения)
 - [ ] **M2.1 Модели.** `Semester`, `DayOff`, `BellSchedule`, `Subject`, `ClassRule` + таблица `events` (kind, title, start, end, is_fixed, is_pinned, status, template_type/template_id, detached, source_type/source_id, subject_id, location, color). CRUD.

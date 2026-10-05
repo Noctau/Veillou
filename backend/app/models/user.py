@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import String
+from sqlalchemy import BigInteger, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,3 +19,5 @@ class User(EntityMixin, Base):
     )
     # Только переопределения пользователя; дефолты — в schemas.settings.UserSettings
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    # Привязанный Telegram; бот отвечает только этим id. Чат с ботом личный -> chat_id == tg_user_id
+    tg_user_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)

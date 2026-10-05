@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.routing import APIRoute
 
-from app.api import auth, health, me
+from app.api import auth, health, me, telegram
 from app.core.config import settings
 from app.core.db import engine
 from app.core.exceptions import ERROR_RESPONSES, register_exception_handlers
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     api.include_router(health.router)
     api.include_router(auth.router)
     api.include_router(me.router)
+    api.include_router(telegram.router)
     app.include_router(api)
     return app
 

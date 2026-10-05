@@ -1,0 +1,36 @@
+"""Telegram-бот (long polling): python -m app.bot / make bot."""
+
+import asyncio
+import logging
+import sys
+
+from app.bot.app import create_bot, create_dispatcher
+from app.core.config import settings
+from app.core.db import engine
+
+
+async def main() -> None:
+    if settings.TELEGRAM_BOT_TOKEN is None:
+        sys.exit("TELEGRAM_BOT_TOKEN не задан в .env")
+    bot = create_bot(settings.TELEGRAM_BOT_TOKEN.get_secret_value())
+    dp = create_dispatcher()
+    try:
+        me = await bot.get_me()
+        if settings.TELEGRAM_BOT_USERNAME and settings.TELEGRAM_BOT_USERNAME != me.username:
+            logging.warning(
+                "TELEGRAM_BOT_USERNAME=%s, а токен от @%s — ссылки привязки будут неверными",
+                settings.TELEGRAM_BOT_USERNAME,
+                me.username,
+            )
+        logging.info("Бот @%s запущен", me.username)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    finally:
+        await bot.session.close()
+        await engine.dispose()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    asyncio.run(main())
