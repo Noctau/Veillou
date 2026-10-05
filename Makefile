@@ -35,7 +35,7 @@ test:
 lint:
 	$(BACK) ruff check .
 	$(BACK) ruff format --check .
-	cd frontend && npx tsc -b --noEmit
+	cd frontend && npx oxlint && npx tsc -b --noEmit
 
 fmt:
 	$(BACK) ruff check --fix .

@@ -13,7 +13,7 @@
   DoD: `make dev` → `/health` 200; `make test` зелёный.
 - [x] **M0.2 Базовая модель.** Миксин `id/user_id/created_at/updated_at/deleted_at`, `core/time.py` (now_utc, local↔UTC, «настенное время + дата → UTC»), базовый репозиторий (фильтр user_id + soft delete).
   DoD: тесты time-хелперов и soft delete.
-- [ ] **M0.3 Frontend.** Vite + React + TS, Tailwind, shadcn init, Router, TanStack Query, layout (нижняя панель / сайдбар), тёмная тема, заглушки разделов, типизированный клиент из `gen-api`, proxy `/api`.
+- [x] **M0.3 Frontend.** Vite + React + TS, Tailwind, shadcn init, Router, TanStack Query, layout (нижняя панель / сайдбар), тёмная тема, заглушки разделов, типизированный клиент из `gen-api`, proxy `/api`.
   DoD: открывается с телефона по LAN, health через клиент.
 - [ ] **M0.4 CI.** GitHub Actions: ruff, pytest (Postgres service), `tsc --noEmit`, `vite build`.
 
