@@ -628,6 +628,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quick-add/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Quick Add
+         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, тип.
+         *
+         *     Ничего не сохраняет — клиент создаёт задание / дело / событие обычными запросами.
+         */
+        post: operations["parse_quick_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1134,6 +1156,11 @@ export interface components {
             /** Db */
             db: string;
         };
+        /**
+         * KindHint
+         * @enum {string}
+         */
+        KindHint: "task" | "backlog" | "event";
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -1152,6 +1179,35 @@ export interface components {
          * @enum {string}
          */
         Priority: "normal" | "high";
+        /**
+         * QuickParseRead
+         * @description Что удалось достать из строки. Ничего не сохраняет.
+         */
+        QuickParseRead: {
+            /** Title */
+            title: string;
+            /** Date */
+            date: string | null;
+            /** Time */
+            time: string | null;
+            /** End Time */
+            end_time: string | null;
+            /** Duration Min */
+            duration_min: number | null;
+            /** Deadline */
+            deadline: string | null;
+            /** Is Deadline */
+            is_deadline: boolean;
+            /** Subject Id */
+            subject_id: string | null;
+            task_type: components["schemas"]["TaskType"] | null;
+            kind_hint: components["schemas"]["KindHint"];
+        };
+        /** QuickParseRequest */
+        QuickParseRequest: {
+            /** Text */
+            text: string;
+        };
         /** RecurringEventCreate */
         RecurringEventCreate: {
             /**
@@ -6439,6 +6495,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubtaskRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_quick_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickParseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickParseRead"];
                 };
             };
             /** @description Bad Request */
