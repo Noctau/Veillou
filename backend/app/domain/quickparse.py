@@ -27,7 +27,7 @@ from enum import StrEnum
 
 from dateutil.relativedelta import relativedelta
 
-from app.domain.enums import TaskType
+from app.domain.enums import ActionTypeKey, TaskType
 
 
 class KindHint(StrEnum):
@@ -54,6 +54,7 @@ class ParseResult:
     is_deadline: bool = False
     subject_id: Hashable | None = None
     task_type: TaskType | None = None
+    action_type: ActionTypeKey | None = None
     kind_hint: KindHint = KindHint.backlog
 
 
@@ -98,6 +99,46 @@ TASK_TYPES: list[tuple[TaskType, str]] = [
 
 # Глаголы учёбы без явного типа: тоже задание
 STUDY_VERBS = r"сдать|написать|решить|подготовить|выучить|доделать|оформить|отправить"
+
+# Тип действия по словам (ТЗ §4.8). Порядок важен: первое совпадение побеждает.
+ACTION_TYPES: list[tuple[ActionTypeKey, str]] = [
+    (
+        ActionTypeKey.institutions,
+        r"деканат[а-я]*|библиотек[а-я]*|врач[а-я]*|стоматолог[а-я]*|поликлиник[а-я]*|"
+        r"больниц[а-я]*|мфц|банк[а-я]*|паспорт[а-я]*|справк[а-я]*|военкомат[а-я]*|"
+        r"налогов[а-я]*|нотариус[а-я]*|записаться|запись",
+    ),
+    (
+        ActionTypeKey.people,
+        r"научрук[а-я]*|руководител[а-я]*|препод[а-я]*|старост[а-я]*|куратор[а-я]*|"
+        r"одногруппник[а-я]*|позвонить|созвониться|спросить|договориться|согласовать",
+    ),
+    (
+        ActionTypeKey.outside,
+        r"купить|магазин[а-я]*|аптек[а-я]*|посылк[а-я]*|почт[а-я]*|забрать|отнести|"
+        r"химчистк[а-я]*|ремонт[а-я]*",
+    ),
+    (
+        ActionTypeKey.home,
+        r"убра[а-я]*|уборк[а-я]*|постира[а-я]*|стирк[а-я]*|приготовить|готовк[а-я]*|"
+        r"помыть|пропылесосить|разобрать|погладить|полить|вынести",
+    ),
+    (
+        ActionTypeKey.personal,
+        r"спорт[а-я]*|зал|бассейн[а-я]*|йог[а-я]*|пробежк[а-я]*|кино|прогулк[а-я]*|"
+        r"погулять|подруг[а-я]*|друз[а-я]*|день\s+рождения",
+    ),
+]
+
+
+def guess_action_type(text: str) -> ActionTypeKey | None:
+    """Тип действия по словам: «записаться к врачу» → учреждения. Без учёбы."""
+    normalized = _normalize(text)
+    for key, pattern in ACTION_TYPES:
+        if re.search(_b(f"(?:{pattern})"), normalized):
+            return key
+    return None
+
 
 WORD = r"[0-9a-zа-я]+"
 _word_re = re.compile(WORD)
@@ -429,6 +470,10 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
     if has_study_verb and day is not None and at is None:
         is_deadline = True
 
+    action_type = guess_action_type(title)
+    if action_type is None and (task_type or subject_id is not None or has_study_verb):
+        action_type = ActionTypeKey.study
+
     if at is not None and not is_deadline and task_type is None:
         kind = KindHint.event
     elif task_type or subject_id is not None or is_deadline:
@@ -446,5 +491,6 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
         is_deadline=is_deadline,
         subject_id=subject_id,
         task_type=task_type,
+        action_type=action_type,
         kind_hint=kind,
     )

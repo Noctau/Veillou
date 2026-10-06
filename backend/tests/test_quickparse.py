@@ -8,8 +8,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.domain.enums import TaskType
-from app.domain.quickparse import KindHint, SubjectRef, parse
+from app.domain.enums import ActionTypeKey, TaskType
+from app.domain.quickparse import KindHint, SubjectRef, guess_action_type, parse
 
 MSK = ZoneInfo("Europe/Moscow")
 NOW = datetime(2026, 10, 6, 15, 0, tzinfo=MSK)
@@ -308,3 +308,31 @@ def test_degenerate_input(text):
 def test_naive_now_rejected():
     with pytest.raises(ValueError):
         parse("x", datetime(2026, 10, 6, 15, 0))
+
+
+# ---------- тип действия ----------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("записаться к стоматологу", ActionTypeKey.institutions),
+        ("забрать справку из деканата", ActionTypeKey.institutions),
+        ("написать научруку до пятницы", ActionTypeKey.people),
+        ("спросить у старосты про перенос", ActionTypeKey.people),
+        ("купить продукты завтра", ActionTypeKey.outside),
+        ("забрать посылку", ActionTypeKey.outside),
+        ("разобрать шкаф на следующей неделе", ActionTypeKey.home),
+        ("бассейн с 19 до 20:30", ActionTypeKey.personal),
+        ("реферат климатология до 15 окт", ActionTypeKey.study),
+        ("написать главу 1", ActionTypeKey.study),
+        ("что-то непонятное", None),
+    ],
+)
+def test_action_type(text, expected):
+    assert p(text).action_type == expected
+
+
+def test_guess_action_type_plain():
+    assert guess_action_type("МФЦ, паспорт") == ActionTypeKey.institutions
+    assert guess_action_type("Глава 1") is None

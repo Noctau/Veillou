@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.routing import APIRoute
 
-from app.api import auth, catalog, events, health, me, quickadd, schedule, tasks, telegram
+from app.api import auth, backlog, catalog, events, health, me, quickadd, schedule, tasks, telegram
 from app.core.config import settings
 from app.core.db import engine
 from app.core.exceptions import ERROR_RESPONSES, register_exception_handlers
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     api.include_router(catalog.router)
     api.include_router(tasks.router)
     api.include_router(quickadd.router)
+    api.include_router(backlog.router)
     app.include_router(api)
     return app
 

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, StringConstraints
 
-from app.domain.enums import TaskType
+from app.domain.enums import ActionTypeKey, TaskType
 from app.domain.quickparse import KindHint
 from app.schemas.common import InputModel, UTCMoment, WallTime
 
@@ -25,4 +25,5 @@ class QuickParseRead(BaseModel):
     is_deadline: bool
     subject_id: uuid.UUID | None
     task_type: TaskType | None
+    action_type: ActionTypeKey | None
     kind_hint: KindHint

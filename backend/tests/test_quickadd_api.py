@@ -30,6 +30,7 @@ async def test_parse_with_user_subjects(auth_client, frozen):
         "is_deadline": True,
         "subject_id": subj["id"],
         "task_type": "essay",
+        "action_type": "study",
         "kind_hint": "task",
     }
 

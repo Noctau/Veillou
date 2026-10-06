@@ -17,4 +17,6 @@ export const queryKeys = {
   tasks: ['tasks'] as const,
   taskList: (params: object) => ['tasks', 'list', params] as const,
   task: (id: string) => ['tasks', 'detail', id] as const,
+  backlogAll: ['backlog'] as const,
+  backlog: (status: string) => ['backlog', status] as const,
 }

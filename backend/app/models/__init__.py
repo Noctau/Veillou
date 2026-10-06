@@ -1,5 +1,6 @@
 """Импорт всех моделей, чтобы они попали в Base.metadata (Alembic, тесты)."""
 
+from app.models.backlog import BacklogItem
 from app.models.catalog import ActionType, Category
 from app.models.event import Event, RecurringEvent
 from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
@@ -10,6 +11,7 @@ from app.models.user import User
 
 __all__ = [
     "ActionType",
+    "BacklogItem",
     "BellSchedule",
     "Category",
     "ClassRule",

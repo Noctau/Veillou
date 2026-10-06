@@ -144,3 +144,21 @@ class SourceType(StrEnum):
 
     subtask = "subtask"
     backlog_item = "backlog_item"
+
+
+# ---------- долгий ящик (M4.6) ----------
+
+
+class BacklogStatus(StrEnum):
+    active = "active"
+    done = "done"
+    archived = "archived"  # «неактуально»
+
+
+class BacklogCondition(StrEnum):
+    """Условия дела — фиксированный набор чипов, без свободного текста."""
+
+    weekday_daytime = "weekday_daytime"  # только в будни днём
+    on_class_days = "on_class_days"  # в дни пар (в городе)
+    needs_laptop = "needs_laptop"  # нужен ноутбук
+    institution_hours = "institution_hours"  # в часы работы учреждений
