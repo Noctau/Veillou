@@ -71,3 +71,20 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
+
+
+class InvalidDataError(AppError):
+    """Итог частичного обновления не прошёл валидацию."""
+
+    code = "invalid_data"
+    message = "Некорректные данные"
+
+
+def format_validation_error(exc: Any) -> str:
+    """Текст pydantic.ValidationError в одну строку для ответа API."""
+    parts = []
+    for err in exc.errors():
+        loc = ".".join(str(p) for p in err["loc"])
+        msg = str(err["msg"]).removeprefix("Value error, ")
+        parts.append(f"{loc}: {msg}" if loc else msg)
+    return "; ".join(parts)

@@ -2,11 +2,12 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import InvalidDataError, NotFoundError, format_validation_error
 from app.core.time import now_utc
 from app.models.base import UserOwnedMixin
 
@@ -62,3 +63,21 @@ class UserScopedRepository[M: UserOwnedMixin]:
 
     def soft_delete(self, obj: M) -> None:
         obj.deleted_at = now_utc()
+
+
+def validate_patch[T: BaseModel](obj: object, patch: BaseModel, schema: type[T]) -> T:
+    """Накладывает частичное обновление на текущие поля `obj` и валидирует итог схемой.
+
+    Так межполевые проверки схемы создания работают и для PATCH.
+    """
+    data = {name: getattr(obj, name) for name in schema.model_fields if hasattr(obj, name)}
+    data.update(patch.model_dump(exclude_unset=True))
+    try:
+        return schema.model_validate(data)
+    except ValidationError as exc:
+        raise InvalidDataError(format_validation_error(exc)) from exc
+
+
+def apply_fields(obj: object, data: BaseModel, *, exclude: set[str] | None = None) -> None:
+    for name, value in data.model_dump(exclude=exclude).items():
+        setattr(obj, name, value)

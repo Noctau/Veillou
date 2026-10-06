@@ -15,15 +15,11 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    PlainSerializer,
     create_model,
     model_validator,
 )
 
-WallTime = Annotated[
-    time,
-    PlainSerializer(lambda t: t.strftime("%H:%M"), return_type=str, when_used="json"),
-]
+from app.schemas.common import WallTime
 
 
 class Channel(StrEnum):
