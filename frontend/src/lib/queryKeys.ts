@@ -14,4 +14,7 @@ export const queryKeys = {
   calendar: (from: string, to: string) => ['calendar', from, to] as const,
   categories: ['categories'] as const,
   actionTypes: ['action-types'] as const,
+  tasks: ['tasks'] as const,
+  taskList: (params: object) => ['tasks', 'list', params] as const,
+  task: (id: string) => ['tasks', 'detail', id] as const,
 }

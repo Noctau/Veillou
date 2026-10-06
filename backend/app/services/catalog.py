@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, InvalidDataError
 from app.domain.enums import ActionTypeKey, CategoryIcon, CategoryKey
-from app.models import ActionType, Category, User
+from app.models import ActionType, Category, Subtask, Task, User
 from app.schemas.catalog import ActionTypeUpdate, CategoryCreate, CategoryUpdate
 from app.services.base import UserScopedRepository
 
@@ -257,5 +257,5 @@ class CatalogService:
         return action_type
 
 
-# Модели с полем category_id: при удалении категории ссылки обнуляются (M4.2+)
-CATEGORY_USERS: tuple[Any, ...] = ()
+# Модели с полем category_id: при удалении категории ссылки обнуляются
+CATEGORY_USERS: tuple[Any, ...] = (Task, Subtask)

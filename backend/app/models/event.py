@@ -22,6 +22,7 @@ class Event(UserOwnedMixin, Base):
     __table_args__ = (
         Index("ix_events_user_start", "user_id", "start"),
         Index("ix_events_template", "template_type", "template_id"),
+        Index("ix_events_source", "source_type", "source_id"),
         # Одно живое вхождение шаблона на дату
         Index(
             "uq_events_template_occurrence",

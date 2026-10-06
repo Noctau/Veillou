@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz
-from app.domain.enums import FIXED_KINDS, EventStatus
+from app.domain.enums import FIXED_KINDS, EventStatus, SourceType
 from app.models import DayOff, Event, RecurringEvent, Subject, User
 from app.schemas.event import (
     EventCreate,
@@ -18,6 +18,7 @@ from app.schemas.event import (
 )
 from app.services.base import UserScopedRepository, apply_fields, validate_patch
 from app.services.schedule_sync import SeriesSync
+from app.services.tasks import on_subtask_event_status
 
 
 class EventRepo(UserScopedRepository[Event]):
@@ -110,6 +111,11 @@ class EventService:
         if event.template_id is not None and _is_manual_edit(changes):
             # Регенерация серии больше не трогает это вхождение
             event.detached = True
+        if not event.is_fixed and changes.keys() & {"start", "end"}:
+            # Гибкий блок, перенесённый руками, планировщик больше не двигает
+            event.is_pinned = True
+        if event.source_type == SourceType.subtask and event.source_id and "status" in changes:
+            await on_subtask_event_status(self.db, self.user_id, event.source_id, event.status)
         await self.db.commit()
         return event
 

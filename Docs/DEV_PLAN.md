@@ -41,7 +41,7 @@
 
 ### M4. Задания, ящик, проекты (без ИИ)
 - [x] **M4.1 Справочники.** `Category`, `ActionType` (окна JSONB) + сид дефолтов (ТЗ §4.8); редактор окон в Настройках.
-- [ ] **M4.2 Task + Subtask.** Поля ТЗ + category, action_type, time_window, project_id, milestone_id, issued_at, `estimate_min`, `actual_feel` (faster/ok/slower). Прогресс = доля done. Подключить блок «Ближайшие дедлайны» на «Сегодня».
+- [x] **M4.2 Task + Subtask.** Поля ТЗ + category, action_type, time_window, project_id, milestone_id, issued_at, `estimate_min`, `actual_feel` (faster/ok/slower). Прогресс = доля done. Подключить блок «Ближайшие дедлайны» на «Сегодня».
 - [ ] **M4.3 `domain/quickparse.py`.** «реферат климатология до 15 окт», «к пятнице», «через 2 недели», «завтра в 14» → `{title, deadline, subject_id?, kind_hint}`. dateparser(ru) + свои правила; предмет — по short_name/синонимам.
   DoD: ≥ 25 тестов на реальных фразах (собрать у жены 20 примеров).
 - [ ] **M4.4 Быстрое добавление (＋).** Одна строка + тип (задание / ящик / событие / конспект), парс в превью «на лету», optimistic save.

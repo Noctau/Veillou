@@ -99,3 +99,48 @@ class CategoryIcon(StrEnum):
     plane = "plane"
     star = "star"
     tag = "tag"
+
+
+# ---------- задания (M4.2) ----------
+
+
+class TaskType(StrEnum):
+    homework = "homework"  # ДЗ
+    report = "report"  # доклад
+    essay = "essay"  # реферат
+    lab = "lab"  # лабораторная
+    coursework = "coursework"  # курсовая
+    reading = "reading"  # чтение
+    exam_prep = "exam_prep"  # подготовка к экзамену
+    other = "other"
+
+
+class Priority(StrEnum):
+    normal = "normal"
+    high = "high"
+
+
+class TaskStatus(StrEnum):
+    active = "active"
+    done = "done"
+    cancelled = "cancelled"
+
+
+class SubtaskStatus(StrEnum):
+    todo = "todo"
+    done = "done"
+
+
+class Feel(StrEnum):
+    """Как прошло по сравнению с оценкой — для калибровки (M9.4)."""
+
+    faster = "faster"
+    ok = "ok"
+    slower = "slower"
+
+
+class SourceType(StrEnum):
+    """Сущность-источник гибкого блока в `events`."""
+
+    subtask = "subtask"
+    backlog_item = "backlog_item"

@@ -1,5 +1,5 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
-import { CalendarClockIcon, MapPinIcon, PlusIcon } from 'lucide-react'
+import { MapPinIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { PersonalEventDialog } from '@/features/calendar/PersonalEventDialog'
 import { type CalendarEvent, useCalendar, useUpdateEvent } from '@/features/calendar/useCalendar'
 import { PARITY_LABEL, weekParity } from '@/features/schedule/parity'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
+import { DeadlinesCard } from '@/features/tasks/DeadlinesCard'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
 import { addDaysIso, dayStartUtc, formatDay, wallTime } from '@/lib/time'
@@ -220,16 +221,7 @@ export function TodayView() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CalendarClockIcon className="size-4" /> Ближайшие дедлайны
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2 text-sm text-muted-foreground">
-              Дедлайнов на ближайшие дни нет.
-            </CardContent>
-          </Card>
+          <DeadlinesCard tz={tz} now={now} />
         </>
       )}
 
