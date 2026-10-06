@@ -3,4 +3,13 @@ export const queryKeys = {
   me: ['me'] as const,
   settings: ['me', 'settings'] as const,
   telegram: ['me', 'telegram'] as const,
+  semesters: ['semesters'] as const,
+  bells: (semesterId: string) => ['semesters', semesterId, 'bells'] as const,
+  daysOff: ['days-off'] as const,
+  subjects: ['subjects'] as const,
+  classRules: (semesterId: string) => ['class-rules', semesterId] as const,
+  classRulesAll: ['class-rules'] as const,
+  recurring: ['recurring-events'] as const,
+  calendarAll: ['calendar'] as const,
+  calendar: (from: string, to: string) => ['calendar', from, to] as const,
 }
