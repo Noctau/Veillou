@@ -2,6 +2,7 @@
 
     python -m app.cli create-user me@example.com [--timezone Europe/Moscow]
     python -m app.cli set-password me@example.com
+    python -m app.cli roll-series   # докатить личные повторы на 90 дней (то же, что ночная джоба)
 
 Пароль спрашивается интерактивно (или берётся из VEILLOU_PASSWORD — для скриптов).
 """
@@ -16,6 +17,7 @@ from app.core.config import settings
 from app.core.db import engine, session_factory
 from app.core.exceptions import AppError
 from app.services import users
+from app.services.schedule_sync import roll_all_users
 
 
 def _read_password() -> str:
@@ -43,12 +45,20 @@ async def _set_password(email: str) -> None:
     print(f"Пароль для {email} обновлён")
 
 
+async def _roll_series() -> None:
+    async with session_factory() as db:
+        created = await roll_all_users(db)
+    print(f"Создано вхождений: {created}")
+
+
 async def _run(args: argparse.Namespace) -> None:
     try:
         if args.command == "create-user":
             await _create_user(args.email, args.timezone)
         elif args.command == "set-password":
             await _set_password(args.email)
+        elif args.command == "roll-series":
+            await _roll_series()
     except (AppError, ValueError) as exc:
         sys.exit(f"Ошибка: {exc}")
     finally:
@@ -65,6 +75,8 @@ def main() -> None:
 
     setpw = sub.add_parser("set-password", help="сменить пароль")
     setpw.add_argument("email")
+
+    sub.add_parser("roll-series", help="докатить личные повторы на 90 дней")
 
     asyncio.run(_run(parser.parse_args()))
 

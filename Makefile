@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot install
+.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install
 
 COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env
 BACK = cd backend && uv run
@@ -51,3 +51,6 @@ create-user:
 
 bot:
 	$(BACK) python -m app.bot
+
+worker:
+	$(BACK) python -m app.worker

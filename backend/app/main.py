@@ -38,6 +38,8 @@ def create_app() -> FastAPI:
     api.include_router(telegram.router)
     api.include_router(schedule.router)
     api.include_router(events.router)
+    api.include_router(events.calendar_router)
+    api.include_router(events.recurring_router)
     app.include_router(api)
     return app
 

@@ -16,14 +16,14 @@ Subject, а для личных повторов — RecurringEvent (и ночн
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.time import local_date, now_utc
+from app.core.time import get_tz, local_date, now_utc
 from app.domain.enums import EventKind, EventStatus, TemplateType
 from app.domain.recurrence import (
     Bells,
@@ -32,8 +32,21 @@ from app.domain.recurrence import (
     DateRange,
     SemesterSpec,
     expand_class_rule,
+    expand_rrule,
 )
-from app.models import BellSchedule, ClassRule, DayOff, Event, Semester, Subject
+from app.models import (
+    BellSchedule,
+    ClassRule,
+    DayOff,
+    Event,
+    RecurringEvent,
+    Semester,
+    Subject,
+    User,
+)
+
+# Личные повторы материализуются на столько дней вперёд (ночная джоба докатывает)
+RECURRING_HORIZON_DAYS = 90
 
 
 @dataclass(frozen=True)
@@ -162,10 +175,21 @@ class SeriesSync:
         return SyncStats(created, updated, deleted)
 
     async def remove_series(
-        self, template: ClassRule | uuid.UUID, template_type: TemplateType = TemplateType.class_rule
+        self,
+        template: ClassRule | RecurringEvent | uuid.UUID,
+        template_type: TemplateType | None = None,
     ) -> None:
         """Шаблон удалён: убираем все будущие вхождения, включая правленные руками."""
-        template_id = template if isinstance(template, uuid.UUID) else template.id
+        if isinstance(template, uuid.UUID):
+            template_id = template
+            template_type = template_type or TemplateType.class_rule
+        else:
+            template_id = template.id
+            template_type = (
+                TemplateType.recurring
+                if isinstance(template, RecurringEvent)
+                else TemplateType.class_rule
+            )
         await self.db.execute(
             update(Event)
             .where(
@@ -296,6 +320,53 @@ class SeriesSync:
         """Праздники влияют на все семестры."""
         return await self.sync_class_rules(await self._live_rules())
 
+    # ---------- личные повторы ----------
+
+    @property
+    def horizon(self) -> date:
+        return self.today + timedelta(days=RECURRING_HORIZON_DAYS)
+
+    async def sync_recurring(self, rec: RecurringEvent) -> SyncStats:
+        """Вхождения повтора на [сегодня, сегодня + 90 дней]."""
+        if rec.deleted_at is not None:
+            await self.remove_series(rec)
+            return SyncStats()
+        occurrences = expand_rrule(
+            rec.rrule,
+            dtstart=rec.start_date,
+            start_time=rec.start_time,
+            end_time=rec.end_time,
+            tz=self.tz,
+            window=DateRange(self.today, self.horizon),
+            until=rec.until,
+            key=rec.id,
+        )
+        fields = {
+            "kind": rec.kind,
+            "title": rec.title,
+            "is_fixed": True,
+            "location": rec.location,
+            "color": rec.color,
+        }
+        return await self.sync_series(
+            TemplateType.recurring,
+            rec.id,
+            [Desired(o.date, o.start, o.end, fields) for o in occurrences],
+            until=self.horizon,
+        )
+
+    async def roll_recurring(self) -> int:
+        """Докатывает окно всех повторов пользователя. Возвращает число созданных вхождений."""
+        rows = await self.db.scalars(
+            select(RecurringEvent).where(
+                RecurringEvent.user_id == self.user_id, RecurringEvent.deleted_at.is_(None)
+            )
+        )
+        created = 0
+        for rec in rows:
+            created += (await self.sync_recurring(rec)).created
+        return created
+
 
 def _items(target: Desired) -> list[tuple[str, Any]]:
     return [(name, target.fields[name]) for name in _TEMPLATE_FIELDS if name in target.fields]
@@ -312,3 +383,13 @@ def _rule_spec(rule: ClassRule) -> ClassRuleSpec:
         valid_from=rule.valid_from,
         valid_to=rule.valid_to,
     )
+
+
+async def roll_all_users(db: AsyncSession, *, now: datetime | None = None) -> int:
+    """Ночная джоба: докатывает окно личных повторов у всех пользователей."""
+    users = list(await db.scalars(select(User).where(User.deleted_at.is_(None))))
+    created = 0
+    for user in users:
+        created += await SeriesSync(db, user.id, get_tz(user.timezone), now=now).roll_recurring()
+    await db.commit()
+    return created

@@ -2,13 +2,15 @@ import uuid
 from datetime import date
 from typing import Annotated, Literal, Self
 
-from pydantic import StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.domain.enums import ClassType, EventKind, EventStatus, TemplateType
-from app.schemas.common import HexColor, InputModel, Moment, ReadModel, UTCMoment
+from app.domain.recurrence import parse_rrule
+from app.schemas.common import HexColor, InputModel, Moment, ReadModel, UTCMoment, WallTime
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 Location = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+RRule = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 # Руками создаются только жёсткие личные события; пары — из ClassRule,
 # гибкие блоки — планировщиком (M8+).
@@ -67,3 +69,75 @@ class EventRead(ReadModel):
     class_type: ClassType | None
     pair_number: int | None
     teacher: str | None
+
+
+# ---------- личные повторы ----------
+
+
+class RecurringEventCreate(InputModel):
+    kind: ManualKind = EventKind.personal
+    title: Title
+    rrule: RRule = Field(description="RRULE без DTSTART, напр. «FREQ=WEEKLY;BYDAY=TU,TH»")
+    start_date: date
+    until: date | None = None
+    start_time: WallTime
+    end_time: WallTime = Field(description="<= start_time — заканчивается на следующий день")
+    location: Location | None = None
+    color: HexColor | None = None
+    note: str = ""
+
+    @field_validator("rrule")
+    @classmethod
+    def _check_rrule(cls, value: str) -> str:
+        parse_rrule(value)
+        return value.removeprefix("RRULE:")
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        if self.until and self.until < self.start_date:
+            raise ValueError("«До» раньше начала")
+        if self.end_time == self.start_time:
+            raise ValueError("Конец должен отличаться от начала")
+        return self
+
+
+class RecurringEventUpdate(InputModel):
+    kind: ManualKind | None = None
+    title: Title | None = None
+    rrule: str | None = None
+    start_date: date | None = None
+    until: date | None = None
+    start_time: WallTime | None = None
+    end_time: WallTime | None = None
+    location: Location | None = None
+    color: HexColor | None = None
+    note: str | None = None
+
+
+class RecurringEventRead(ReadModel):
+    id: uuid.UUID
+    kind: EventKind
+    title: str
+    rrule: str
+    start_date: date
+    until: date | None
+    start_time: WallTime
+    end_time: WallTime
+    location: str | None
+    color: str | None
+    note: str
+
+
+# ---------- календарь ----------
+
+
+class CalendarDayOff(ReadModel):
+    id: uuid.UUID
+    date_from: date
+    date_to: date
+    title: str
+
+
+class CalendarRead(BaseModel):
+    events: list[EventRead]
+    days_off: list[CalendarDayOff]
