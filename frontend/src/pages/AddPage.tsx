@@ -1,11 +1,11 @@
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Placeholder } from '@/components/layout/Placeholder'
+import { QuickAdd } from '@/features/quickadd/QuickAdd'
 
 export function AddPage() {
   return (
     <>
       <PageHeader title="Быстрое добавление" />
-      <Placeholder text="Одна строка — и задание, дело или событие готово." />
+      <QuickAdd />
     </>
   )
 }

@@ -19,4 +19,5 @@ export const queryKeys = {
   task: (id: string) => ['tasks', 'detail', id] as const,
   backlogAll: ['backlog'] as const,
   backlog: (status: string) => ['backlog', status] as const,
+  quickParse: (text: string) => ['quick-parse', text] as const,
 }
