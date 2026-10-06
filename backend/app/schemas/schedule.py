@@ -38,8 +38,9 @@ class SemesterCreate(InputModel):
         if self.session_start and self.session_end:
             if self.session_end < self.session_start:
                 raise ValueError("Конец сессии раньше начала")
-            if self.session_start < self.start_date:
-                raise ValueError("Сессия раньше начала семестра")
+            # Пары генерируются до classes_end включительно — в сессии их быть не должно
+            if self.session_start <= self.classes_end:
+                raise ValueError("Сессия должна начинаться после последнего дня занятий")
         return self
 
 

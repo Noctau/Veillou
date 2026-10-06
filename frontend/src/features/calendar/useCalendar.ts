@@ -50,6 +50,12 @@ export function useCreateEvent() {
   })
 }
 
+/** Как на бэкенде (services/events._is_manual_edit): «сделано», pin и заметка не отвязывают вхождение от серии. */
+function isManualEdit(body: EventUpdate): boolean {
+  if (body.status === 'cancelled') return true
+  return Object.keys(body).some((k) => !['status', 'is_pinned', 'note'].includes(k))
+}
+
 /** Правка события — optimistic: календарь и «Сегодня» меняются сразу. */
 export function useUpdateEvent() {
   const queryClient = useQueryClient()
@@ -70,7 +76,7 @@ export function useUpdateEvent() {
           ...old,
           events: old.events.map((e) =>
             e.id === id
-              ? ({ ...e, ...body, detached: e.template_id ? true : e.detached } as CalendarEvent)
+              ? ({ ...e, ...body, detached: e.detached || (!!e.template_id && isManualEdit(body)) } as CalendarEvent)
               : e,
           ),
         },

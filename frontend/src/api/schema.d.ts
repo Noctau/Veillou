@@ -804,7 +804,7 @@ export interface components {
         EventStatus: "planned" | "done" | "cancelled" | "missed";
         /**
          * EventUpdate
-         * @description Правка события. У вхождения шаблона любая правка ставит detached=true.
+         * @description Правка события. У вхождения шаблона ставит detached=true (кроме «сделано», pin, заметки).
          */
         EventUpdate: {
             /** Title */

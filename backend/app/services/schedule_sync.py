@@ -15,7 +15,7 @@ Subject, а для личных повторов — RecurringEvent (и ночн
 
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -92,6 +92,16 @@ def bells_from_rows(rows: Sequence[BellSchedule]) -> Bells:
         slots(default.slots) if default else [],
         {r.weekday: slots(r.slots) for r in rows if r.weekday is not None},
     )
+
+
+@dataclass
+class _ClassContext:
+    """Кэш на один проход синхронизации пар."""
+
+    days_off: list[DateRange]
+    semesters: dict[uuid.UUID, Semester | None] = field(default_factory=dict)
+    bells: dict[uuid.UUID, Bells] = field(default_factory=dict)
+    subjects: dict[uuid.UUID, Subject | None] = field(default_factory=dict)
 
 
 class SeriesSync:
@@ -202,6 +212,37 @@ class SeriesSync:
             .values(deleted_at=self.now)
         )
 
+    async def restore_occurrence(self, event: Event) -> None:
+        """«Как в расписании» для одного вхождения — в том числе прошедшего.
+
+        Время и поля берутся из шаблона на дату вхождения, статус сбрасывается.
+        Если по шаблону в этот день вхождения нет (или шаблон удалён) — событие удаляется.
+        """
+        assert event.template_id is not None and event.occurrence_date is not None
+        day = event.occurrence_date
+        window = DateRange(day, day)
+        desired: list[Desired] | None = None
+        if event.template_type == TemplateType.class_rule:
+            rule = await self.db.get(ClassRule, event.template_id)
+            if rule is not None:
+                ctx = _ClassContext(await self._days_off())
+                desired = await self._rule_desired(rule, window, ctx)
+        elif event.template_type == TemplateType.recurring:
+            rec = await self.db.get(RecurringEvent, event.template_id)
+            if rec is not None and rec.deleted_at is None:
+                desired = self._recurring_desired(rec, window)
+
+        event.detached = False
+        event.status = EventStatus.planned
+        target = next((d for d in desired or [] if d.date == day), None)
+        if target is None:
+            event.deleted_at = self.now
+        else:
+            event.start, event.end = target.start, target.end
+            for name, value in _items(target):
+                setattr(event, name, value)
+        await self.db.flush()
+
     # ---------- пары ----------
 
     async def _days_off(self) -> list[DateRange]:
@@ -228,64 +269,60 @@ class SeriesSync:
         )
         return list(rows)
 
+    async def _rule_desired(
+        self, rule: ClassRule, window: DateRange, ctx: _ClassContext
+    ) -> list[Desired] | None:
+        """Вхождения правила пары в `window`; None — правило (или его семестр/предмет) удалено."""
+        if rule.semester_id not in ctx.semesters:
+            ctx.semesters[rule.semester_id] = await self.db.get(Semester, rule.semester_id)
+            ctx.bells[rule.semester_id] = await self._bells(rule.semester_id)
+        if rule.subject_id not in ctx.subjects:
+            ctx.subjects[rule.subject_id] = await self.db.get(Subject, rule.subject_id)
+        semester = ctx.semesters[rule.semester_id]
+        subject = ctx.subjects[rule.subject_id]
+        if (
+            rule.deleted_at is not None
+            or semester is None
+            or semester.deleted_at is not None
+            or subject is None
+            or subject.deleted_at is not None
+        ):
+            return None
+
+        spec = SemesterSpec(semester.start_date, semester.classes_end, semester.first_week_parity)
+        occurrences = expand_class_rule(
+            _rule_spec(rule),
+            spec,
+            ctx.bells[rule.semester_id],
+            self.tz,
+            days_off=ctx.days_off,
+            window=window,
+        )
+        fields = {
+            "kind": EventKind.class_,
+            "title": subject.name,
+            "is_fixed": True,
+            "location": rule.location,
+            "color": subject.color,
+            "subject_id": subject.id,
+            "class_type": rule.class_type,
+            "pair_number": rule.pair_number,
+            "teacher": rule.teacher,
+        }
+        return [Desired(o.date, o.start, o.end, fields) for o in occurrences]
+
     async def sync_class_rules(self, rules: Sequence[ClassRule]) -> SyncStats:
         """Синхронизирует серии правил пар (удалённые правила — убирает)."""
         total = SyncStats()
         if not rules:
             return total
-        days_off = await self._days_off()
-        semesters: dict[uuid.UUID, Semester | None] = {}
-        bells: dict[uuid.UUID, Bells] = {}
-        subjects: dict[uuid.UUID, Subject | None] = {}
-
+        ctx = _ClassContext(await self._days_off())
         for rule in rules:
-            if rule.semester_id not in semesters:
-                semesters[rule.semester_id] = await self.db.get(Semester, rule.semester_id)
-                bells[rule.semester_id] = await self._bells(rule.semester_id)
-            if rule.subject_id not in subjects:
-                subjects[rule.subject_id] = await self.db.get(Subject, rule.subject_id)
-            semester = semesters[rule.semester_id]
-            subject = subjects[rule.subject_id]
-
-            alive = (
-                rule.deleted_at is None
-                and semester is not None
-                and semester.deleted_at is None
-                and subject is not None
-                and subject.deleted_at is None
-            )
-            if not alive:
+            desired = await self._rule_desired(rule, DateRange(self.today, date.max), ctx)
+            if desired is None:
                 await self.remove_series(rule)
                 continue
-            assert semester is not None and subject is not None
-
-            spec = SemesterSpec(
-                semester.start_date, semester.classes_end, semester.first_week_parity
-            )
-            occurrences = expand_class_rule(
-                _rule_spec(rule),
-                spec,
-                bells[rule.semester_id],
-                self.tz,
-                days_off=days_off,
-                window=DateRange(self.today, date.max),
-            )
-            fields = {
-                "kind": EventKind.class_,
-                "title": subject.name,
-                "is_fixed": True,
-                "location": rule.location,
-                "color": subject.color,
-                "subject_id": subject.id,
-                "class_type": rule.class_type,
-                "pair_number": rule.pair_number,
-                "teacher": rule.teacher,
-            }
-            stats = await self.sync_series(
-                TemplateType.class_rule,
-                rule.id,
-                [Desired(o.date, o.start, o.end, fields) for o in occurrences],
-            )
+            stats = await self.sync_series(TemplateType.class_rule, rule.id, desired)
             total = SyncStats(
                 total.created + stats.created,
                 total.updated + stats.updated,
@@ -326,18 +363,14 @@ class SeriesSync:
     def horizon(self) -> date:
         return self.today + timedelta(days=RECURRING_HORIZON_DAYS)
 
-    async def sync_recurring(self, rec: RecurringEvent) -> SyncStats:
-        """Вхождения повтора на [сегодня, сегодня + 90 дней]."""
-        if rec.deleted_at is not None:
-            await self.remove_series(rec)
-            return SyncStats()
+    def _recurring_desired(self, rec: RecurringEvent, window: DateRange) -> list[Desired]:
         occurrences = expand_rrule(
             rec.rrule,
             dtstart=rec.start_date,
             start_time=rec.start_time,
             end_time=rec.end_time,
             tz=self.tz,
-            window=DateRange(self.today, self.horizon),
+            window=window,
             until=rec.until,
             key=rec.id,
         )
@@ -348,10 +381,17 @@ class SeriesSync:
             "location": rec.location,
             "color": rec.color,
         }
+        return [Desired(o.date, o.start, o.end, fields) for o in occurrences]
+
+    async def sync_recurring(self, rec: RecurringEvent) -> SyncStats:
+        """Вхождения повтора на [сегодня, сегодня + 90 дней]."""
+        if rec.deleted_at is not None:
+            await self.remove_series(rec)
+            return SyncStats()
         return await self.sync_series(
             TemplateType.recurring,
             rec.id,
-            [Desired(o.date, o.start, o.end, fields) for o in occurrences],
+            self._recurring_desired(rec, DateRange(self.today, self.horizon)),
             until=self.horizon,
         )
 

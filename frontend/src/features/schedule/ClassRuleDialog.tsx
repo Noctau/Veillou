@@ -194,24 +194,28 @@ function RuleForm({
   const copyToDay = async (target: number) => {
     if (!rule) return
     const { id: _, ...rest } = rule
-    await createRule.mutateAsync({ ...rest, weekday: target })
-    toast.success(`Скопировано на ${WEEKDAYS_FULL[target - 1].toLowerCase()}`)
+    try {
+      await createRule.mutateAsync({ ...rest, weekday: target })
+      toast.success(`Скопировано на ${WEEKDAYS_FULL[target - 1].toLowerCase()}`)
+    } catch {
+      // ошибка уже показана тостом в onError мутации
+    }
   }
 
   /** «Другая чётность»: копия с противоположной чётностью (у «каждой недели» — разделить). */
   const copyToOtherParity = async () => {
     if (!rule) return
     const { id: _, ...rest } = rule
-    let mine: Parity
-    if (rule.parity === 'all') {
-      mine = viewParity
-      await updateRule.mutateAsync({ id: rule.id, body: { parity: mine } })
-    } else {
-      mine = rule.parity
+    const mine: Parity = rule.parity === 'all' ? viewParity : rule.parity
+    try {
+      // Сначала копия: если она не создастся, исходная пара останется «каждую неделю»
+      const copy = await createRule.mutateAsync({ ...rest, parity: oppositeParity(mine) })
+      if (rule.parity === 'all') await updateRule.mutateAsync({ id: rule.id, body: { parity: mine } })
+      toast.success('Копия создана — поправьте её')
+      onEditRule(copy)
+    } catch {
+      // ошибка уже показана тостом в onError мутации
     }
-    const copy = await createRule.mutateAsync({ ...rest, parity: oppositeParity(mine) })
-    toast.success('Копия создана — поправьте её')
-    onEditRule(copy)
   }
 
   return (

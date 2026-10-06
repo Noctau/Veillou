@@ -133,7 +133,14 @@ function PersonalEventForm({
   const date = useWatch({ control, name: 'date' })
   const saving = createEvent.isPending || createRecurring.isPending || updateRecurring.isPending
 
+  // Правило, которое UI не умеет показать днями (напр. ежемесячное), сохраняется как есть
+  const keepsOwnRrule = !!recurring && rruleToWeekdays(recurring.rrule) === null
+
   const onSubmit = form.handleSubmit(async (v) => {
+    if (recurring && !keepsOwnRrule && v.repeat.length === 0) {
+      form.setError('repeat', { message: 'Выберите дни повтора или удалите серию' })
+      return
+    }
     const common = {
       kind: v.kind,
       title: v.title,
@@ -201,7 +208,7 @@ function PersonalEventForm({
         </div>
         {(errors.end || errors.date) && <FieldError>{errors.end?.message ?? errors.date?.message}</FieldError>}
 
-        <Field>
+        <Field data-invalid={!!errors.repeat}>
           <FieldLabel>Повтор</FieldLabel>
           <Controller
             control={control}
@@ -213,7 +220,10 @@ function PersonalEventForm({
                 size="sm"
                 className="w-full"
                 value={field.value}
-                onValueChange={field.onChange}
+                onValueChange={(v) => {
+                  field.onChange(v)
+                  form.clearErrors('repeat')
+                }}
               >
                 {WEEKDAYS_SHORT.map((d, i) => (
                   <ToggleGroupItem key={d} value={String(i + 1)} className="flex-1">
@@ -223,8 +233,11 @@ function PersonalEventForm({
               </ToggleGroup>
             )}
           />
+          {errors.repeat && <FieldError>{errors.repeat.message}</FieldError>}
           <FieldDescription>
-            {repeat.length
+            {keepsOwnRrule && !repeat.length
+              ? `Повтор: ${recurring?.rrule}. Выберите дни, чтобы заменить.`
+              : repeat.length
               ? 'Повторяется в выбранные дни.'
               : `Не повторяется. Нажмите дни, чтобы повторять${date ? ` (например, ${WEEKDAYS_SHORT[isoWeekday(date) - 1]})` : ''}.`}
           </FieldDescription>

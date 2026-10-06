@@ -200,3 +200,58 @@ def test_worker_waits_until_3am_moscow():
     assert seconds_until(NIGHTLY_AT, datetime(2026, 10, 5, 22, 0, tzinfo=UTC)) == 2 * 3600
     # 06.10 04:00 МСК -> до завтрашних 03:00 23 часа
     assert seconds_until(NIGHTLY_AT, datetime(2026, 10, 6, 1, 0, tzinfo=UTC)) == 23 * 3600
+
+
+async def test_calendar_day_off_on_next_day_not_included(auth_client, clock):
+    # Экран «Сегодня» запрашивает [00:00, 00:00 следующего дня) — выходной завтра не «сегодня»
+    await auth_client.post(
+        f"{API}/days-off", json={"date_from": "2026-11-04", "date_to": "2026-11-04", "title": "ДНЕ"}
+    )
+    resp = await auth_client.get(
+        f"{API}/calendar",
+        params={"from": "2026-11-03T00:00:00+03:00", "to": "2026-11-04T00:00:00+03:00"},
+    )
+    assert resp.json()["days_off"] == []
+    resp = await auth_client.get(
+        f"{API}/calendar",
+        params={"from": "2026-11-04T00:00:00+03:00", "to": "2026-11-05T00:00:00+03:00"},
+    )
+    assert [d["title"] for d in resp.json()["days_off"]] == ["ДНЕ"]
+
+
+async def test_mark_done_does_not_detach(auth_client, session: AsyncSession, clock):
+    # «Сделано» — не ручная правка: серия по-прежнему обновляет вхождение
+    await create_recurring(auth_client, kind="personal")
+    target = (await live_events(session))[0]
+    resp = await auth_client.patch(f"{API}/events/{target.id}", json={"status": "done"})
+    assert resp.json()["status"] == "done" and resp.json()["detached"] is False
+    # Отмена — ручная правка
+    resp = await auth_client.patch(f"{API}/events/{target.id}", json={"status": "cancelled"})
+    assert resp.json()["detached"] is True
+
+
+async def test_reset_when_series_no_longer_has_day(auth_client, session: AsyncSession, clock):
+    rec = await create_recurring(auth_client)
+    target = (await live_events(session))[0]  # вт 06.10
+    await auth_client.patch(f"{API}/events/{target.id}", json={"title": "Тренажёрка"})
+    # Серия теперь только по четвергам; правленный вторник остаётся (detached)
+    await auth_client.patch(
+        f"{API}/recurring-events/{rec['id']}", json={"rrule": "FREQ=WEEKLY;BYDAY=TH"}
+    )
+    assert (await auth_client.get(f"{API}/events/{target.id}")).status_code == 200
+    resp = await auth_client.post(f"{API}/events/{target.id}/reset")
+    assert resp.status_code == 200
+    assert (await auth_client.get(f"{API}/events/{target.id}")).status_code == 404
+
+
+async def test_worker_survives_failing_job(monkeypatch):
+    from app.worker import __main__ as worker
+
+    async def boom() -> None:
+        raise ConnectionError("db down")
+
+    logged: list[str] = []
+    monkeypatch.setattr(worker, "nightly", boom)
+    monkeypatch.setattr(worker.log, "exception", lambda msg, *a: logged.append(msg))
+    await worker.run_nightly_safely()  # не бросает
+    assert logged == ["Ночная джоба упала"]

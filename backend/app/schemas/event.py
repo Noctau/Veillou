@@ -35,7 +35,7 @@ class EventCreate(InputModel):
 
 
 class EventUpdate(InputModel):
-    """Правка события. У вхождения шаблона любая правка ставит detached=true."""
+    """Правка события. У вхождения шаблона ставит detached=true (кроме «сделано», pin, заметки)."""
 
     title: Title | None = None
     start: Moment | None = None

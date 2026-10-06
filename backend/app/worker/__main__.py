@@ -33,15 +33,20 @@ async def nightly() -> None:
     log.info("Ночная докатка повторов: создано %d вхождений", created)
 
 
+async def run_nightly_safely() -> None:
+    """Ошибка джобы (например, БД ещё не поднялась) не должна ронять воркер."""
+    try:
+        await nightly()
+    except Exception:
+        log.exception("Ночная джоба упала")
+
+
 async def main() -> None:
     try:
-        await nightly()  # после рестарта — сразу, чтобы окно не отставало
+        await run_nightly_safely()  # после рестарта — сразу, чтобы окно не отставало
         while True:
             await asyncio.sleep(seconds_until(NIGHTLY_AT, now_utc()))
-            try:
-                await nightly()
-            except Exception:
-                log.exception("Ночная джоба упала")
+            await run_nightly_safely()
     finally:
         await engine.dispose()
 

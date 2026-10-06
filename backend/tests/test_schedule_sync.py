@@ -215,3 +215,21 @@ async def test_rule_created_mid_semester_starts_today(
     tuesdays = sorted(e.occurrence_date for e in await live_events(session) if e.pair_number == 1)
     # Неделя 05.10 — 6-я от начала семестра (1-я — числитель) -> знаменатель
     assert tuesdays[:3] == [date(2026, 10, 6), date(2026, 10, 20), date(2026, 11, 3)]
+
+
+async def test_reset_past_occurrence(setup, auth_client: AsyncClient, session: AsyncSession, clock):
+    # Пару перенесли, день прошёл — «Как в расписании» всё равно возвращает время и аудиторию
+    target = (await live_events(session))[0]
+    await auth_client.patch(
+        f"{API}/events/{target.id}",
+        json={
+            "start": "2026-10-09T12:00:00+03:00",
+            "end": "2026-10-09T13:35:00+03:00",
+            "location": "А-4",
+        },
+    )
+    clock["now"] = datetime(2026, 10, 20, 4, 0, tzinfo=UTC)
+    resp = await auth_client.post(f"{API}/events/{target.id}/reset")
+    data = resp.json()
+    assert data["detached"] is False and data["location"] == "1801"
+    assert data["start"] == "2026-10-08T07:45:00Z"

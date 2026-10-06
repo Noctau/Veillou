@@ -1,17 +1,18 @@
+import type { ComponentType } from 'react'
 import { createBrowserRouter } from 'react-router'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/features/auth/RequireAuth'
-import { AddPage } from '@/pages/AddPage'
-import { InboxPage } from '@/pages/InboxPage'
-import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { StudyPage } from '@/pages/StudyPage'
 import { TodayPage } from '@/pages/TodayPage'
 
+// «Сегодня» — стартовый экран, грузится сразу; остальные разделы — отдельными чанками
+function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) {
+  return async () => ({ Component: (await load())[name] })
+}
+
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
+  { path: '/login', lazy: page(() => import('@/pages/LoginPage'), 'LoginPage') },
   {
     element: <RequireAuth />,
     children: [
@@ -19,15 +20,11 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <TodayPage /> },
-          {
-            // FullCalendar тяжёлый — отдельным чанком
-            path: 'calendar',
-            lazy: async () => ({ Component: (await import('@/pages/CalendarPage')).CalendarPage }),
-          },
-          { path: 'add', element: <AddPage /> },
-          { path: 'study', element: <StudyPage /> },
-          { path: 'inbox', element: <InboxPage /> },
-          { path: 'settings', element: <SettingsPage /> },
+          { path: 'calendar', lazy: page(() => import('@/pages/CalendarPage'), 'CalendarPage') },
+          { path: 'add', lazy: page(() => import('@/pages/AddPage'), 'AddPage') },
+          { path: 'study', lazy: page(() => import('@/pages/StudyPage'), 'StudyPage') },
+          { path: 'inbox', lazy: page(() => import('@/pages/InboxPage'), 'InboxPage') },
+          { path: 'settings', lazy: page(() => import('@/pages/SettingsPage'), 'SettingsPage') },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

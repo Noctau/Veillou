@@ -79,6 +79,12 @@ async def test_semester_validation(auth_client: AsyncClient):
     assert resp.status_code == 422
     resp = await auth_client.post(f"{API}/semesters", json={**SEMESTER, "session_end": None})
     assert resp.status_code == 422
+    # Сессия пересекается с занятиями -> пары генерировались бы в сессию
+    resp = await auth_client.post(
+        f"{API}/semesters", json={**SEMESTER, "session_start": "2026-12-20"}
+    )
+    assert resp.status_code == 422
+    assert "после последнего дня занятий" in resp.text
 
     sem = await make_semester(auth_client)
     # PATCH валидирует итог: конец занятий раньше начала

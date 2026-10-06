@@ -2,13 +2,14 @@
 
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz
-from app.domain.enums import FIXED_KINDS, EventStatus, TemplateType
-from app.models import ClassRule, DayOff, Event, RecurringEvent, Subject, User
+from app.domain.enums import FIXED_KINDS, EventStatus
+from app.models import DayOff, Event, RecurringEvent, Subject, User
 from app.schemas.event import (
     EventCreate,
     EventUpdate,
@@ -46,6 +47,14 @@ class NotFromTemplateError(InvalidDataError):
     message = "Событие не из расписания"
 
 
+def _is_manual_edit(changes: dict[str, Any]) -> bool:
+    """Отметки «сделано / не сделано», закрепление и заметка — не правка вхождения:
+    серия по-прежнему обновляет время, аудиторию и т. п. (статус она не трогает)."""
+    if changes.get("status") == EventStatus.cancelled:
+        return True
+    return bool(changes.keys() - {"status", "is_pinned", "note"})
+
+
 class EventService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
@@ -67,7 +76,8 @@ class EventService:
             Event.start < end, Event.end > start, order_by=[Event.start, Event.title]
         )
         first = start.astimezone(self.tz).date()
-        last = end.astimezone(self.tz).date()
+        # `end` не входит в диапазон: [пн 00:00, вт 00:00) — это только понедельник
+        last = (end - timedelta(microseconds=1)).astimezone(self.tz).date()
         days_off = await DayOffRefRepo(self.db, self.user_id).find_all(
             DayOff.date_from <= last, DayOff.date_to >= first, order_by=[DayOff.date_from]
         )
@@ -97,7 +107,7 @@ class EventService:
             raise InvalidDataError("Конец должен быть позже начала")
         for name, value in changes.items():
             setattr(event, name, value)
-        if changes and event.template_id is not None:
+        if event.template_id is not None and _is_manual_edit(changes):
             # Регенерация серии больше не трогает это вхождение
             event.detached = True
         await self.db.commit()
@@ -119,17 +129,7 @@ class EventService:
         event = await self.events.get_or_404(id)
         if event.template_id is None:
             raise NotFromTemplateError()
-        event.detached = False
-        event.status = EventStatus.planned
-        await self.db.flush()
-        if event.template_type == TemplateType.class_rule:
-            rule = await self.db.get(ClassRule, event.template_id)
-            if rule is not None:
-                await self.sync.sync_class_rules([rule])
-        elif event.template_type == TemplateType.recurring:
-            rec = await self.db.get(RecurringEvent, event.template_id)
-            if rec is not None:
-                await self.sync.sync_recurring(rec)
+        await self.sync.restore_occurrence(event)
         await self.db.commit()
         await self.db.refresh(event)
         return event

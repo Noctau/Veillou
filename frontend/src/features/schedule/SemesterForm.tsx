@@ -33,6 +33,11 @@ const schema = z
     message: 'Конец сессии раньше начала',
     path: ['session_end'],
   })
+  // Пары генерируются до конца занятий включительно — в сессии их быть не должно
+  .refine((v) => !v.session_start || v.session_start > v.classes_end, {
+    message: 'Сессия начинается после последнего дня занятий',
+    path: ['session_start'],
+  })
 
 type FormValues = z.infer<typeof schema>
 
@@ -122,9 +127,10 @@ export function SemesterForm({ semester, today, onDone }: Props) {
             <Input id="sem-end" type="date" {...register('classes_end')} />
             {errors.classes_end && <FieldError>{errors.classes_end.message}</FieldError>}
           </Field>
-          <Field>
+          <Field data-invalid={!!errors.session_start}>
             <FieldLabel htmlFor="sem-ss">Начало сессии</FieldLabel>
             <Input id="sem-ss" type="date" {...register('session_start')} />
+            {errors.session_start && <FieldError>{errors.session_start.message}</FieldError>}
           </Field>
           <Field data-invalid={!!errors.session_end}>
             <FieldLabel htmlFor="sem-se">Конец сессии</FieldLabel>
