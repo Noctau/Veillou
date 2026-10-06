@@ -2,10 +2,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import PostgresDsn, SecretStr, computed_field, field_validator
+from pydantic import PostgresDsn, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+DEV_SECRET = "dev-insecure-secret-change-me"
 
 
 class Settings(BaseSettings):
@@ -34,6 +35,14 @@ class Settings(BaseSettings):
     # В проде фронт и /api на одном HTTPS-домене -> Secure. В dev по LAN — http.
     SESSION_COOKIE_SECURE: bool = False
 
+    # Подпись ссылок на файлы. В проде — длинная случайная строка в .env
+    SECRET_KEY: SecretStr = SecretStr(DEV_SECRET)
+
+    # Файлы (вложения, фото конспектов). MVP — диск сервера.
+    STORAGE_DIR: Path = REPO_ROOT / "data" / "files"
+    MAX_UPLOAD_MB: int = 100
+    FILE_URL_TTL_MIN: int = 60
+
     TELEGRAM_BOT_TOKEN: SecretStr | None = None
     TELEGRAM_BOT_USERNAME: str | None = None  # без @, для ссылки t.me/<bot>?start=<код>
     TELEGRAM_LINK_CODE_TTL_MIN: int = 10
@@ -45,6 +54,18 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             value = value.strip().removeprefix("@")
         return value or None
+
+    @field_validator("SECRET_KEY", mode="before")
+    @classmethod
+    def _empty_secret(cls, value: Any) -> Any:
+        # `SECRET_KEY=` в .env — не задан
+        return value or DEV_SECRET
+
+    @model_validator(mode="after")
+    def _prod_secret(self) -> "Settings":
+        if self.ENV == "prod" and self.SECRET_KEY.get_secret_value() == DEV_SECRET:
+            raise ValueError("В проде задайте SECRET_KEY в .env")
+        return self
 
     @computed_field
     @property

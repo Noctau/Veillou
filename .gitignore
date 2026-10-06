@@ -227,3 +227,6 @@ __marimo__/
 
 #MacOS
 .DS_Store
+
+# Файлы приложения (STORAGE_DIR по умолчанию)
+/data/

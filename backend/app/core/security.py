@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 
 from pwdlib import PasswordHash
@@ -27,3 +28,12 @@ def new_token() -> str:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def sign(message: str, secret: str) -> str:
+    """HMAC-SHA256 подпись (подписанные ссылки на файлы)."""
+    return hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+
+def verify_signature(message: str, signature: str, secret: str) -> bool:
+    return hmac.compare_digest(sign(message, secret), signature)

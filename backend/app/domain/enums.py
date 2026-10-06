@@ -162,3 +162,12 @@ class BacklogCondition(StrEnum):
     on_class_days = "on_class_days"  # в дни пар (в городе)
     needs_laptop = "needs_laptop"  # нужен ноутбук
     institution_hours = "institution_hours"  # в часы работы учреждений
+
+
+# ---------- файлы (M5.1) ----------
+
+
+class AttachmentOwner(StrEnum):
+    """К чему приложен файл. note / source появятся в M5.2 / M5.5."""
+
+    task = "task"

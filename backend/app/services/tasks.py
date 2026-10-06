@@ -16,6 +16,7 @@ from app.core.exceptions import InvalidDataError
 from app.core.time import now_utc
 from app.domain.enums import (
     ActionTypeKey,
+    AttachmentOwner,
     EventKind,
     EventStatus,
     SourceType,
@@ -35,6 +36,7 @@ from app.schemas.task import (
     TaskRead,
     TaskUpdate,
 )
+from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
 from app.services.catalog import ensure_defaults
 
@@ -262,6 +264,7 @@ class TaskService:
         await self._drop_planned_events([s.id for s in subtasks])
         for s in subtasks:
             self.subtasks.soft_delete(s)
+        await delete_for_owners(self.db, self.user_id, AttachmentOwner.task, [id])
         self.tasks.soft_delete(task)
         await self.db.commit()
 
