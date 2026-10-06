@@ -12,4 +12,6 @@ export const queryKeys = {
   recurring: ['recurring-events'] as const,
   calendarAll: ['calendar'] as const,
   calendar: (from: string, to: string) => ['calendar', from, to] as const,
+  categories: ['categories'] as const,
+  actionTypes: ['action-types'] as const,
 }

@@ -1,6 +1,8 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
+import { CategoriesSection } from '@/features/catalog/CategoriesSection'
 import { AccountSection } from '@/features/settings/sections/AccountSection'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
 import { RemindersSection } from '@/features/settings/sections/RemindersSection'
@@ -36,6 +38,8 @@ export function SettingsPage() {
           <DayModeSection settings={settings} />
           <StudySection settings={settings} />
           <RestSection settings={settings} />
+          <ActionTypesSection />
+          <CategoriesSection />
           <ScheduleSection settings={settings} />
           <RemindersSection settings={settings} />
           <TelegramSection />

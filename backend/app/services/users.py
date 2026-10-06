@@ -9,6 +9,7 @@ from app.core.exceptions import ConflictError
 from app.core.security import hash_password
 from app.core.time import is_valid_tz
 from app.models import User
+from app.services.catalog import ensure_defaults
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -51,6 +52,8 @@ async def create_user(
 
     user = User(email=email, password_hash=hash_password(password), timezone=timezone)
     session.add(user)
+    await session.flush()
+    await ensure_defaults(session, user.id)
     await session.commit()
     return user
 

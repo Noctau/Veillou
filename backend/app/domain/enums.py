@@ -59,3 +59,43 @@ class TemplateType(StrEnum):
 
     class_rule = "class_rule"
     recurring = "recurring"  # RecurringEvent (личные блоки и отдых с повтором)
+
+
+# ---------- справочники (M4.1) ----------
+
+
+class CategoryKey(StrEnum):
+    """Системные категории (ТЗ §4.8). Пользовательские категории — без ключа."""
+
+    study = "study"
+    work = "work"
+    home = "home"
+    personal = "personal"
+
+
+class ActionTypeKey(StrEnum):
+    """Тип действия — когда дело уместно делать. Набор фиксированный, окна правятся."""
+
+    people = "people"  # связь с людьми
+    institutions = "institutions"  # учреждения
+    study = "study"  # самостоятельная учёба
+    outside = "outside"  # вне дома
+    home = "home"  # домашние дела
+    personal = "personal"  # личное
+
+
+class CategoryIcon(StrEnum):
+    """Иконки категорий (имена lucide-react в kebab-case)."""
+
+    graduation_cap = "graduation-cap"
+    briefcase = "briefcase"
+    house = "house"
+    heart = "heart"
+    shopping_cart = "shopping-cart"
+    stethoscope = "stethoscope"
+    file_text = "file-text"
+    dumbbell = "dumbbell"
+    users = "users"
+    plane = "plane"
+    star = "star"
+    tag = "tag"
