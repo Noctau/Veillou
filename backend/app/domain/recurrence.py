@@ -3,6 +3,7 @@
 - `expand_class_rules` — пары из сетки недели с учётом чётности, звонков,
   срока действия правила, праздников и границ семестра (сессия — без пар).
 - `expand_rrule` — личные блоки с RRULE («по Вт, Чт»).
+- `rrule_dates` — только даты RRULE (регулярные подзадачи: «встреча с научруком по чт»).
 
 Вхождение идентифицируется (ключ шаблона, локальная дата) — на этом держится
 материализация: перенесённое вручную вхождение не создаётся заново.
@@ -216,6 +217,20 @@ def parse_rrule(value: str) -> rrule:
     if not isinstance(rule, rrule) or rule._freq not in _ALLOWED_FREQ:
         raise ValueError("Повтор допускается не чаще раза в день")
     return rule
+
+
+def rrule_dates(
+    value: str, *, dtstart: date, window: DateRange, until: date | None = None
+) -> list[date]:
+    """Даты вхождений RRULE в окне `window` (включительно), начиная с `dtstart`."""
+    rule = parse_rrule(value).replace(dtstart=datetime.combine(dtstart, time(0)))
+    span = DateRange(dtstart, until or date.max).intersect(window)
+    if span is None:
+        return []
+    days = rule.between(
+        datetime.combine(span.start, time(0)), datetime.combine(span.end, time(0)), inc=True
+    )
+    return [d.date() for d in days]
 
 
 def expand_rrule(

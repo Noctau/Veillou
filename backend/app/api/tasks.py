@@ -16,6 +16,7 @@ from app.schemas.task import (
     TaskDetail,
     TaskRead,
     TaskUpdate,
+    WorkTaskCreate,
 )
 from app.services.tasks import TaskService
 
@@ -38,16 +39,26 @@ async def list_tasks(
     svc: Service,
     status: Annotated[list[TaskStatus], Query()] = [],  # noqa: B006
     subject_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
     due_before: Moment | None = None,
 ) -> list[TaskRead]:
     """Сортировка: ближайший дедлайн первым, без дедлайна — в конце.
     `due_before` — только с дедлайном раньше этого момента (просроченные тоже)."""
-    return await svc.list_tasks(statuses=status, subject_id=subject_id, due_before=due_before)
+    return await svc.list_tasks(
+        statuses=status, subject_id=subject_id, project_id=project_id, due_before=due_before
+    )
 
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
 async def create_task(data: TaskCreate, svc: Service) -> TaskDetail:
     return await svc.create(data)
+
+
+@router.post("/tasks/work", status_code=status.HTTP_201_CREATED)
+async def create_work_task(data: WorkTaskCreate, svc: Service) -> TaskDetail:
+    """«Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней,
+    проект — «по умолчанию для заданий с работы» (ВКР), если не указан другой."""
+    return await svc.create_work_task(data)
 
 
 @router.get("/tasks/{task_id}")

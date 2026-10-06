@@ -14,6 +14,7 @@ from app.domain.recurrence import (
     expand_class_rules,
     expand_rrule,
     parse_rrule,
+    rrule_dates,
     week_parity,
 )
 
@@ -248,3 +249,20 @@ def test_rrule_overnight_and_dst():
 def test_parse_rrule_rejects(value):
     with pytest.raises(ValueError):
         parse_rrule(value)
+
+
+def test_rrule_dates_window_and_start():
+    window = DateRange(date(2026, 10, 6), date(2026, 10, 31))
+    # По четвергам с 1 октября — в окне с 6-го: 8, 15, 22, 29
+    dates = rrule_dates("FREQ=WEEKLY;BYDAY=TH", dtstart=date(2026, 10, 1), window=window)
+    assert dates == [date(2026, 10, 8), date(2026, 10, 15), date(2026, 10, 22), date(2026, 10, 29)]
+    # Раз в две недели, начало позже окна
+    dates = rrule_dates(
+        "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU", dtstart=date(2026, 10, 13), window=window
+    )
+    assert dates == [date(2026, 10, 13), date(2026, 10, 27)]
+    assert rrule_dates("FREQ=DAILY", dtstart=date(2026, 11, 1), window=window) == []
+    until = rrule_dates(
+        "FREQ=DAILY", dtstart=date(2026, 10, 1), window=window, until=date(2026, 10, 7)
+    )
+    assert until == [date(2026, 10, 6), date(2026, 10, 7)]

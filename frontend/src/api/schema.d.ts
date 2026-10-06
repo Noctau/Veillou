@@ -532,6 +532,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Work Task
+         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней,
+         *     проект — «по умолчанию для заданий с работы» (ВКР), если не указан другой.
+         */
+        post: operations["create_work_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}": {
         parameters: {
             query?: never;
@@ -695,6 +716,87 @@ export interface paths {
         patch: operations["update_backlog_item"];
         trace?: never;
     };
+    "/api/v1/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description Ближайший итоговый срок первым. Прогресс — по разовым заданиям и этапам.
+         */
+        get: operations["list_projects"];
+        put?: never;
+        /** Create Project */
+        post: operations["create_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Project */
+        get: operations["read_project"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Project
+         * @description Задания проекта остаются, но без проекта.
+         */
+        delete: operations["delete_project"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Project
+         * @description is_work_default=true снимает флаг с остальных проектов.
+         */
+        patch: operations["update_project"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Milestone */
+        post: operations["create_milestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/milestones/{milestone_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Milestone */
+        delete: operations["delete_milestone"];
+        options?: never;
+        head?: never;
+        /** Update Milestone */
+        patch: operations["update_milestone"];
+        trace?: never;
+    };
     "/api/v1/attachments": {
         parameters: {
             query?: never;
@@ -801,7 +903,7 @@ export interface components {
          * @description К чему приложен файл. note / source появятся в M5.2 / M5.5.
          * @enum {string}
          */
-        AttachmentOwner: "task";
+        AttachmentOwner: "task" | "project";
         /** AttachmentRead */
         AttachmentRead: {
             /**
@@ -1428,6 +1530,50 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MilestoneCreate */
+        MilestoneCreate: {
+            /** Title */
+            title: string;
+            /** Date */
+            date?: string | null;
+        };
+        /** MilestoneRead */
+        MilestoneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Title */
+            title: string;
+            /** Date */
+            date: string | null;
+            status: components["schemas"]["MilestoneStatus"];
+            /** Done At */
+            done_at: string | null;
+            /** Position */
+            position: number;
+        };
+        /**
+         * MilestoneStatus
+         * @enum {string}
+         */
+        MilestoneStatus: "planned" | "done";
+        /** MilestoneUpdate */
+        MilestoneUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Date */
+            date?: string | null;
+            status?: components["schemas"]["MilestoneStatus"] | null;
+            /** Position */
+            position?: number | null;
+        };
         /**
          * Parity
          * @description Чётность недели: числитель = odd, знаменатель = even.
@@ -1439,6 +1585,164 @@ export interface components {
          * @enum {string}
          */
         Priority: "normal" | "high";
+        /** ProjectCreate */
+        ProjectCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Category Id
+             * @description null — «Учёба»
+             */
+            category_id?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Contacts */
+            contacts?: components["schemas"]["Teacher"][];
+            /** Links */
+            links?: components["schemas"]["SubjectLink"][];
+            /** Weekly Norm Min */
+            weekly_norm_min?: number | null;
+            /**
+             * Is Work Default
+             * @description Сюда по умолчанию попадают задания с работы
+             * @default false
+             */
+            is_work_default: boolean;
+        };
+        /** ProjectDetail */
+        ProjectDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Category Id */
+            category_id: string | null;
+            /** Deadline */
+            deadline: string | null;
+            /** Description */
+            description: string;
+            /** Contacts */
+            contacts: components["schemas"]["Teacher"][];
+            /** Links */
+            links: components["schemas"]["SubjectLink"][];
+            /** Weekly Norm Min */
+            weekly_norm_min: number | null;
+            status: components["schemas"]["ProjectStatus"];
+            /** Is Work Default */
+            is_work_default: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Tasks Total
+             * @default 0
+             */
+            tasks_total: number;
+            /**
+             * Tasks Done
+             * @default 0
+             */
+            tasks_done: number;
+            /**
+             * Milestones Total
+             * @default 0
+             */
+            milestones_total: number;
+            /**
+             * Milestones Done
+             * @default 0
+             */
+            milestones_done: number;
+            next_milestone: components["schemas"]["MilestoneRead"] | null;
+            /** Milestones */
+            milestones: components["schemas"]["MilestoneRead"][];
+        };
+        /** ProjectRead */
+        ProjectRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Category Id */
+            category_id: string | null;
+            /** Deadline */
+            deadline: string | null;
+            /** Description */
+            description: string;
+            /** Contacts */
+            contacts: components["schemas"]["Teacher"][];
+            /** Links */
+            links: components["schemas"]["SubjectLink"][];
+            /** Weekly Norm Min */
+            weekly_norm_min: number | null;
+            status: components["schemas"]["ProjectStatus"];
+            /** Is Work Default */
+            is_work_default: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Tasks Total
+             * @default 0
+             */
+            tasks_total: number;
+            /**
+             * Tasks Done
+             * @default 0
+             */
+            tasks_done: number;
+            /**
+             * Milestones Total
+             * @default 0
+             */
+            milestones_total: number;
+            /**
+             * Milestones Done
+             * @default 0
+             */
+            milestones_done: number;
+            next_milestone: components["schemas"]["MilestoneRead"] | null;
+        };
+        /**
+         * ProjectStatus
+         * @enum {string}
+         */
+        ProjectStatus: "active" | "done" | "archived";
+        /** ProjectUpdate */
+        ProjectUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Category Id */
+            category_id?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Contacts */
+            contacts?: components["schemas"]["Teacher"][] | null;
+            /** Links */
+            links?: components["schemas"]["SubjectLink"][] | null;
+            /** Weekly Norm Min */
+            weekly_norm_min?: number | null;
+            /** Is Work Default */
+            is_work_default?: boolean | null;
+            status?: components["schemas"]["ProjectStatus"] | null;
+        };
         /**
          * QuickParseRead
          * @description Что удалось достать из строки. Ничего не сохраняет.
@@ -1957,6 +2261,11 @@ export interface components {
             /** Note */
             note: string;
             /**
+             * Occurrence Date
+             * @description День вхождения регулярного задания
+             */
+            occurrence_date: string | null;
+            /**
              * Events
              * @description Блоки в календаре
              */
@@ -2032,6 +2341,23 @@ export interface components {
             estimate_min?: number | null;
             /** Issued At */
             issued_at?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Milestone Id
+             * @description Проект берётся из этапа
+             */
+            milestone_id?: string | null;
+            /**
+             * Recurrence
+             * @description Регулярное задание: вхождения станут подзадачами с датой
+             */
+            recurrence?: string | null;
+            /**
+             * Recurrence Start
+             * @description null — с сегодня
+             */
+            recurrence_start?: string | null;
             /** Subtasks */
             subtasks?: components["schemas"]["SubtaskCreate"][];
         };
@@ -2065,6 +2391,14 @@ export interface components {
             estimate_min: number | null;
             /** Issued At */
             issued_at: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Milestone Id */
+            milestone_id: string | null;
+            /** Recurrence */
+            recurrence: string | null;
+            /** Recurrence Start */
+            recurrence_start: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2119,6 +2453,14 @@ export interface components {
             estimate_min: number | null;
             /** Issued At */
             issued_at: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Milestone Id */
+            milestone_id: string | null;
+            /** Recurrence */
+            recurrence: string | null;
+            /** Recurrence Start */
+            recurrence_start: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2174,6 +2516,14 @@ export interface components {
             estimate_min?: number | null;
             /** Issued At */
             issued_at?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Milestone Id */
+            milestone_id?: string | null;
+            /** Recurrence */
+            recurrence?: string | null;
+            /** Recurrence Start */
+            recurrence_start?: string | null;
         };
         /** Teacher */
         Teacher: {
@@ -2448,6 +2798,40 @@ export interface components {
         WorkHoursPatch: {
             weekdays?: components["schemas"]["DayRangePatch"] | null;
             weekends?: components["schemas"]["DayRangePatch"] | null;
+        };
+        /**
+         * WorkTaskCreate
+         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней, проект ВКР.
+         */
+        WorkTaskCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Issued At
+             * @description null — сегодня
+             */
+            issued_at?: string | null;
+            /**
+             * Deadline
+             * @description null — выдача + 14 дней, 23:59
+             */
+            deadline?: string | null;
+            /**
+             * Project Id
+             * @description null — проект «по умолчанию для заданий с работы»
+             */
+            project_id?: string | null;
+            /**
+             * No Project
+             * @description Не привязывать к проекту
+             * @default false
+             */
+            no_project: boolean;
         };
     };
     responses: never;
@@ -5887,6 +6271,7 @@ export interface operations {
             query?: {
                 status?: components["schemas"]["TaskStatus"][];
                 subject_id?: string | null;
+                project_id?: string | null;
                 due_before?: string | null;
             };
             header?: never;
@@ -5970,6 +6355,84 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_work_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkTaskCreate"];
             };
         };
         responses: {
@@ -7142,6 +7605,624 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacklogRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ProjectStatus"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_milestone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestoneCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_milestone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                milestone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_milestone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                milestone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestoneUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneRead"];
                 };
             };
             /** @description Bad Request */

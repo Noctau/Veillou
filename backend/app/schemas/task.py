@@ -4,9 +4,10 @@ import uuid
 from datetime import date
 from typing import Annotated, Self
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from app.domain.enums import EventStatus, Feel, Priority, SubtaskStatus, TaskStatus, TaskType
+from app.domain.recurrence import parse_rrule
 from app.schemas.catalog import TimeWindow, Windows
 from app.schemas.common import InputModel, Moment, ReadModel, UTCMoment
 
@@ -14,6 +15,18 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 Description = Annotated[str, StringConstraints(max_length=20_000)]
 SubtaskEstimate = Annotated[int, Field(ge=5, le=600, description="Минуты")]
 TaskEstimate = Annotated[int, Field(ge=5, le=10_000, description="Минуты")]
+RRule = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+    Field(description="RRULE без DTSTART: «FREQ=WEEKLY;BYDAY=TH»"),
+]
+
+
+def _check_rrule(value: str | None) -> str | None:
+    if value is None:
+        return None
+    parse_rrule(value)
+    return value.removeprefix("RRULE:")
 
 
 # ---------- подзадачи ----------
@@ -82,6 +95,7 @@ class SubtaskRead(ReadModel):
     action_type_id: uuid.UUID | None
     time_window: list[TimeWindow] | None
     note: str
+    occurrence_date: date | None = Field(description="День вхождения регулярного задания")
     events: list[SubtaskEvent] = Field(default_factory=list, description="Блоки в календаре")
 
 
@@ -104,7 +118,15 @@ class TaskCreate(InputModel):
     priority: Priority = Priority.normal
     estimate_min: TaskEstimate | None = None
     issued_at: date | None = None
+    project_id: uuid.UUID | None = None
+    milestone_id: uuid.UUID | None = Field(default=None, description="Проект берётся из этапа")
+    recurrence: RRule | None = Field(
+        default=None, description="Регулярное задание: вхождения станут подзадачами с датой"
+    )
+    recurrence_start: date | None = Field(default=None, description="null — с сегодня")
     subtasks: list[SubtaskCreate] = Field(default_factory=list, max_length=50)
+
+    _rrule = field_validator("recurrence")(_check_rrule)
 
 
 class TaskUpdate(InputModel):
@@ -120,6 +142,25 @@ class TaskUpdate(InputModel):
     status: TaskStatus | None = None
     estimate_min: TaskEstimate | None = None
     issued_at: date | None = None
+    project_id: uuid.UUID | None = None
+    milestone_id: uuid.UUID | None = None
+    recurrence: RRule | None = None
+    recurrence_start: date | None = None
+
+    _rrule = field_validator("recurrence")(_check_rrule)
+
+
+class WorkTaskCreate(InputModel):
+    """«Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней, проект ВКР."""
+
+    title: Title
+    description: Description = ""
+    issued_at: date | None = Field(default=None, description="null — сегодня")
+    deadline: Moment | None = Field(default=None, description="null — выдача + 14 дней, 23:59")
+    project_id: uuid.UUID | None = Field(
+        default=None, description="null — проект «по умолчанию для заданий с работы»"
+    )
+    no_project: bool = Field(default=False, description="Не привязывать к проекту")
 
 
 class TaskRead(ReadModel):
@@ -137,6 +178,10 @@ class TaskRead(ReadModel):
     done_at: UTCMoment | None
     estimate_min: int | None
     issued_at: date | None
+    project_id: uuid.UUID | None
+    milestone_id: uuid.UUID | None
+    recurrence: str | None
+    recurrence_start: date | None
     created_at: UTCMoment
     subtasks_total: int = 0
     subtasks_done: int = 0

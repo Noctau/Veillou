@@ -171,3 +171,18 @@ class AttachmentOwner(StrEnum):
     """К чему приложен файл. note / source появятся в M5.2 / M5.5."""
 
     task = "task"
+    project = "project"
+
+
+# ---------- проекты (M4.7) ----------
+
+
+class ProjectStatus(StrEnum):
+    active = "active"
+    done = "done"
+    archived = "archived"
+
+
+class MilestoneStatus(StrEnum):
+    planned = "planned"
+    done = "done"

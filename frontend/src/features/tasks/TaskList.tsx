@@ -1,5 +1,5 @@
 import { PlusIcon } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
@@ -15,11 +15,20 @@ import { cn } from '@/lib/utils'
 import { describeDeadline, TASK_TYPE_LABEL } from './labels'
 import { type TaskStatus, useTasks } from './useTasks'
 
-/** Все задания: активные (ближайший дедлайн первым) или закрытые. */
-export function TaskList({ subjectId }: { subjectId?: string }) {
+type Props = {
+  subjectId?: string
+  projectId?: string
+  /** Кнопки справа от фильтра (по умолчанию — «＋ Задание»). */
+  actions?: ReactNode
+}
+
+/** Разовые задания: активные (ближайший дедлайн первым) или закрытые. Регулярные — отдельно. */
+export function TaskList({ subjectId, projectId, actions }: Props) {
   const tz = useTimeZone()
   const [status, setStatus] = useState<TaskStatus>('active')
-  const { data: tasks, isPending, isError, error } = useTasks({ status: [status], subject_id: subjectId })
+  const query = useTasks({ status: [status], subject_id: subjectId, project_id: projectId })
+  const { isPending, isError, error } = query
+  const tasks = query.data?.filter((t) => !t.recurrence)
   const { data: subjects } = useSubjects()
   const subjectById = new Map(subjects?.map((s) => [s.id, s]))
 
@@ -30,11 +39,15 @@ export function TaskList({ subjectId }: { subjectId?: string }) {
           <ToggleGroupItem value="active">Активные</ToggleGroupItem>
           <ToggleGroupItem value="done">Сделанные</ToggleGroupItem>
         </ToggleGroup>
-        <Button asChild size="sm" variant="ghost" className="ml-auto">
-          <Link to="/add">
-            <PlusIcon /> Задание
-          </Link>
-        </Button>
+        <div className="ml-auto flex gap-1">
+          {actions ?? (
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/add">
+                <PlusIcon /> Задание
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
       {isPending && <Skeleton className="h-32" />}
       {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}

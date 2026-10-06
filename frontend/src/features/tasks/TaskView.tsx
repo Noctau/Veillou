@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CheckIcon, MoreVerticalIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
+import { ArrowLeftIcon, CheckIcon, MoreVerticalIcon, RepeatIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useNavigate } from 'react-router'
 
@@ -27,7 +27,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { AttachmentList } from '@/features/attachments/AttachmentList'
+import { describeRrule } from '@/features/calendar/rrule'
 import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
+import { useProject, useProjects } from '@/features/projects/useProjects'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSubjects } from '@/features/subjects/useSubjects'
 import { errorMessage } from '@/lib/errors'
@@ -107,6 +109,51 @@ function DeadlineEditor({ task, onSave }: { task: TaskDetail; onSave: (deadline:
   )
 }
 
+function ProjectFields({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => void }) {
+  const { data: projects } = useProjects(['active', 'done'])
+  const { data: project } = useProject(task.project_id ?? undefined)
+  return (
+    <>
+      <Field>
+        <FieldLabel htmlFor="task-project">Проект</FieldLabel>
+        <Select value={task.project_id ?? NONE} onValueChange={(v) => patch({ project_id: v === NONE ? null : v })}>
+          <SelectTrigger id="task-project" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Без проекта</SelectItem>
+            {projects?.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="task-milestone">Этап</FieldLabel>
+        <Select
+          value={task.milestone_id ?? NONE}
+          disabled={!project?.milestones.length}
+          onValueChange={(v) => patch({ milestone_id: v === NONE ? null : v })}
+        >
+          <SelectTrigger id="task-milestone" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Без этапа</SelectItem>
+            {project?.milestones.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    </>
+  )
+}
+
 function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => void }) {
   const { data: subjects } = useSubjects()
   return (
@@ -159,6 +206,7 @@ function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => 
             onChange={(action_type_id) => patch({ action_type_id })}
           />
         </Field>
+        <ProjectFields task={task} patch={patch} />
         <Field className="sm:col-span-2">
           <FieldLabel>Важность</FieldLabel>
           <ToggleGroup
@@ -226,7 +274,15 @@ export function TaskView({ taskId }: { taskId: string }) {
           <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
             <span>{TASK_TYPE_LABEL[task.task_type]}</span>
             {due && <span className={cn(due.tone === 'overdue' && !done && 'text-destructive')}>{due.text}</span>}
-            {estimate > 0 && <span>осталось ~{formatMinutes(estimate)}</span>}
+            {estimate > 0 && !task.recurrence && <span>осталось ~{formatMinutes(estimate)}</span>}
+            {task.recurrence && (
+              <span className="flex items-center gap-1">
+                <RepeatIcon className="size-3.5" /> {describeRrule(task.recurrence)}
+                <button type="button" className="underline underline-offset-4" onClick={() => patch({ recurrence: null })}>
+                  остановить
+                </button>
+              </span>
+            )}
           </div>
         </div>
         <DropdownMenu>

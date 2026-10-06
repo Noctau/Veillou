@@ -45,12 +45,14 @@ export function useTask(id: string | undefined) {
   })
 }
 
-/** Задания и календарь (блоки подзадач) после любой правки. */
+/** Задания, календарь (блоки подзадач) и проекты после любой правки. */
 export function useInvalidateTasks() {
   const queryClient = useQueryClient()
   return () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.tasks })
     queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
+    // Прогресс проекта считается по его заданиям
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects })
   }
 }
 

@@ -21,4 +21,6 @@ export const queryKeys = {
   backlog: (status: string) => ['backlog', status] as const,
   quickParse: (text: string) => ['quick-parse', text] as const,
   attachments: (ownerType: string, ownerId: string) => ['attachments', ownerType, ownerId] as const,
+  projects: ['projects'] as const,
+  project: (id: string) => ['projects', 'detail', id] as const,
 }

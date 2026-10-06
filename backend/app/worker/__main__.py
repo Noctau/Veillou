@@ -1,7 +1,7 @@
 """Фоновый процесс: python -m app.worker / make worker.
 
 Пока только ночная джоба (3:00 по DEFAULT_TIMEZONE): докатка личных повторов
-на 90 дней вперёд. Очередь jobs/reminders с SKIP LOCKED появится в M6.1.
+на 90 дней вперёд и регулярных заданий на 60. Очередь jobs/reminders с SKIP LOCKED появится в M6.1.
 """
 
 import asyncio
@@ -11,6 +11,7 @@ from datetime import datetime, time, timedelta
 from app.core.config import settings
 from app.core.db import engine, session_factory
 from app.core.time import get_tz, now_utc
+from app.services.recurring_tasks import roll_all_recurring_tasks
 from app.services.schedule_sync import roll_all_users
 
 log = logging.getLogger("app.worker")
@@ -30,7 +31,12 @@ def seconds_until(at: time, now: datetime) -> float:
 async def nightly() -> None:
     async with session_factory() as db:
         created = await roll_all_users(db)
-    log.info("Ночная докатка повторов: создано %d вхождений", created)
+        subtasks = await roll_all_recurring_tasks(db)
+    log.info(
+        "Ночная докатка: %d вхождений повторов, %d подзадач регулярных заданий",
+        created,
+        subtasks,
+    )
 
 
 async def run_nightly_safely() -> None:

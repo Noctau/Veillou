@@ -1,5 +1,6 @@
 import {
   BookOpenIcon,
+  BriefcaseIcon,
   CalendarIcon,
   CheckIcon,
   ClockIcon,
@@ -20,6 +21,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
 import { type ActionTypeKey, useActionTypes } from '@/features/catalog/useCatalog'
+import { WorkTaskDialog } from '@/features/projects/WorkTaskDialog'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSubjects } from '@/features/subjects/useSubjects'
 import { TASK_TYPE_LABEL } from '@/features/tasks/labels'
@@ -80,6 +82,7 @@ export function QuickAdd() {
   const [dropSubject, setDropSubject] = useState(false)
   const [dropDate, setDropDate] = useState(false)
   const [saved, setSaved] = useState<Saved[]>([])
+  const [workTask, setWorkTask] = useState(false)
 
   const { data: parsed } = useQuickParse(text)
   const parseNow = useParseNow()
@@ -267,6 +270,11 @@ export function QuickAdd() {
           {kind === 'note' && <p className="text-xs text-muted-foreground">Конспекты появятся в следующем обновлении.</p>}
         </CardContent>
       </Card>
+
+      <Button variant="outline" size="sm" className="self-start" onClick={() => setWorkTask(true)}>
+        <BriefcaseIcon /> Задание с работы
+      </Button>
+      <WorkTaskDialog open={workTask} onOpenChange={setWorkTask} />
 
       {saved.length > 0 && (
         <div className="flex flex-col gap-1">

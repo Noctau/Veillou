@@ -90,6 +90,7 @@ function Row({
               <ClockIcon className="size-3" />
               {formatMinutes(subtask.estimate_min)}
             </span>
+            {subtask.occurrence_date && <span className="text-foreground">{formatDay(subtask.occurrence_date)}</span>}
             {ownType && <span>{ownType}</span>}
             {block && (
               <span className="flex items-center gap-1 text-foreground">
