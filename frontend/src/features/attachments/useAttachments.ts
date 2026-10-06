@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import type { components } from '@/api/schema'
@@ -12,19 +12,25 @@ export type AttachmentOwner = components['schemas']['AttachmentOwner']
 // Ссылки на файлы подписаны на час — обновляем список заранее
 const URL_REFRESH_MS = 30 * 60_000
 
-export function useAttachments(ownerType: AttachmentOwner, ownerId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.attachments(ownerType, ownerId ?? ''),
-    enabled: !!ownerId,
+export function attachmentsQueryOptions(ownerType: AttachmentOwner, ownerId: string) {
+  return queryOptions({
+    queryKey: queryKeys.attachments(ownerType, ownerId),
     staleTime: URL_REFRESH_MS,
-    refetchInterval: URL_REFRESH_MS,
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/attachments', {
-        params: { query: { owner_type: ownerType, owner_id: ownerId! } },
+        params: { query: { owner_type: ownerType, owner_id: ownerId } },
       })
       if (error) throw error
       return data
     },
+  })
+}
+
+export function useAttachments(ownerType: AttachmentOwner, ownerId: string | undefined) {
+  return useQuery({
+    ...attachmentsQueryOptions(ownerType, ownerId ?? ''),
+    enabled: !!ownerId,
+    refetchInterval: URL_REFRESH_MS,
   })
 }
 
@@ -37,22 +43,25 @@ function useInvalidateOwner(ownerType: AttachmentOwner, ownerId: string) {
   }
 }
 
+/** Загрузка файла без хука — когда владелец создаётся тут же (быстрое добавление из «Поделиться»). */
+export async function uploadAttachment(ownerType: AttachmentOwner, ownerId: string, file: File): Promise<Attachment> {
+  const form = new FormData()
+  form.append('owner_type', ownerType)
+  form.append('owner_id', ownerId)
+  form.append('file', file)
+  const { data, error } = await api.POST('/api/v1/attachments', {
+    // Тело — multipart; типы openapi-fetch описывают его полями, отдаём FormData как есть
+    body: { owner_type: ownerType, owner_id: ownerId, file: '' },
+    bodySerializer: () => form,
+  })
+  if (error) throw error
+  return data
+}
+
 export function useUploadAttachment(ownerType: AttachmentOwner, ownerId: string) {
   const invalidate = useInvalidateOwner(ownerType, ownerId)
   return useMutation({
-    mutationFn: async (file: File) => {
-      const form = new FormData()
-      form.append('owner_type', ownerType)
-      form.append('owner_id', ownerId)
-      form.append('file', file)
-      const { data, error } = await api.POST('/api/v1/attachments', {
-        // Тело — multipart; типы openapi-fetch описывают его полями, отдаём FormData как есть
-        body: { owner_type: ownerType, owner_id: ownerId, file: '' },
-        bodySerializer: () => form,
-      })
-      if (error) throw error
-      return data
-    },
+    mutationFn: (file: File) => uploadAttachment(ownerType, ownerId, file),
     onSuccess: invalidate,
     onError: (error) => toast.error(errorMessage(error, 'Не удалось загрузить файл')),
   })

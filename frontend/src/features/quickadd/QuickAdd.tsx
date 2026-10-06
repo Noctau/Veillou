@@ -5,11 +5,13 @@ import {
   CheckIcon,
   ClockIcon,
   InboxIcon,
+  Loader2Icon,
   ListTodoIcon,
   NotebookPenIcon,
   SendIcon,
   XIcon,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -18,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { type AttachmentOwner, uploadAttachment } from '@/features/attachments/useAttachments'
 import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
 import { useCreateNote } from '@/features/notes/useNotes'
@@ -29,10 +32,15 @@ import { TASK_TYPE_LABEL } from '@/features/tasks/labels'
 import { useCreateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
+import { compressImage } from '@/lib/image'
+import { SHARE_PARAM } from '@/lib/pwa-shared'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatDay, wallToUtc } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
+import { SharedFiles } from './SharedFiles'
 import { type QuickParse, useParseNow, useQuickParse } from './useQuickParse'
+import { useShare } from './useShare'
 
 type Kind = 'task' | 'backlog' | 'event' | 'note'
 
@@ -44,6 +52,8 @@ const KINDS: { value: Kind; label: string; icon: typeof InboxIcon }[] = [
 ]
 
 const DEFAULT_EVENT_MIN = 60
+/** С файлами (из «Поделиться») можно создать только задание или конспект. */
+const FILE_KINDS: Kind[] = ['task', 'note']
 
 type Saved = { id: string; kind: Kind; title: string; link?: string }
 
@@ -84,6 +94,10 @@ export function QuickAdd() {
   const [dropDate, setDropDate] = useState(false)
   const [saved, setSaved] = useState<Saved[]>([])
   const [workTask, setWorkTask] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const share = useShare(params.get(SHARE_PARAM), setText)
+  const hasFiles = share.files.length > 0
+  const queryClient = useQueryClient()
 
   const { data: parsed } = useQuickParse(text)
   const parseNow = useParseNow()
@@ -95,7 +109,8 @@ export function QuickAdd() {
   const createNote = useCreateNote()
 
   const live = text.trim() ? parsed : undefined
-  const kind: Kind = kindOverride ?? live?.kind_hint ?? 'backlog'
+  const wanted: Kind = kindOverride ?? live?.kind_hint ?? (hasFiles ? 'task' : 'backlog')
+  const kind: Kind = hasFiles && !FILE_KINDS.includes(wanted) ? 'task' : wanted
   const subject = !dropSubject && live?.subject_id ? subjects?.find((s) => s.id === live.subject_id) : undefined
   const date = dropDate ? null : (live?.date ?? null)
   const needsTime = kind === 'event' && (!date || !live?.time)
@@ -112,7 +127,66 @@ export function QuickAdd() {
 
   const remember = (item: Saved) => setSaved((old) => [item, ...old].slice(0, 5))
 
+  /** Задание или конспект с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
+  const saveWithFiles = async () => {
+    const raw = text.trim()
+    if (kind === 'task' && !raw) {
+      toast.error('Напишите, что за задание')
+      return
+    }
+    setUploading(true)
+    let owner: { type: AttachmentOwner; id: string; link: string }
+    try {
+      const p = raw ? await parseNow(raw) : null
+      const day = dropDate ? null : (p?.date ?? null)
+      const subjectId = dropSubject ? null : (p?.subject_id ?? null)
+      if (kind === 'task') {
+        const t = await createTask.mutateAsync({
+          title: p?.title || raw,
+          task_type: p?.task_type ?? 'other',
+          description: '',
+          subject_id: subjectId,
+          action_type_id: actionTypeId(p?.action_type ?? null),
+          deadline: day ? (p?.deadline ?? null) : null,
+          priority: 'normal',
+          subtasks: [],
+        })
+        owner = { type: 'task', id: t.id, link: `/tasks/${t.id}` }
+      } else {
+        const allImages = share.files.every((f) => f.type.startsWith('image/'))
+        const n = await createNote.mutateAsync({
+          title: p?.title || raw || null,
+          kind: allImages ? 'photo' : 'file',
+          subject_id: subjectId,
+          class_date: day,
+          body_md: '',
+        })
+        owner = { type: 'note', id: n.id, link: `/notes/${n.id}` }
+      }
+    } catch {
+      // Ошибку создания уже показал хук мутации
+      setUploading(false)
+      return
+    }
+    try {
+      for (const file of share.files) await uploadAttachment(owner.type, owner.id, await compressImage(file))
+      share.finish()
+      reset()
+      navigate(owner.link, { replace: true })
+    } catch (error) {
+      toast.error(errorMessage(error, 'Не удалось загрузить файл'), {
+        description: 'Само задание или конспект создан — добавьте файлы на его странице',
+        action: { label: 'Открыть', onClick: () => navigate(owner.link) },
+      })
+    } finally {
+      queryClient.invalidateQueries({ queryKey: queryKeys.attachments(owner.type, owner.id) })
+      if (owner.type === 'note') queryClient.invalidateQueries({ queryKey: queryKeys.notesAll })
+      setUploading(false)
+    }
+  }
+
   const save = async () => {
+    if (hasFiles) return saveWithFiles()
     const raw = text.trim()
     if (!raw) return
     let p: QuickParse
@@ -223,14 +297,26 @@ export function QuickAdd() {
                 }
               }}
               enterKeyHint="send"
-              placeholder="реферат климатология до 15 окт · купить продукты · завтра в 14 врач"
+              placeholder={
+                hasFiles
+                  ? 'Что это: «реферат климатология до 15 окт» или тема конспекта'
+                  : 'реферат климатология до 15 окт · купить продукты · завтра в 14 врач'
+              }
               aria-label="Что добавить"
               className="min-h-14 resize-none text-base"
             />
-            <Button type="submit" size="icon" className="size-11 shrink-0" aria-label="Добавить" disabled={!text.trim() || needsTime}>
-              <SendIcon />
+            <Button
+              type="submit"
+              size="icon"
+              className="size-11 shrink-0"
+              aria-label="Добавить"
+              disabled={uploading || needsTime || (!text.trim() && !(hasFiles && kind === 'note'))}
+            >
+              {uploading ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
             </Button>
           </form>
+
+          {hasFiles && <SharedFiles files={share.files} onRemove={share.removeFile} />}
 
           <ToggleGroup
             type="single"
@@ -241,7 +327,12 @@ export function QuickAdd() {
             onValueChange={(v) => v && setKindOverride(v as Kind)}
           >
             {KINDS.map(({ value, label, icon: Icon }) => (
-              <ToggleGroupItem key={value} value={value} className="flex-1 gap-1">
+              <ToggleGroupItem
+                key={value}
+                value={value}
+                className="flex-1 gap-1"
+                disabled={hasFiles && !FILE_KINDS.includes(value)}
+              >
                 <Icon className="size-4" />
                 <span className="hidden sm:inline">{label}</span>
                 <span className="sm:hidden">{label.replace('В ящик', 'Ящик')}</span>

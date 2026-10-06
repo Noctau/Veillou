@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import type { components } from '@/api/schema'
 import { api } from '@/lib/api'
+import { clearOfflineData } from '@/lib/persist'
 import { queryKeys } from '@/lib/queryKeys'
 
 type LoginRequest = components['schemas']['LoginRequest']
@@ -24,8 +25,8 @@ export function useLogout() {
     mutationFn: async () => {
       await api.POST('/api/v1/auth/logout')
     },
-    onSettled: () => {
-      queryClient.clear()
+    onSettled: async () => {
+      await clearOfflineData()
       queryClient.setQueryData(queryKeys.me, null)
     },
   })

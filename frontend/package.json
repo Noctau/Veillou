@@ -21,11 +21,14 @@
     "@fullcalendar/timegrid": "^6.1.21",
     "@hookform/resolvers": "^5.9.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/query-async-storage-persister": "^5.104.1",
     "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-query-persist-client": "^5.104.1",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
+    "idb-keyval": "^6.3.0",
     "katex": "^0.19.0",
     "lucide-react": "^1.52.0",
     "openapi-fetch": "^0.17.0",
@@ -53,7 +56,11 @@
     "typescript": "~5.9",
     "vite": "^8.3.0",
     "vite-plugin-pwa": "^2.0.0",
+    "workbox-cacheable-response": "^7.4.1",
     "workbox-core": "^7.4.1",
-    "workbox-precaching": "^7.4.1"
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1"
   }
 }

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import type { components, operations } from '@/api/schema'
@@ -16,10 +16,9 @@ export type NoteListParams = NonNullable<operations['list_notes']['parameters'][
 // В списке есть подписанные ссылки на обложки — живут час
 const URL_REFRESH_MS = 30 * 60_000
 
-export function useNotes(params: NoteListParams = {}, enabled = true) {
-  return useQuery({
+export function notesQueryOptions(params: NoteListParams = {}) {
+  return queryOptions({
     queryKey: queryKeys.noteList(params),
-    enabled,
     staleTime: URL_REFRESH_MS,
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/notes', { params: { query: params } })
@@ -29,18 +28,25 @@ export function useNotes(params: NoteListParams = {}, enabled = true) {
   })
 }
 
-export function useNote(id: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.note(id ?? ''),
-    enabled: !!id,
+export function noteQueryOptions(id: string) {
+  return queryOptions({
+    queryKey: queryKeys.note(id),
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/notes/{note_id}', {
-        params: { path: { note_id: id! } },
+        params: { path: { note_id: id } },
       })
       if (error) throw error
       return data
     },
   })
+}
+
+export function useNotes(params: NoteListParams = {}, enabled = true) {
+  return useQuery({ ...notesQueryOptions(params), enabled })
+}
+
+export function useNote(id: string | undefined) {
+  return useQuery({ ...noteQueryOptions(id ?? ''), enabled: !!id })
 }
 
 export function useCreateNote() {

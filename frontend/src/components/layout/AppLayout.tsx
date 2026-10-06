@@ -1,5 +1,8 @@
 import { NavLink, Outlet } from 'react-router'
 
+import { OfflineBanner } from '@/features/offline/OfflineBanner'
+import { useOfflinePrefetch } from '@/features/offline/useOfflinePrefetch'
+import { useOnline } from '@/features/offline/useOnline'
 import { cn } from '@/lib/utils'
 
 import { mainNav, settingsNav, type NavItem } from './nav'
@@ -56,6 +59,8 @@ function BottomLink({ item }: { item: NavItem }) {
 }
 
 export function AppLayout() {
+  const online = useOnline()
+  useOfflinePrefetch(online)
   return (
     <div className="min-h-dvh bg-background text-foreground lg:flex">
       <aside className="hidden w-60 shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-3 lg:flex">
@@ -69,6 +74,7 @@ export function AppLayout() {
       </aside>
 
       <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-24 lg:pb-8">
+        <OfflineBanner />
         <Outlet />
       </main>
 

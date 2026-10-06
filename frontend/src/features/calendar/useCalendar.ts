@@ -1,10 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import type { components } from '@/api/schema'
+import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
+import { wallDate } from '@/lib/time'
 
 export type CalendarEvent = components['schemas']['EventRead']
 export type CalendarData = components['schemas']['CalendarRead']
@@ -16,19 +18,46 @@ export type RecurringEvent = components['schemas']['RecurringEventRead']
 export type RecurringEventCreate = components['schemas']['RecurringEventCreate']
 export type RecurringEventUpdate = components['schemas']['RecurringEventUpdate']
 
-/** События, пересекающие [from, to) (ISO-моменты с Z). */
-export function useCalendar(from: string | undefined, to: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.calendar(from ?? '', to ?? ''),
-    enabled: !!from && !!to,
-    placeholderData: (prev) => prev,
+export function calendarQueryOptions(from: string, to: string) {
+  return queryOptions({
+    queryKey: queryKeys.calendar(from, to),
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/calendar', {
-        params: { query: { from: from!, to: to! } },
-      })
+      const { data, error } = await api.GET('/api/v1/calendar', { params: { query: { from, to } } })
       if (error) throw error
       return data
     },
+  })
+}
+
+/**
+ * Срез уже загруженного диапазона, который накрывает [from, to): день из загруженной
+ * недели показывается сразу — и без сети (офлайн-окно грузит useOfflinePrefetch).
+ */
+function cachedSubrange(queryClient: QueryClient, from: string, to: string, tz: string): CalendarData | undefined {
+  const start = Date.parse(from)
+  const end = Date.parse(to)
+  const firstDay = wallDate(from, tz)
+  const lastDay = wallDate(new Date(end - 1).toISOString(), tz)
+  for (const [key, data] of queryClient.getQueriesData<CalendarData>({ queryKey: queryKeys.calendarAll })) {
+    const [, qFrom, qTo] = key as string[]
+    if (!data || !qFrom || !qTo || Date.parse(qFrom) > start || Date.parse(qTo) < end) continue
+    if (qFrom === from && qTo === to) continue
+    return {
+      events: data.events.filter((e) => Date.parse(e.start) < end && Date.parse(e.end) > start),
+      days_off: data.days_off.filter((d) => d.date_from <= lastDay && d.date_to >= firstDay),
+    }
+  }
+  return undefined
+}
+
+/** События, пересекающие [from, to) (ISO-моменты с Z). */
+export function useCalendar(from: string | undefined, to: string | undefined) {
+  const queryClient = useQueryClient()
+  const tz = useTimeZone()
+  return useQuery({
+    ...calendarQueryOptions(from ?? '', to ?? ''),
+    enabled: !!from && !!to,
+    placeholderData: (prev) => (from && to && cachedSubrange(queryClient, from, to, tz)) || prev,
   })
 }
 
