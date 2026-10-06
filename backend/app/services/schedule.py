@@ -4,7 +4,8 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import BellSchedule, ClassRule, DayOff, Semester, Subject
+from app.core.time import get_tz
+from app.models import BellSchedule, ClassRule, DayOff, Semester, Subject, User
 from app.schemas.schedule import (
     BellsReplace,
     ClassRuleCreate,
@@ -17,6 +18,7 @@ from app.schemas.schedule import (
     SubjectUpdate,
 )
 from app.services.base import UserScopedRepository, apply_fields, validate_patch
+from app.services.schedule_sync import SeriesSync
 
 
 class SemesterRepo(UserScopedRepository[Semester]):
@@ -44,9 +46,12 @@ class ClassRuleRepo(UserScopedRepository[ClassRule]):
 
 
 class ScheduleService:
-    def __init__(self, db: AsyncSession, user_id: uuid.UUID) -> None:
+    """CRUD шаблонов; каждое изменение пересинхронизирует затронутые серии пар."""
+
+    def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
-        self.user_id = user_id
+        self.user_id = user_id = user.id
+        self.sync = SeriesSync(db, user_id, get_tz(user.timezone))
         self.semesters = SemesterRepo(db, user_id)
         self.bells = BellRepo(db, user_id)
         self.days_off = DayOffRepo(db, user_id)
@@ -68,6 +73,8 @@ class ScheduleService:
     async def update_semester(self, id: uuid.UUID, patch: SemesterUpdate) -> Semester:
         semester = await self.semesters.get_or_404(id)
         apply_fields(semester, validate_patch(semester, patch, SemesterCreate))
+        await self.db.flush()
+        await self.sync.sync_semester(id)
         await self.db.commit()
         return semester
 
@@ -76,6 +83,7 @@ class ScheduleService:
         semester = await self.semesters.get_or_404(id)
         for rule in await self.rules.find_all(ClassRule.semester_id == id):
             self.rules.soft_delete(rule)
+            await self.sync.remove_series(rule)
         for bell in await self.bells.find_all(BellSchedule.semester_id == id):
             self.bells.soft_delete(bell)
         for subject in await self.subjects.find_all(Subject.semester_id == id):
@@ -103,6 +111,8 @@ class ScheduleService:
                     slots=[s.model_dump(mode="json") for s in item.slots],
                 )
             )
+        await self.db.flush()
+        await self.sync.sync_semester(semester_id)
         await self.db.commit()
         return await self.list_bells(semester_id)
 
@@ -115,17 +125,22 @@ class ScheduleService:
         day_off = DayOff()
         apply_fields(day_off, data)
         self.days_off.add(day_off)
-        await self.db.commit()
+        await self._days_off_changed()
         return day_off
 
     async def update_day_off(self, id: uuid.UUID, patch: DayOffUpdate) -> DayOff:
         day_off = await self.days_off.get_or_404(id)
         apply_fields(day_off, validate_patch(day_off, patch, DayOffCreate))
-        await self.db.commit()
+        await self._days_off_changed()
         return day_off
 
     async def delete_day_off(self, id: uuid.UUID) -> None:
         self.days_off.soft_delete(await self.days_off.get_or_404(id))
+        await self._days_off_changed()
+
+    async def _days_off_changed(self) -> None:
+        await self.db.flush()
+        await self.sync.sync_all_class_rules()
         await self.db.commit()
 
     # ---------- предметы ----------
@@ -152,6 +167,8 @@ class ScheduleService:
         if data.semester_id and data.semester_id != subject.semester_id:
             await self.semesters.get_or_404(data.semester_id)
         apply_fields(subject, data)
+        await self.db.flush()
+        await self.sync.sync_subject(subject)
         await self.db.commit()
         return subject
 
@@ -159,6 +176,7 @@ class ScheduleService:
         subject = await self.subjects.get_or_404(id)
         for rule in await self.rules.find_all(ClassRule.subject_id == id):
             self.rules.soft_delete(rule)
+            await self.sync.remove_series(rule)
         self.subjects.soft_delete(subject)
         await self.db.commit()
 
@@ -176,6 +194,8 @@ class ScheduleService:
         rule = ClassRule()
         apply_fields(rule, data)
         self.rules.add(rule)
+        await self.db.flush()
+        await self.sync.sync_class_rules([rule])
         await self.db.commit()
         return rule
 
@@ -185,9 +205,13 @@ class ScheduleService:
         if data.subject_id != rule.subject_id:
             await self.subjects.get_or_404(data.subject_id)
         apply_fields(rule, data)
+        await self.db.flush()
+        await self.sync.sync_class_rules([rule])
         await self.db.commit()
         return rule
 
     async def delete_rule(self, id: uuid.UUID) -> None:
-        self.rules.soft_delete(await self.rules.get_or_404(id))
+        rule = await self.rules.get_or_404(id)
+        self.rules.soft_delete(rule)
+        await self.sync.remove_series(rule)
         await self.db.commit()

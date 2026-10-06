@@ -5,10 +5,12 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
-from app.domain.enums import FIXED_KINDS, EventStatus
-from app.models import Event, Subject
+from app.core.time import get_tz
+from app.domain.enums import FIXED_KINDS, EventStatus, TemplateType
+from app.models import ClassRule, Event, Subject, User
 from app.schemas.event import EventCreate, EventUpdate
 from app.services.base import UserScopedRepository, apply_fields
+from app.services.schedule_sync import SeriesSync
 
 
 class EventRepo(UserScopedRepository[Event]):
@@ -21,11 +23,17 @@ class SubjectRefRepo(UserScopedRepository[Subject]):
     not_found_message = "Предмет не найден"
 
 
+class NotFromTemplateError(InvalidDataError):
+    code = "not_from_template"
+    message = "Событие не из расписания"
+
+
 class EventService:
-    def __init__(self, db: AsyncSession, user_id: uuid.UUID) -> None:
+    def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
-        self.user_id = user_id
-        self.events = EventRepo(db, user_id)
+        self.user_id = user.id
+        self.tz = get_tz(user.timezone)
+        self.events = EventRepo(db, user.id)
 
     async def get(self, id: uuid.UUID) -> Event:
         return await self.events.get_or_404(id)
@@ -67,3 +75,20 @@ class EventService:
         else:
             self.events.soft_delete(event)
         await self.db.commit()
+
+    async def reset(self, id: uuid.UUID) -> Event:
+        """«Вернуть как в расписании»: снимает detached и пересобирает вхождение по шаблону."""
+        event = await self.events.get_or_404(id)
+        if event.template_id is None:
+            raise NotFromTemplateError()
+        event.detached = False
+        event.status = EventStatus.planned
+        await self.db.flush()
+        sync = SeriesSync(self.db, self.user_id, self.tz)
+        if event.template_type == TemplateType.class_rule:
+            rule = await self.db.get(ClassRule, event.template_id)
+            if rule is not None:
+                await sync.sync_class_rules([rule])
+        await self.db.commit()
+        await self.db.refresh(event)
+        return event

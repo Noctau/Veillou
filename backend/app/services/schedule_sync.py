@@ -1,0 +1,314 @@
+"""Материализация шаблонов в `events`.
+
+Серия шаблона синхронизируется по ключу (template_type, template_id,
+occurrence_date) начиная с сегодняшнего дня (локального):
+
+- вхождение есть и в шаблоне, и в БД → поля обновляются на месте (id, а значит
+  и привязанные конспекты/напоминания, сохраняются);
+- есть только в шаблоне → создаётся;
+- есть только в БД → мягко удаляется;
+- `detached` (правили руками) и прошедшие дни не трогаются.
+
+Вызывается после любого изменения ClassRule / BellSchedule / DayOff / Semester /
+Subject, а для личных повторов — RecurringEvent (и ночной докаткой окна).
+"""
+
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date, datetime, time
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.time import local_date, now_utc
+from app.domain.enums import EventKind, EventStatus, TemplateType
+from app.domain.recurrence import (
+    Bells,
+    BellSlot,
+    ClassRuleSpec,
+    DateRange,
+    SemesterSpec,
+    expand_class_rule,
+)
+from app.models import BellSchedule, ClassRule, DayOff, Event, Semester, Subject
+
+
+@dataclass(frozen=True)
+class Desired:
+    """Каким должно быть вхождение по шаблону."""
+
+    date: date
+    start: datetime
+    end: datetime
+    fields: dict[str, Any]  # title, kind, location, color, …
+
+
+@dataclass(frozen=True)
+class SyncStats:
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+
+
+# Поля, которые шаблон переписывает у не-detached вхождения
+_TEMPLATE_FIELDS = (
+    "kind",
+    "title",
+    "is_fixed",
+    "location",
+    "color",
+    "subject_id",
+    "class_type",
+    "pair_number",
+    "teacher",
+)
+
+
+def bells_from_rows(rows: Sequence[BellSchedule]) -> Bells:
+    def slots(raw: list[dict[str, Any]]) -> list[BellSlot]:
+        return [
+            BellSlot(s["number"], time.fromisoformat(s["start"]), time.fromisoformat(s["end"]))
+            for s in raw
+        ]
+
+    default = next((r for r in rows if r.weekday is None), None)
+    return Bells.from_slots(
+        slots(default.slots) if default else [],
+        {r.weekday: slots(r.slots) for r in rows if r.weekday is not None},
+    )
+
+
+class SeriesSync:
+    def __init__(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        tz: ZoneInfo,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        self.db = db
+        self.user_id = user_id
+        self.tz = tz
+        self.now = now or now_utc()
+        self.today = local_date(self.now, tz)
+
+    # ---------- общий механизм ----------
+
+    async def _existing(self, template_type: TemplateType, template_id: uuid.UUID) -> list[Event]:
+        rows = await self.db.scalars(
+            select(Event).where(
+                Event.user_id == self.user_id,
+                Event.template_type == template_type,
+                Event.template_id == template_id,
+                Event.deleted_at.is_(None),
+            )
+        )
+        return list(rows)
+
+    async def sync_series(
+        self,
+        template_type: TemplateType,
+        template_id: uuid.UUID,
+        desired: Sequence[Desired],
+        *,
+        until: date | None = None,
+    ) -> SyncStats:
+        """Приводит будущие вхождения шаблона к `desired`.
+
+        `until` — граница окна материализации (личные повторы на 90 дней):
+        вхождения позже неё не удаляются, даже если их нет в `desired`.
+        """
+        existing = {e.occurrence_date: e for e in await self._existing(template_type, template_id)}
+        wanted = {d.date: d for d in desired if d.date >= self.today}
+        created = updated = deleted = 0
+
+        for day, event in existing.items():
+            if day is None or day < self.today or event.detached:
+                continue
+            target = wanted.get(day)
+            if target is None:
+                if until is None or day <= until:
+                    event.deleted_at = self.now
+                    deleted += 1
+                continue
+            changed = False
+            for name, value in (("start", target.start), ("end", target.end), *_items(target)):
+                if getattr(event, name) != value:
+                    setattr(event, name, value)
+                    changed = True
+            updated += changed
+
+        for day, target in wanted.items():
+            if day in existing:
+                continue
+            self.db.add(
+                Event(
+                    user_id=self.user_id,
+                    template_type=template_type,
+                    template_id=template_id,
+                    occurrence_date=day,
+                    start=target.start,
+                    end=target.end,
+                    status=EventStatus.planned,
+                    **target.fields,
+                )
+            )
+            created += 1
+        await self.db.flush()
+        return SyncStats(created, updated, deleted)
+
+    async def remove_series(
+        self, template: ClassRule | uuid.UUID, template_type: TemplateType = TemplateType.class_rule
+    ) -> None:
+        """Шаблон удалён: убираем все будущие вхождения, включая правленные руками."""
+        template_id = template if isinstance(template, uuid.UUID) else template.id
+        await self.db.execute(
+            update(Event)
+            .where(
+                Event.user_id == self.user_id,
+                Event.template_type == template_type,
+                Event.template_id == template_id,
+                Event.occurrence_date >= self.today,
+                Event.deleted_at.is_(None),
+            )
+            .values(deleted_at=self.now)
+        )
+
+    # ---------- пары ----------
+
+    async def _days_off(self) -> list[DateRange]:
+        rows = await self.db.scalars(
+            select(DayOff).where(DayOff.user_id == self.user_id, DayOff.deleted_at.is_(None))
+        )
+        return [DateRange(r.date_from, r.date_to) for r in rows]
+
+    async def _bells(self, semester_id: uuid.UUID) -> Bells:
+        rows = await self.db.scalars(
+            select(BellSchedule).where(
+                BellSchedule.user_id == self.user_id,
+                BellSchedule.semester_id == semester_id,
+                BellSchedule.deleted_at.is_(None),
+            )
+        )
+        return bells_from_rows(list(rows))
+
+    async def _live_rules(self, *where: Any) -> list[ClassRule]:
+        rows = await self.db.scalars(
+            select(ClassRule).where(
+                ClassRule.user_id == self.user_id, ClassRule.deleted_at.is_(None), *where
+            )
+        )
+        return list(rows)
+
+    async def sync_class_rules(self, rules: Sequence[ClassRule]) -> SyncStats:
+        """Синхронизирует серии правил пар (удалённые правила — убирает)."""
+        total = SyncStats()
+        if not rules:
+            return total
+        days_off = await self._days_off()
+        semesters: dict[uuid.UUID, Semester | None] = {}
+        bells: dict[uuid.UUID, Bells] = {}
+        subjects: dict[uuid.UUID, Subject | None] = {}
+
+        for rule in rules:
+            if rule.semester_id not in semesters:
+                semesters[rule.semester_id] = await self.db.get(Semester, rule.semester_id)
+                bells[rule.semester_id] = await self._bells(rule.semester_id)
+            if rule.subject_id not in subjects:
+                subjects[rule.subject_id] = await self.db.get(Subject, rule.subject_id)
+            semester = semesters[rule.semester_id]
+            subject = subjects[rule.subject_id]
+
+            alive = (
+                rule.deleted_at is None
+                and semester is not None
+                and semester.deleted_at is None
+                and subject is not None
+                and subject.deleted_at is None
+            )
+            if not alive:
+                await self.remove_series(rule)
+                continue
+            assert semester is not None and subject is not None
+
+            spec = SemesterSpec(
+                semester.start_date, semester.classes_end, semester.first_week_parity
+            )
+            occurrences = expand_class_rule(
+                _rule_spec(rule),
+                spec,
+                bells[rule.semester_id],
+                self.tz,
+                days_off=days_off,
+                window=DateRange(self.today, date.max),
+            )
+            fields = {
+                "kind": EventKind.class_,
+                "title": subject.name,
+                "is_fixed": True,
+                "location": rule.location,
+                "color": subject.color,
+                "subject_id": subject.id,
+                "class_type": rule.class_type,
+                "pair_number": rule.pair_number,
+                "teacher": rule.teacher,
+            }
+            stats = await self.sync_series(
+                TemplateType.class_rule,
+                rule.id,
+                [Desired(o.date, o.start, o.end, fields) for o in occurrences],
+            )
+            total = SyncStats(
+                total.created + stats.created,
+                total.updated + stats.updated,
+                total.deleted + stats.deleted,
+            )
+        return total
+
+    async def sync_semester(self, semester_id: uuid.UUID) -> SyncStats:
+        rules = await self._live_rules(ClassRule.semester_id == semester_id)
+        return await self.sync_class_rules(rules)
+
+    async def sync_subject(self, subject: Subject) -> SyncStats:
+        stats = await self.sync_class_rules(
+            await self._live_rules(ClassRule.subject_id == subject.id)
+        )
+        # Название и цвет предмета обновляются и у правленных руками вхождений
+        await self.db.execute(
+            update(Event)
+            .where(
+                Event.user_id == self.user_id,
+                Event.subject_id == subject.id,
+                Event.kind == EventKind.class_,
+                Event.detached.is_(True),
+                Event.occurrence_date >= self.today,
+                Event.deleted_at.is_(None),
+            )
+            .values(title=subject.name, color=subject.color)
+        )
+        return stats
+
+    async def sync_all_class_rules(self) -> SyncStats:
+        """Праздники влияют на все семестры."""
+        return await self.sync_class_rules(await self._live_rules())
+
+
+def _items(target: Desired) -> list[tuple[str, Any]]:
+    return [(name, target.fields[name]) for name in _TEMPLATE_FIELDS if name in target.fields]
+
+
+def _rule_spec(rule: ClassRule) -> ClassRuleSpec:
+    return ClassRuleSpec(
+        key=rule.id,
+        weekday=rule.weekday,
+        parity=rule.parity,
+        pair_number=rule.pair_number,
+        start_time=rule.start_time,
+        end_time=rule.end_time,
+        valid_from=rule.valid_from,
+        valid_to=rule.valid_to,
+    )

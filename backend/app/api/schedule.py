@@ -24,7 +24,7 @@ from app.services.schedule import ScheduleService
 
 
 def get_service(db: SessionDep, user: CurrentUser) -> ScheduleService:
-    return ScheduleService(db, user.id)
+    return ScheduleService(db, user)
 
 
 Service = Annotated[ScheduleService, Depends(get_service)]

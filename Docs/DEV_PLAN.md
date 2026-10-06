@@ -28,7 +28,7 @@
 - [x] **M2.1 Модели.** `Semester`, `DayOff`, `BellSchedule`, `Subject`, `ClassRule` + таблица `events` (kind, title, start, end, is_fixed, is_pinned, status, template_type/template_id, detached, source_type/source_id, subject_id, location, color). CRUD.
 - [x] **M2.2 `domain/recurrence.py`.** `expand_class_rules(...)` → вхождения (чётность, valid_from/to, DayOff, период сессии без пар); `expand_rrule(...)`. Чистые функции.
   DoD: ≥ 12 тестов: odd/even, первая неделя, «через неделю», праздник, граница семестра, tz.
-- [ ] **M2.3 Материализация.** Сервис `sync_series(template)`: удаляет будущие не-detached вхождения шаблона и создаёт заново. Вызывается при изменении ClassRule/BellSchedule/DayOff/Semester. Редактирование вхождения (отмена/перенос/аудитория) → `detached=true`.
+- [x] **M2.3 Материализация.** Сервис `sync_series(template)`: удаляет будущие не-detached вхождения шаблона и создаёт заново. Вызывается при изменении ClassRule/BellSchedule/DayOff/Semester. Редактирование вхождения (отмена/перенос/аудитория) → `detached=true`.
   DoD: тест — правка серии не затирает вручную перенесённую пару.
 - [ ] **M2.4 Фронт: предметы** (карточки, цвет, преподы, форма контроля, ссылки).
 - [ ] **M2.5 Фронт: сетка недели пар.** Дни × номер пары; клик → пара; «копировать на день / на другую чётность»; переключатель числитель/знаменатель; звонки.

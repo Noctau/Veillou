@@ -9,7 +9,7 @@ from app.services.events import EventService
 
 
 def get_service(db: SessionDep, user: CurrentUser) -> EventService:
-    return EventService(db, user.id)
+    return EventService(db, user)
 
 
 Service = Annotated[EventService, Depends(get_service)]
@@ -36,3 +36,10 @@ async def update_event(event_id: uuid.UUID, patch: EventUpdate, svc: Service) ->
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(event_id: uuid.UUID, svc: Service) -> None:
     await svc.delete(event_id)
+
+
+@router.post("/{event_id}/reset")
+async def reset_event(event_id: uuid.UUID, svc: Service) -> EventRead:
+    """Вернуть вхождение как в расписании (снять detached). Если в этот день по
+    шаблону вхождения больше нет — событие удаляется (404 при следующем чтении)."""
+    return EventRead.model_validate(await svc.reset(event_id))
