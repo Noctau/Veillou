@@ -16,6 +16,7 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      { path: 'onboarding', lazy: page(() => import('@/pages/OnboardingPage'), 'OnboardingPage') },
       {
         element: <AppLayout />,
         children: [

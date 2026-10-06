@@ -1,8 +1,9 @@
-import { NavLink, Outlet } from 'react-router'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
 
 import { OfflineBanner } from '@/features/offline/OfflineBanner'
 import { useOfflinePrefetch } from '@/features/offline/useOfflinePrefetch'
 import { useOnline } from '@/features/offline/useOnline'
+import { useSettings } from '@/features/settings/useSettings'
 import { cn } from '@/lib/utils'
 
 import { mainNav, settingsNav, type NavItem } from './nav'
@@ -61,6 +62,14 @@ function BottomLink({ item }: { item: NavItem }) {
 export function AppLayout() {
   const online = useOnline()
   useOfflinePrefetch(online)
+  const { data: settings } = useSettings()
+  const { pathname } = useLocation()
+
+  // Первый вход — короткая настройка. «Поделиться» (/add) не перехватываем.
+  if (settings && !settings.onboarding_done && pathname !== '/add') {
+    return <Navigate to="/onboarding" replace />
+  }
+
   return (
     <div className="min-h-dvh bg-background text-foreground lg:flex">
       <aside className="hidden w-60 shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-3 lg:flex">

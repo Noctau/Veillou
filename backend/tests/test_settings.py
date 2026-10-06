@@ -127,3 +127,10 @@ async def test_settings_are_per_user(auth_client: AsyncClient, client: AsyncClie
             "/api/v1/auth/login", json={"email": "other@example.com", "password": PASSWORD}
         )
         assert (await other.get(URL)).json()["travel_buffer_min"] == 60
+
+
+async def test_onboarding_flag(auth_client: AsyncClient):
+    assert (await auth_client.get(URL)).json()["onboarding_done"] is False
+    resp = await auth_client.patch(URL, json={"onboarding_done": True})
+    assert resp.status_code == 200, resp.text
+    assert (await auth_client.get(URL)).json()["onboarding_done"] is True

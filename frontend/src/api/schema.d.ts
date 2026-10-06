@@ -3556,6 +3556,12 @@ export interface components {
              *     }
              */
             rest: components["schemas"]["Rest"];
+            /**
+             * Onboarding Done
+             * @description Первичная настройка пройдена или пропущена
+             * @default false
+             */
+            onboarding_done: boolean;
         };
         /** UserSettingsPatch */
         UserSettingsPatch: {
@@ -3578,6 +3584,11 @@ export interface components {
             schedule?: components["schemas"]["SchedulePatch"] | null;
             reminders?: components["schemas"]["RemindersPatch"] | null;
             rest?: components["schemas"]["RestPatch"] | null;
+            /**
+             * Onboarding Done
+             * @description Первичная настройка пройдена или пропущена
+             */
+            onboarding_done?: boolean | null;
         };
         /** ValidationError */
         ValidationError: {

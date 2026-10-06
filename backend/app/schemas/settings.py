@@ -121,6 +121,9 @@ class UserSettings(_Model):
     schedule: Schedule = Schedule()
     reminders: Reminders = Reminders()
     rest: Rest = Rest()
+    onboarding_done: bool = Field(
+        default=False, description="Первичная настройка пройдена или пропущена"
+    )
 
 
 # ---------- частичное обновление ----------
