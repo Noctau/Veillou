@@ -191,13 +191,13 @@ function PersonalEventForm({
           <Input id="pe-title" autoFocus={!recurring} placeholder="Бассейн, врач, встреча…" {...register('title')} />
           {errors.title && <FieldError>{errors.title.message}</FieldError>}
         </Field>
-        <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
-          <Field data-invalid={!!errors.date}>
+        <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <Field data-invalid={!!errors.date} className="col-span-2 sm:col-span-1">
             <FieldLabel htmlFor="pe-date">{repeat.length ? 'Начиная с' : 'Когда'}</FieldLabel>
             <Input id="pe-date" type="date" {...register('date')} />
           </Field>
-          <Input type="time" step={300} aria-label="Начало" className="w-24" {...register('start')} />
-          <Input type="time" step={300} aria-label="Конец" className="w-24" {...register('end')} />
+          <Input type="time" step={300} aria-label="Начало" className="sm:w-24" {...register('start')} />
+          <Input type="time" step={300} aria-label="Конец" className="sm:w-24" {...register('end')} />
         </div>
         {(errors.end || errors.date) && <FieldError>{errors.end?.message ?? errors.date?.message}</FieldError>}
 

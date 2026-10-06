@@ -3,7 +3,6 @@ import { createBrowserRouter } from 'react-router'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { AddPage } from '@/pages/AddPage'
-import { CalendarPage } from '@/pages/CalendarPage'
 import { InboxPage } from '@/pages/InboxPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -20,7 +19,11 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <TodayPage /> },
-          { path: 'calendar', element: <CalendarPage /> },
+          {
+            // FullCalendar тяжёлый — отдельным чанком
+            path: 'calendar',
+            lazy: async () => ({ Component: (await import('@/pages/CalendarPage')).CalendarPage }),
+          },
           { path: 'add', element: <AddPage /> },
           { path: 'study', element: <StudyPage /> },
           { path: 'inbox', element: <InboxPage /> },

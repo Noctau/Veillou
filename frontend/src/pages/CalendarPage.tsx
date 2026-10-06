@@ -2,8 +2,8 @@ import { PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Placeholder } from '@/components/layout/Placeholder'
 import { Button } from '@/components/ui/button'
+import { CalendarView } from '@/features/calendar/CalendarView'
 import { PersonalEventDialog } from '@/features/calendar/PersonalEventDialog'
 import { RecurringList } from '@/features/calendar/RecurringList'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
@@ -22,8 +22,8 @@ export function CalendarPage() {
           </Button>
         }
       />
-      <div className="flex flex-col gap-4">
-        <Placeholder text="Неделя и месяц появятся здесь." />
+      <div className="flex flex-col gap-6">
+        <CalendarView />
         <RecurringList />
       </div>
       <PersonalEventDialog open={creating} onOpenChange={setCreating} draft={{ date: todayIn(tz) }} />

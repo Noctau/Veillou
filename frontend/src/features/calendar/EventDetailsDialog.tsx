@@ -157,13 +157,13 @@ function EventDetails({
                 <Input id="ev-title" {...form.register('title')} />
               </Field>
             )}
-            <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
-              <Field>
+            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <Field className="col-span-2 sm:col-span-1">
                 <FieldLabel htmlFor="ev-date">{isClass ? 'Перенести на' : 'Когда'}</FieldLabel>
                 <Input id="ev-date" type="date" {...form.register('date')} />
               </Field>
-              <Input type="time" step={300} aria-label="Начало" className="w-24" {...form.register('start')} />
-              <Input type="time" step={300} aria-label="Конец" className="w-24" {...form.register('end')} />
+              <Input type="time" step={300} aria-label="Начало" className="sm:w-24" {...form.register('start')} />
+              <Input type="time" step={300} aria-label="Конец" className="sm:w-24" {...form.register('end')} />
             </div>
             {errors.end && <FieldError>{errors.end.message}</FieldError>}
             <Field>
