@@ -30,3 +30,11 @@ Telegram: создать бота у @BotFather, вписать `TELEGRAM_BOT_TO
 Напоминания: `make vapid-keys` → `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` в `.env`, запустить
 `make worker`, затем «Настройки → Уведомления → Включить» (push работает на https или localhost)
 и «Проверить уведомления». Без воркера напоминания не уходят.
+
+## Прод
+
+VPS + Docker Compose + Caddy, `make deploy` с мака, ежедневные бэкапы с восстановлением —
+[Docs/DEPLOY.md](Docs/DEPLOY.md).
+
+PWA локально (офлайн, «Поделиться» и прочее, чего нет в dev-режиме): `cd frontend && npx vite build && npx vite preview`
+(прокси `/api` → :8000 тот же).

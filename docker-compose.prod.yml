@@ -1,0 +1,108 @@
+# Прод: postgres, миграции, api, worker, bot, web (Caddy + собранный фронт), backup.
+# На сервере: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+# Обычно не руками, а `make deploy` с мака (Docs/DEPLOY.md).
+name: veillou-prod
+
+x-backend: &backend
+  build: ./backend
+  image: veillou-backend
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    ENV: prod
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    STORAGE_DIR: /data/files
+    SESSION_COOKIE_SECURE: "true"
+    APP_URL: https://${DOMAIN:?DOMAIN не задан в .env}
+  volumes:
+    - files:/data/files
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker"]
+
+  bot:
+    <<: *backend
+    command: ["python", "-m", "app.bot"]
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/caddy/Dockerfile
+    image: veillou-web
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  backup:
+    build: ./infra/backup
+    image: veillou-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${DEFAULT_TIMEZONE:-Europe/Moscow}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_UID: ${BACKUP_UID:-}
+      BACKUP_GID: ${BACKUP_GID:-}
+    volumes:
+      - files:/data/files
+      - ${BACKUP_DIR:-/srv/veillou/backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  files:
+  caddy_data:
+  caddy_config:

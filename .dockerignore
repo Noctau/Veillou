@@ -1,0 +1,6 @@
+# Контекст образа web (корень репо): нужны только frontend/ и infra/caddy/
+*
+!frontend
+!infra/caddy
+frontend/node_modules
+frontend/dist
