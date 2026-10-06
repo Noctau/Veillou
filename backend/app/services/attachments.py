@@ -21,7 +21,7 @@ from app.core.exceptions import ForbiddenError, InvalidDataError, NotFoundError
 from app.core.security import sign, verify_signature
 from app.core.storage import CHUNK, Storage, StoredBlob
 from app.domain.enums import AttachmentOwner
-from app.models import Attachment, Note, Project, Task, User
+from app.models import Attachment, Note, Project, Source, Task, User
 from app.schemas.attachment import AttachmentOrder, AttachmentRead, AttachmentUpdate
 from app.services.base import UserScopedRepository
 
@@ -29,6 +29,7 @@ OWNER_MODELS: dict[AttachmentOwner, Any] = {
     AttachmentOwner.task: Task,
     AttachmentOwner.project: Project,
     AttachmentOwner.note: Note,
+    AttachmentOwner.source: Source,
 }
 
 # Что безопасно показывать в браузере прямо со своего домена. Остальное (HTML,

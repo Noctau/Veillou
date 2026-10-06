@@ -24,6 +24,7 @@ export const router = createBrowserRouter([
           { path: 'add', lazy: page(() => import('@/pages/AddPage'), 'AddPage') },
           { path: 'study', lazy: page(() => import('@/pages/StudyPage'), 'StudyPage') },
           { path: 'tasks/:taskId', lazy: page(() => import('@/pages/TaskPage'), 'TaskPage') },
+          { path: 'subjects/:subjectId', lazy: page(() => import('@/pages/SubjectPage'), 'SubjectPage') },
           { path: 'notes/:noteId', lazy: page(() => import('@/pages/NotePage'), 'NotePage') },
           { path: 'projects/:projectId', lazy: page(() => import('@/pages/ProjectPage'), 'ProjectPage') },
           { path: 'inbox', lazy: page(() => import('@/pages/InboxPage'), 'InboxPage') },

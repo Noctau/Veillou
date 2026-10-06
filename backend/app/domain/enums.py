@@ -173,6 +173,7 @@ class AttachmentOwner(StrEnum):
     task = "task"
     project = "project"
     note = "note"  # страницы фото-конспекта, PDF
+    source = "source"  # файл источника литературы
 
 
 # ---------- конспекты (M5.2) ----------
@@ -185,6 +186,22 @@ class NoteKind(StrEnum):
     photo = "photo"  # фото страниц тетради
     file = "file"  # PDF и другие файлы
     link = "link"  # ссылка на Диск / сайт
+
+
+# ---------- литература (M5.5) ----------
+
+
+class SourceKind(StrEnum):
+    textbook = "textbook"  # учебник, книга
+    article = "article"  # статья
+    website = "website"  # сайт
+    other = "other"
+
+
+class SourceStatus(StrEnum):
+    to_read = "to_read"
+    reading = "reading"
+    done = "done"
 
 
 # ---------- проекты (M4.7) ----------

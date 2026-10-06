@@ -1,5 +1,6 @@
 import { ExternalLinkIcon, PlusIcon, UserIcon } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,13 +13,13 @@ import { cn } from '@/lib/utils'
 import { SubjectDialog } from './SubjectDialog'
 import { CONTROL_FORM_LABEL, type Subject, useSubjects } from './useSubjects'
 
-function SubjectCard({ subject, onOpen }: { subject: Subject; onOpen: () => void }) {
+function SubjectCard({ subject }: { subject: Subject }) {
   const color = paletteColor(subject.color)
   return (
     <Card className="relative overflow-hidden py-0">
       <span className={cn('absolute inset-y-0 left-0 w-1.5', color.bg)} aria-hidden />
       <CardContent className="flex flex-col gap-2 py-3 pl-5">
-        <button type="button" onClick={onOpen} className="flex items-start gap-2 text-left">
+        <Link to={`/subjects/${subject.id}`} className="flex items-start gap-2 text-left after:absolute after:inset-0">
           <span className="flex-1">
             <span className="block font-medium leading-tight">{subject.name}</span>
             {subject.short_name && (
@@ -28,7 +29,7 @@ function SubjectCard({ subject, onOpen }: { subject: Subject; onOpen: () => void
           {subject.control_form !== 'none' && (
             <Badge variant="secondary">{CONTROL_FORM_LABEL[subject.control_form]}</Badge>
           )}
-        </button>
+        </Link>
         {subject.teachers.length > 0 && (
           <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground">
             {subject.teachers.map((t, i) => (
@@ -50,7 +51,7 @@ function SubjectCard({ subject, onOpen }: { subject: Subject; onOpen: () => void
                 href={l.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                className="relative z-10 inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
               >
                 {l.title || new URL(l.url).hostname}
                 <ExternalLinkIcon className="size-3" />
@@ -65,7 +66,6 @@ function SubjectCard({ subject, onOpen }: { subject: Subject; onOpen: () => void
 
 export function SubjectList({ semesterId }: { semesterId?: string }) {
   const { data, isPending, isError, error } = useSubjects()
-  const [editing, setEditing] = useState<Subject | null>(null)
   const [creating, setCreating] = useState(false)
 
   const subjects = (data ?? []).filter((s) => !semesterId || s.semester_id === semesterId || !s.semester_id)
@@ -81,7 +81,7 @@ export function SubjectList({ semesterId }: { semesterId?: string }) {
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         {subjects.map((s) => (
-          <SubjectCard key={s.id} subject={s} onOpen={() => setEditing(s)} />
+          <SubjectCard key={s.id} subject={s} />
         ))}
       </div>
       <Button variant="outline" className="self-start" onClick={() => setCreating(true)}>
@@ -93,11 +93,6 @@ export function SubjectList({ semesterId }: { semesterId?: string }) {
         onOpenChange={setCreating}
         semesterId={semesterId}
         colorIndex={data?.length ?? 0}
-      />
-      <SubjectDialog
-        open={!!editing}
-        onOpenChange={(open) => !open && setEditing(null)}
-        subject={editing ?? undefined}
       />
     </div>
   )

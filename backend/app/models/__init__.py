@@ -8,6 +8,7 @@ from app.models.note import Note
 from app.models.project import Milestone, Project
 from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
 from app.models.session import UserSession
+from app.models.source import Source
 from app.models.task import Subtask, Task
 from app.models.telegram import TelegramLinkCode
 from app.models.user import User
@@ -26,6 +27,7 @@ __all__ = [
     "Project",
     "RecurringEvent",
     "Semester",
+    "Source",
     "Subject",
     "Subtask",
     "Task",

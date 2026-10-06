@@ -13,10 +13,11 @@ type Props = {
   variant?: 'default' | 'outline' | 'secondary' | 'ghost'
   onDone?: () => void
   className?: string
+  label?: string
 }
 
 /** «Конспект к этой паре»: открывает начатый конспект пары или создаёт новый с предметом и датой. */
-export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'outline', onDone, className }: Props) {
+export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'outline', onDone, className, label }: Props) {
   const navigate = useNavigate()
   const open = useNoteForEvent()
   return (
@@ -37,7 +38,7 @@ export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'o
         )
       }
     >
-      <NotebookPenIcon /> {hasNote ? 'Открыть конспект' : 'Конспект к этой паре'}
+      <NotebookPenIcon /> {label ?? (hasNote ? 'Открыть конспект' : 'Конспект к этой паре')}
     </Button>
   )
 }

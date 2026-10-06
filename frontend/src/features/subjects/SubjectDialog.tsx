@@ -85,9 +85,11 @@ type Props = {
   semesterId?: string
   /** Для нового предмета — следующий цвет палитры, чтобы предметы различались. */
   colorIndex?: number
+  /** После удаления (с карточки предмета — уйти со страницы). */
+  onDeleted?: () => void
 }
 
-export function SubjectDialog({ open, onOpenChange, subject, semesterId, colorIndex }: Props) {
+export function SubjectDialog({ open, onOpenChange, subject, semesterId, colorIndex, onDeleted }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -100,6 +102,7 @@ export function SubjectDialog({ open, onOpenChange, subject, semesterId, colorIn
             semesterId={semesterId}
             colorIndex={colorIndex}
             onDone={() => onOpenChange(false)}
+            onDeleted={onDeleted}
           />
         )}
       </DialogContent>
@@ -112,11 +115,13 @@ function SubjectForm({
   semesterId,
   colorIndex,
   onDone,
+  onDeleted,
 }: {
   subject?: Subject
   semesterId?: string
   colorIndex?: number
   onDone: () => void
+  onDeleted?: () => void
 }) {
   const create = useCreateSubject()
   const update = useUpdateSubject()
@@ -265,7 +270,14 @@ function SubjectForm({
           <ConfirmButton
             title={`Удалить «${subject.name}»?`}
             description="Пары этого предмета исчезнут из расписания."
-            onConfirm={() => remove.mutate(subject.id, { onSuccess: onDone })}
+            onConfirm={() =>
+              remove.mutate(subject.id, {
+                onSuccess: () => {
+                  onDone()
+                  onDeleted?.()
+                },
+              })
+            }
           >
             <Button type="button" variant="ghost" size="icon" aria-label="Удалить предмет" className="mr-auto text-destructive">
               <Trash2Icon />

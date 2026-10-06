@@ -24,6 +24,7 @@ import { useAttachments } from '@/features/attachments/useAttachments'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSubjects } from '@/features/subjects/useSubjects'
 import { errorMessage } from '@/lib/errors'
+import { normalizeUrl } from '@/lib/url'
 
 import { isPageImage, NOTE_KIND, NOTE_KINDS, pairLabel } from './labels'
 import { NotePages } from './NotePages'
@@ -73,29 +74,24 @@ function LinkEditor({ note, onSave }: { note: Note; onSave: (url: string | null)
   const [value, setValue] = useState(note.url ?? '')
   const [invalid, setInvalid] = useState(false)
   const commit = () => {
-    const raw = value.trim()
-    if (!raw) {
+    if (!value.trim()) {
       setInvalid(false)
       if (note.url) onSave(null)
       return
     }
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
-    try {
-      const url = new URL(withScheme)
-      if (!/^https?:$/.test(url.protocol)) throw new Error()
-      setInvalid(false)
-      setValue(url.href)
-      if (url.href !== note.url) onSave(url.href)
-    } catch {
-      setInvalid(true)
-    }
+    const url = normalizeUrl(value)
+    setInvalid(!url)
+    if (!url) return
+    setValue(url)
+    if (url !== note.url) onSave(url)
   }
   return (
     <div className="flex flex-col gap-1">
       <div className="flex gap-2">
         <Input
-          type="url"
+          type="text"
           inputMode="url"
+          autoComplete="url"
           value={value}
           placeholder="https://disk.yandex.ru/…"
           aria-label="Ссылка"
