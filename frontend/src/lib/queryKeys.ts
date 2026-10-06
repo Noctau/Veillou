@@ -20,4 +20,5 @@ export const queryKeys = {
   backlogAll: ['backlog'] as const,
   backlog: (status: string) => ['backlog', status] as const,
   quickParse: (text: string) => ['quick-parse', text] as const,
+  attachments: (ownerType: string, ownerId: string) => ['attachments', ownerType, ownerId] as const,
 }

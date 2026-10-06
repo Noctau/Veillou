@@ -25,4 +25,7 @@ class InputModel(BaseModel):
 
 
 class ReadModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # Поля с дефолтами в ответе всегда есть — в TS-типах они обязательные
+    model_config = ConfigDict(
+        from_attributes=True, json_schema_serialization_defaults_required=True
+    )

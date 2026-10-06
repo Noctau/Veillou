@@ -1960,7 +1960,7 @@ export interface components {
              * Events
              * @description Блоки в календаре
              */
-            events?: components["schemas"]["SubtaskEvent"][];
+            events: components["schemas"]["SubtaskEvent"][];
         };
         /**
          * SubtaskSchedule

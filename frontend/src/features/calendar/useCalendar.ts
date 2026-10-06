@@ -87,7 +87,11 @@ export function useUpdateEvent() {
       for (const [key, data] of context?.snapshot ?? []) queryClient.setQueryData(key, data)
       toast.error(errorMessage(error))
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll }),
+    onSettled: (_data, _error, { body }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
+      // «Сделано» на блоке подзадачи закрывает и саму подзадачу
+      if (body.status) queryClient.invalidateQueries({ queryKey: queryKeys.tasks })
+    },
   })
 }
 

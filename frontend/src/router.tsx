@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
           { path: 'calendar', lazy: page(() => import('@/pages/CalendarPage'), 'CalendarPage') },
           { path: 'add', lazy: page(() => import('@/pages/AddPage'), 'AddPage') },
           { path: 'study', lazy: page(() => import('@/pages/StudyPage'), 'StudyPage') },
+          { path: 'tasks/:taskId', lazy: page(() => import('@/pages/TaskPage'), 'TaskPage') },
           { path: 'inbox', lazy: page(() => import('@/pages/InboxPage'), 'InboxPage') },
           { path: 'settings', lazy: page(() => import('@/pages/SettingsPage'), 'SettingsPage') },
           { path: '*', element: <NotFoundPage /> },

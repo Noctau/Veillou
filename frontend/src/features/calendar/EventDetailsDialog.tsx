@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BanIcon, CheckIcon, PencilIcon, RepeatIcon, RotateCcwIcon, Trash2Icon, Undo2Icon } from 'lucide-react'
+import { BanIcon, CheckIcon, ExternalLinkIcon, PencilIcon, RepeatIcon, RotateCcwIcon, Trash2Icon, Undo2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useNavigate } from 'react-router'
 import { z } from 'zod'
 
 import { ConfirmButton } from '@/components/common/ConfirmButton'
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
+import { api } from '@/lib/api'
 import { paletteColor } from '@/lib/colors'
 import { addDaysIso, formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { cn } from '@/lib/utils'
@@ -72,6 +74,20 @@ export function EventDetailsDialog({ event, onOpenChange }: Props) {
         recurring={series}
       />
     </>
+  )
+}
+
+/** Блок подзадачи → экран её задания. */
+function OpenTaskButton({ subtaskId }: { subtaskId: string }) {
+  const navigate = useNavigate()
+  const open = async () => {
+    const { data } = await api.GET('/api/v1/subtasks/{subtask_id}', { params: { path: { subtask_id: subtaskId } } })
+    if (data) navigate(`/tasks/${data.task_id}`)
+  }
+  return (
+    <Button variant="ghost" onClick={() => void open()}>
+      <ExternalLinkIcon /> Задание
+    </Button>
   )
 }
 
@@ -207,6 +223,9 @@ function EventDetails({
             <Button variant="ghost" onClick={() => onEditSeries(event.template_id!)}>
               <RepeatIcon /> Вся серия
             </Button>
+          )}
+          {event.source_type === 'subtask' && event.source_id && (
+            <OpenTaskButton subtaskId={event.source_id} />
           )}
           {!fromTemplate && (
             <ConfirmButton title="Удалить событие?" onConfirm={() => remove.mutate(event.id, { onSuccess: onClose })}>
