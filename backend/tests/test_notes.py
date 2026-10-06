@@ -149,6 +149,7 @@ async def test_cover_and_attachments_deleted_with_note(auth_client: AsyncClient)
     listed = (await auth_client.get(f"{API}/notes")).json()
     assert listed[0]["attachments_count"] == 1
     assert listed[0]["cover_url"].startswith(f"{API}/files/{page['id']}?")
+    assert listed[0]["cover_url"].endswith(page["url"][page["url"].index("&v=") :])
 
     await auth_client.delete(f"{API}/notes/{note['id']}")
     resp = await auth_client.get(

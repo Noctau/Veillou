@@ -16,6 +16,7 @@ from app.api import (
     projects,
     quickadd,
     schedule,
+    search,
     sources,
     tasks,
     telegram,
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     api.include_router(projects.router)
     api.include_router(notes.router)
     api.include_router(sources.router)
+    api.include_router(search.router)
     api.include_router(attachments.router)
     api.include_router(attachments.files_router)
     app.include_router(api)

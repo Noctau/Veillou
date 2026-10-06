@@ -1,6 +1,7 @@
 """Литература: CRUD по предмету и задание чтения из источника."""
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import func, select
@@ -60,15 +61,18 @@ class SourceService:
         read.files_count = (await self._files_count([source.id])).get(source.id, 0)
         return read
 
-    async def list(self, subject_id: uuid.UUID | None = None) -> list[SourceRead]:
-        where = [Source.subject_id == subject_id] if subject_id else []
-        sources = await self.sources.find_all(*where, order_by=[Source.created_at])
-        sources.sort(key=lambda s: (not s.required, _STATUS_ORDER.get(s.status, 9)))
+    async def reads(self, sources: Sequence[Source]) -> list[SourceRead]:
         counts = await self._files_count([s.id for s in sources])
         reads = [SourceRead.model_validate(s) for s in sources]
         for read in reads:
             read.files_count = counts.get(read.id, 0)
         return reads
+
+    async def list(self, subject_id: uuid.UUID | None = None) -> list[SourceRead]:
+        where = [Source.subject_id == subject_id] if subject_id else []
+        sources = await self.sources.find_all(*where, order_by=[Source.created_at])
+        sources.sort(key=lambda s: (not s.required, _STATUS_ORDER.get(s.status, 9)))
+        return await self.reads(sources)
 
     async def get(self, id: uuid.UUID) -> SourceRead:
         return await self._read(await self.sources.get_or_404(id))

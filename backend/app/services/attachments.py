@@ -77,12 +77,16 @@ def signed_url(
     return url + "&download=1" if download else url
 
 
+def file_url(attachment: Attachment, *, download: bool = False) -> str:
+    """Подписанная ссылка с версией содержимого (v=): после замены файла (поворот
+    страницы) браузер не покажет старую картинку из кэша."""
+    return signed_url(attachment.id, download=download) + f"&v={attachment.sha256[:12]}"
+
+
 def to_read(attachment: Attachment) -> AttachmentRead:
     read = AttachmentRead.model_validate(attachment)
-    # v= — версия содержимого: после замены (поворот страницы) кэш браузера не мешает
-    version = f"&v={attachment.sha256[:12]}"
-    read.url = signed_url(attachment.id) + version
-    read.download_url = signed_url(attachment.id, download=True) + version
+    read.url = file_url(attachment)
+    read.download_url = file_url(attachment, download=True)
     return read
 
 

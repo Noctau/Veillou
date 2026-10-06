@@ -927,6 +927,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Конспекты (название и текст) и литература (название, автор, заметка).
+         *     Каждое слово — префикс: искать можно по мере набора. Самое подходящее — первым.
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attachments": {
         parameters: {
             query?: never;
@@ -1823,6 +1844,57 @@ export interface components {
             pair_number: number | null;
             class_type: components["schemas"]["ClassType"] | null;
         };
+        /** NoteHit */
+        NoteHit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            kind: components["schemas"]["NoteKind"];
+            /** Subject Id */
+            subject_id: string | null;
+            /** Event Id */
+            event_id: string | null;
+            /** Class Date */
+            class_date: string | null;
+            /** Url */
+            url: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Excerpt
+             * @description Начало текста без разметки
+             * @default
+             */
+            excerpt: string;
+            /**
+             * Attachments Count
+             * @default 0
+             */
+            attachments_count: number;
+            /**
+             * Cover Url
+             * @description Первая страница-картинка
+             */
+            cover_url: string | null;
+            /**
+             * Snippet
+             * @description Фрагмент текста; совпадения обёрнуты в \u0002…\u0003
+             * @default
+             */
+            snippet: string;
+        };
         /**
          * NoteKind
          * @description Чем в основном является конспект — от этого зависит экран просмотра.
@@ -2408,6 +2480,13 @@ export interface components {
             weekly_review_weekday?: number | null;
             /** Weekly Review */
             weekly_review?: string | null;
+        };
+        /** SearchResults */
+        SearchResults: {
+            /** Notes */
+            notes: components["schemas"]["NoteHit"][];
+            /** Sources */
+            sources: components["schemas"]["SourceRead"][];
         };
         /** SemesterCreate */
         SemesterCreate: {
@@ -9625,6 +9704,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+                subject_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
                 };
             };
             /** @description Bad Request */

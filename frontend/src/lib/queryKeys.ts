@@ -27,6 +27,7 @@ export const queryKeys = {
   notesList: ['notes', 'list'] as const,
   noteList: (params: object) => ['notes', 'list', params] as const,
   note: (id: string) => ['notes', 'detail', id] as const,
+  search: (q: string, subjectId?: string) => ['search', q, subjectId ?? ''] as const,
   sourcesAll: ['sources'] as const,
   sources: (subjectId: string) => ['sources', subjectId] as const,
 }

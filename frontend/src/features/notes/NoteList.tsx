@@ -1,8 +1,9 @@
-import { PaperclipIcon, PlusIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { BookIcon, PaperclipIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSubjects } from '@/features/subjects/useSubjects'
@@ -11,7 +12,9 @@ import { errorMessage } from '@/lib/errors'
 import { formatDay } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
+import { Highlight } from './Highlight'
 import { NOTE_KIND, NOTE_KINDS } from './labels'
+import { useSearch } from './useSearch'
 import { type NoteCreate, type NoteListItem, useCreateNote, useNotes } from './useNotes'
 
 /** «＋ Конспект» → вид → сразу открыть новый конспект. */
@@ -87,28 +90,106 @@ type Props = {
   limit?: number
 }
 
+function SearchResultsList({ text, subjectId, showSubject }: { text: string; subjectId?: string; showSubject?: boolean }) {
+  const { data, isPending, isError, error, isPlaceholderData } = useSearch(text, subjectId)
+  const { data: subjects } = useSubjects()
+  if (isPending) return <Skeleton className="h-24" />
+  if (isError) return <p className="text-sm text-destructive">{errorMessage(error)}</p>
+  if (!data.notes.length && !data.sources.length) {
+    return <p className="py-8 text-center text-sm text-muted-foreground">Ничего не нашлось.</p>
+  }
+  return (
+    <div className={cn('flex flex-col gap-4', isPlaceholderData && 'opacity-60')}>
+      {data.notes.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {data.notes.map((n) => (
+            <li key={n.id}>
+              <NoteRow note={n} showSubject={showSubject} snippet={n.snippet ? <Highlight text={n.snippet} /> : undefined} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {data.sources.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h3 className="px-1 text-xs text-muted-foreground uppercase">Литература</h3>
+          <ul className="flex flex-col gap-1">
+            {data.sources.map((s) => {
+              const subject = subjects?.find((x) => x.id === s.subject_id)
+              return (
+                <li key={s.id}>
+                  <Link
+                    to={`/subjects/${s.subject_id}?tab=sources`}
+                    className="flex items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted"
+                  >
+                    <BookIcon className="size-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{s.title}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {[s.author, showSubject && subject && (subject.short_name || subject.name)].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
 /** Конспекты предмета (или все): свежие пары первыми. */
 export function NoteList({ subjectId, showSubject, limit }: Props) {
+  const [text, setText] = useState('')
+  const searching = text.trim().length > 0
   const { data: notes, isPending, isError, error } = useNotes({ subject_id: subjectId, limit })
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-end">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Поиск по конспектам и литературе"
+            aria-label="Поиск по конспектам"
+            className="pr-8 pl-8 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {searching && (
+            <button
+              type="button"
+              aria-label="Очистить поиск"
+              onClick={() => setText('')}
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+            >
+              <XIcon className="size-4" />
+            </button>
+          )}
+        </div>
         <NewNoteButton draft={{ subject_id: subjectId ?? null }} />
       </div>
-      {isPending && <Skeleton className="h-24" />}
-      {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
-      {notes && notes.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Конспектов пока нет. Текст с формулами, фото тетради, PDF или ссылка на Диск.
-        </p>
+      {searching ? (
+        <SearchResultsList text={text} subjectId={subjectId} showSubject={showSubject} />
+      ) : (
+        <>
+          {isPending && <Skeleton className="h-24" />}
+          {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+          {notes && notes.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Конспектов пока нет. Текст с формулами, фото тетради, PDF или ссылка на Диск.
+            </p>
+          )}
+          <ul className="flex flex-col gap-1">
+            {notes?.map((n) => (
+              <li key={n.id}>
+                <NoteRow note={n} showSubject={showSubject} />
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-      <ul className="flex flex-col gap-1">
-        {notes?.map((n) => (
-          <li key={n.id}>
-            <NoteRow note={n} showSubject={showSubject} />
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

@@ -13,7 +13,7 @@ from app.domain.enums import AttachmentOwner, NoteKind
 from app.domain.notes import default_title, excerpt
 from app.models import Attachment, Event, Note, Subject, User
 from app.schemas.note import NoteCreate, NoteEvent, NoteListItem, NoteRead, NoteUpdate
-from app.services.attachments import delete_for_owners, is_inline_image, signed_url
+from app.services.attachments import delete_for_owners, file_url, is_inline_image
 from app.services.base import UserScopedRepository
 
 
@@ -71,7 +71,7 @@ class NoteService:
         read.excerpt = excerpt(note.body_md)
         read.attachments_count = len(attachments)
         cover = next((a for a in attachments if is_inline_image(a.mime)), None)
-        read.cover_url = signed_url(cover.id) if cover else None
+        read.cover_url = file_url(cover) if cover else None
         return read
 
     async def list_items(self, notes: Sequence[Note]) -> list[NoteListItem]:
