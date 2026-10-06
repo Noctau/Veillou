@@ -216,3 +216,40 @@ class ProjectStatus(StrEnum):
 class MilestoneStatus(StrEnum):
     planned = "planned"
     done = "done"
+
+
+# ---------- уведомления (M6) ----------
+
+
+class JobStatus(StrEnum):
+    pending = "pending"
+    running = "running"
+    done = "done"
+    failed = "failed"
+
+
+class JobKind(StrEnum):
+    reminders_sync = "reminders.sync"  # пересобрать будущие напоминания пользователя
+
+
+class ReminderKind(StrEnum):
+    morning_digest = "morning_digest"
+    before_class = "before_class"
+    deadline = "deadline"
+    subtask_start = "subtask_start"
+    test = "test"  # «Проверить уведомления» из Настроек
+
+
+class ReminderStatus(StrEnum):
+    pending = "pending"
+    sent = "sent"
+    skipped = "skipped"  # устарело (пара отменена, задание сделано, истёк срок)
+    failed = "failed"  # кончились попытки
+
+
+class ReminderAction(StrEnum):
+    """Кнопки на напоминании (Telegram и Android-пуш)."""
+
+    done = "done"  # «Сделано»
+    snooze = "snooze"  # «+15 мин»
+    tomorrow = "tomorrow"  # «На завтра»

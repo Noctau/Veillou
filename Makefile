@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install
+.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install vapid-keys
 
 COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env
 BACK = cd backend && uv run
@@ -54,3 +54,7 @@ bot:
 
 worker:
 	$(BACK) python -m app.worker
+
+# Ключи Web Push -> скопировать в .env
+vapid-keys:
+	$(BACK) python -m app.cli vapid-keys

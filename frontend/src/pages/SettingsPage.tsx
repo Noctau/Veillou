@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
+import { NotificationsSection } from '@/features/notifications/NotificationsSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
 import { AccountSection } from '@/features/settings/sections/AccountSection'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
@@ -42,6 +43,7 @@ export function SettingsPage() {
           <CategoriesSection />
           <ScheduleSection settings={settings} />
           <RemindersSection settings={settings} />
+          <NotificationsSection />
           <TelegramSection />
           <AccountSection />
         </div>

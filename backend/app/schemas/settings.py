@@ -16,6 +16,7 @@ from pydantic import (
     ConfigDict,
     Field,
     create_model,
+    field_validator,
     model_validator,
 )
 
@@ -62,10 +63,28 @@ class BeforeClassRule(ReminderRule):
     minutes_before: int = Field(default=15, ge=0, le=180)
 
 
+DaysBefore = Annotated[int, Field(ge=0, le=14)]
+
+
+class DeadlineRule(ReminderRule):
+    """Приходит во время утренней сводки (и склеивается с ней)."""
+
+    days_before: list[DaysBefore] = Field(
+        default_factory=lambda: [3, 1, 0],
+        max_length=5,
+        description="За сколько дней до дедлайна; 0 — утром в день сдачи",
+    )
+
+    @field_validator("days_before")
+    @classmethod
+    def _unique_desc(cls, value: list[int]) -> list[int]:
+        return sorted(set(value), reverse=True)
+
+
 class Reminders(_Model):
     morning_digest: ReminderRule = ReminderRule()
     before_class: BeforeClassRule = BeforeClassRule()
-    deadlines: ReminderRule = ReminderRule()
+    deadlines: DeadlineRule = DeadlineRule()
     evening_review: ReminderRule = ReminderRule()
     weekly_review: ReminderRule = ReminderRule()
     subtask_start: ReminderRule = ReminderRule(enabled=False)

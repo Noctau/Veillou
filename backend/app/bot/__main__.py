@@ -4,9 +4,18 @@ import asyncio
 import logging
 import sys
 
+from aiogram.types import BotCommand
+
 from app.bot.app import create_bot, create_dispatcher
 from app.core.config import settings
 from app.core.db import engine
+
+COMMANDS = [
+    BotCommand(command="today", description="План на сегодня"),
+    BotCommand(command="week", description="План на неделю"),
+    BotCommand(command="add", description="Добавить дело: /add текст"),
+    BotCommand(command="help", description="Что я умею"),
+]
 
 
 async def main() -> None:
@@ -22,6 +31,7 @@ async def main() -> None:
                 settings.TELEGRAM_BOT_USERNAME,
                 me.username,
             )
+        await bot.set_my_commands(COMMANDS)
         logging.info("Бот @%s запущен", me.username)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

@@ -251,7 +251,6 @@ async def test_worker_survives_failing_job(monkeypatch):
         raise ConnectionError("db down")
 
     logged: list[str] = []
-    monkeypatch.setattr(worker, "nightly", boom)
-    monkeypatch.setattr(worker.log, "exception", lambda msg, *a: logged.append(msg))
-    await worker.run_nightly_safely()  # не бросает
-    assert logged == ["Ночная джоба упала"]
+    monkeypatch.setattr(worker.log, "exception", lambda msg, *a: logged.append(msg % a))
+    await worker.safely("Ночная джоба", boom)  # не бросает
+    assert logged == ["Ночная джоба: ошибка"]

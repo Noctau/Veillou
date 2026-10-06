@@ -21,6 +21,12 @@ make dev          # Postgres 16 (docker, :5433) + миграции + API :8000 +
 | `make gen-api` | OpenAPI бэкенда → `frontend/src/api/schema.d.ts` |
 | `make create-user email=...` | создать пользователя (пароль спросит; регистрации в приложении нет) |
 | `make bot` | Telegram-бот (long polling), нужен `TELEGRAM_BOT_TOKEN` в `.env` |
+| `make worker` | фоновый процесс: напоминания (push + Telegram), пересборка, ночная докатка |
+| `make vapid-keys` | ключи Web Push → вписать в `.env` |
 
 Telegram: создать бота у @BotFather, вписать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_BOT_USERNAME`
 в `.env`, запустить `make bot`, затем «Настройки → Telegram → Привязать».
+
+Напоминания: `make vapid-keys` → `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` в `.env`, запустить
+`make worker`, затем «Настройки → Уведомления → Включить» (push работает на https или localhost)
+и «Проверить уведомления». Без воркера напоминания не уходят.

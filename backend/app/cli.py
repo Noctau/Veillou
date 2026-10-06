@@ -3,6 +3,7 @@
     python -m app.cli create-user me@example.com [--timezone Europe/Moscow]
     python -m app.cli set-password me@example.com
     python -m app.cli roll-series   # докатить повторы и регулярные задания (как ночная джоба)
+    python -m app.cli vapid-keys    # сгенерировать ключи Web Push для .env
 
 Пароль спрашивается интерактивно (или берётся из VEILLOU_PASSWORD — для скриптов).
 """
@@ -53,6 +54,23 @@ async def _roll_series() -> None:
     print(f"Создано вхождений: {created}, подзадач регулярных заданий: {subtasks}")
 
 
+def _vapid_keys() -> None:
+    """Пара ключей P-256 в формате, который ждут браузер (applicationServerKey) и pywebpush."""
+    import base64
+
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    def b64(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    private = key.private_numbers().private_value.to_bytes(32, "big")
+    public = key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    print(f"VAPID_PUBLIC_KEY={b64(public)}")
+    print(f"VAPID_PRIVATE_KEY={b64(private)}")
+
+
 async def _run(args: argparse.Namespace) -> None:
     try:
         if args.command == "create-user":
@@ -79,8 +97,13 @@ def main() -> None:
     setpw.add_argument("email")
 
     sub.add_parser("roll-series", help="докатить повторы и регулярные задания")
+    sub.add_parser("vapid-keys", help="сгенерировать VAPID-ключи для Web Push")
 
-    asyncio.run(_run(parser.parse_args()))
+    args = parser.parse_args()
+    if args.command == "vapid-keys":
+        _vapid_keys()
+        return
+    asyncio.run(_run(args))
 
 
 if __name__ == "__main__":

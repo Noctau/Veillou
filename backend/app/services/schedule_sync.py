@@ -44,6 +44,7 @@ from app.models import (
     Subject,
     User,
 )
+from app.services.jobs import request_reminders_sync
 
 # Личные повторы материализуются на столько дней вперёд (ночная джоба докатывает)
 RECURRING_HORIZON_DAYS = 90
@@ -211,6 +212,7 @@ class SeriesSync:
             )
             .values(deleted_at=self.now)
         )
+        await request_reminders_sync(self.db, self.user_id)
 
     async def restore_occurrence(self, event: Event) -> None:
         """«Как в расписании» для одного вхождения — в том числе прошедшего.

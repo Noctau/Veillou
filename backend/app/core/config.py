@@ -47,12 +47,31 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_USERNAME: str | None = None  # без @, для ссылки t.me/<bot>?start=<код>
     TELEGRAM_LINK_CODE_TTL_MIN: int = 10
 
+    # Публичный адрес приложения (https://…) — для кнопки «Открыть» в Telegram.
+    # Без него ссылок в боте нет: Telegram не принимает http://localhost.
+    APP_URL: str | None = None
+
+    # Web Push (VAPID). Ключи: `make vapid-keys`. Subject — mailto: или https: владельца.
+    VAPID_PUBLIC_KEY: str | None = None
+    VAPID_PRIVATE_KEY: SecretStr | None = None
+    VAPID_SUBJECT: str = "mailto:admin@localhost"
+
+    # Как часто воркер проверяет очереди (точность напоминаний — не хуже минуты)
+    WORKER_POLL_SEC: float = 10.0
+
     @field_validator("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_USERNAME", mode="before")
     @classmethod
     def _empty_is_none(cls, value: Any) -> Any:
         # `TELEGRAM_BOT_TOKEN=` в .env означает «не задан»
         if isinstance(value, str):
             value = value.strip().removeprefix("@")
+        return value or None
+
+    @field_validator("APP_URL", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = value.strip().rstrip("/")
         return value or None
 
     @field_validator("SECRET_KEY", mode="before")
