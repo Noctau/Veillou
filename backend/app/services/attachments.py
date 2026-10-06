@@ -19,15 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import ForbiddenError, InvalidDataError, NotFoundError
 from app.core.security import sign, verify_signature
-from app.core.storage import CHUNK, Storage
+from app.core.storage import CHUNK, Storage, StoredBlob
 from app.domain.enums import AttachmentOwner
-from app.models import Attachment, Project, Task, User
-from app.schemas.attachment import AttachmentRead, AttachmentUpdate
+from app.models import Attachment, Note, Project, Task, User
+from app.schemas.attachment import AttachmentOrder, AttachmentRead, AttachmentUpdate
 from app.services.base import UserScopedRepository
 
 OWNER_MODELS: dict[AttachmentOwner, Any] = {
     AttachmentOwner.task: Task,
     AttachmentOwner.project: Project,
+    AttachmentOwner.note: Note,
 }
 
 # Что безопасно показывать в браузере прямо со своего домена. Остальное (HTML,
@@ -40,6 +41,11 @@ def is_inline_safe(mime: str) -> bool:
     return mime in INLINE_MIME or mime.startswith(INLINE_MIME_PREFIXES)
 
 
+def is_inline_image(mime: str) -> bool:
+    """Картинка, которую браузер покажет в <img> (обложка конспекта, галерея)."""
+    return mime.startswith(INLINE_MIME_PREFIXES) and mime != "image/heic"
+
+
 class AttachmentRepo(UserScopedRepository[Attachment]):
     model = Attachment
     not_found_message = "Файл не найден"
@@ -48,6 +54,13 @@ class AttachmentRepo(UserScopedRepository[Attachment]):
 def _clean_filename(name: str | None) -> str:
     base = PurePath((name or "").replace("\\", "/")).name.strip()
     return (base or "файл")[:255]
+
+
+def _mime(file: UploadFile, filename: str) -> str:
+    mime = file.content_type or ""
+    if not mime or mime == "application/octet-stream":
+        mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return mime[:127]
 
 
 def _message(attachment_id: uuid.UUID, exp: int) -> str:
@@ -65,8 +78,10 @@ def signed_url(
 
 def to_read(attachment: Attachment) -> AttachmentRead:
     read = AttachmentRead.model_validate(attachment)
-    read.url = signed_url(attachment.id)
-    read.download_url = signed_url(attachment.id, download=True)
+    # v= — версия содержимого: после замены (поворот страницы) кэш браузера не мешает
+    version = f"&v={attachment.sha256[:12]}"
+    read.url = signed_url(attachment.id) + version
+    read.download_url = signed_url(attachment.id, download=True) + version
     return read
 
 
@@ -103,6 +118,16 @@ class AttachmentService:
         if exists is None:
             raise NotFoundError("Не найдено, к чему приложить файл")
 
+    async def reorder(self, data: AttachmentOrder) -> list[Attachment]:
+        current = await self.list(data.owner_type, data.owner_id)
+        if len(set(data.ids)) != len(data.ids) or set(data.ids) != {a.id for a in current}:
+            raise InvalidDataError("Нужен полный список файлов без повторов")
+        by_id = {a.id: a for a in current}
+        for position, attachment_id in enumerate(data.ids):
+            by_id[attachment_id].position = position
+        await self.db.commit()
+        return [by_id[i] for i in data.ids]
+
     async def list(self, owner_type: AttachmentOwner, owner_id: uuid.UUID) -> list[Attachment]:
         await self._check_owner(owner_type, owner_id)
         return await self.attachments.find_all(
@@ -111,11 +136,7 @@ class AttachmentService:
             order_by=[Attachment.position, Attachment.created_at],
         )
 
-    async def upload(
-        self, owner_type: AttachmentOwner, owner_id: uuid.UUID, file: UploadFile
-    ) -> Attachment:
-        await self._check_owner(owner_type, owner_id)
-
+    async def _save(self, file: UploadFile) -> StoredBlob:
         async def chunks() -> AsyncIterator[bytes]:
             while chunk := await file.read(CHUNK):
                 yield chunk
@@ -123,6 +144,13 @@ class AttachmentService:
         blob = await self.storage.save(chunks(), max_bytes=settings.MAX_UPLOAD_MB * 1024 * 1024)
         if blob.size == 0:
             raise InvalidDataError("Пустой файл")
+        return blob
+
+    async def upload(
+        self, owner_type: AttachmentOwner, owner_id: uuid.UUID, file: UploadFile
+    ) -> Attachment:
+        await self._check_owner(owner_type, owner_id)
+        blob = await self._save(file)
         # Тот же файл к тому же объекту второй раз не прикладываем
         same = await self.attachments.find_all(
             Attachment.owner_type == owner_type,
@@ -133,9 +161,7 @@ class AttachmentService:
             return same[0]
 
         filename = _clean_filename(file.filename)
-        mime = file.content_type or ""
-        if not mime or mime == "application/octet-stream":
-            mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        mime = _mime(file, filename)
         last = await self.db.scalar(
             select(func.max(Attachment.position)).where(
                 Attachment.user_id == self.user_id,
@@ -148,7 +174,7 @@ class AttachmentService:
             owner_type=owner_type,
             owner_id=owner_id,
             filename=filename,
-            mime=mime[:127],
+            mime=mime,
             size=blob.size,
             sha256=blob.sha256,
             storage_key=blob.key,
@@ -164,6 +190,19 @@ class AttachmentService:
             if value is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
             setattr(attachment, name, value)
+        await self.db.commit()
+        return attachment
+
+    async def replace(self, id: uuid.UUID, file: UploadFile) -> Attachment:
+        """Новое содержимое того же вложения (повёрнутая страница): id и место не меняются."""
+        attachment = await self.attachments.get_or_404(id)
+        blob = await self._save(file)
+        attachment.sha256 = blob.sha256
+        attachment.storage_key = blob.key
+        attachment.size = blob.size
+        if file.filename:
+            attachment.filename = _clean_filename(file.filename)
+        attachment.mime = _mime(file, attachment.filename)
         await self.db.commit()
         return attachment
 

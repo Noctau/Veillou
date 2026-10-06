@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.exceptions import NotFoundError
 from app.core.storage import FileTooLargeError, Storage, get_storage
 from app.domain.enums import AttachmentOwner
-from app.schemas.attachment import AttachmentRead, AttachmentUpdate
+from app.schemas.attachment import AttachmentOrder, AttachmentRead, AttachmentUpdate
 from app.services.attachments import AttachmentService, is_inline_safe, resolve_signed, to_read
 
 StorageDep = Annotated[Storage, Depends(get_storage)]
@@ -51,6 +51,20 @@ async def upload_attachment(
     return to_read(await svc.upload(owner_type, owner_id, file))
 
 
+@router.put("/order")
+async def reorder_attachments(data: AttachmentOrder, svc: Service) -> list[AttachmentRead]:
+    """Порядок файлов объекта (страниц фото-конспекта)."""
+    return [to_read(a) for a in await svc.reorder(data)]
+
+
+@router.post("/{attachment_id}/replace", dependencies=[Depends(_limit_body)])
+async def replace_attachment(
+    attachment_id: uuid.UUID, svc: Service, file: Annotated[UploadFile, File()]
+) -> AttachmentRead:
+    """Заменить содержимое (повёрнутая страница) — id и позиция сохраняются."""
+    return to_read(await svc.replace(attachment_id, file))
+
+
 @router.patch("/{attachment_id}")
 async def update_attachment(
     attachment_id: uuid.UUID, patch: AttachmentUpdate, svc: Service
@@ -78,13 +92,17 @@ async def download_file(
         raise NotFoundError("Файл потерян в хранилище")
     inline = is_inline_safe(attachment.mime) and not download
     disposition = "inline" if inline else "attachment"
+    headers = {
+        "Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(attachment.filename)}",
+        "Cache-Control": f"private, max-age={settings.FILE_URL_TTL_MIN * 60}",
+        "X-Content-Type-Options": "nosniff",
+    }
+    # Встроенный просмотрщик PDF в браузере не работает в sandbox — для него
+    # ограничение снимаем (сам PDF к странице приложения доступа не получает)
+    if not (inline and attachment.mime == "application/pdf"):
+        headers["Content-Security-Policy"] = "sandbox"
     return FileResponse(
         storage.path(attachment.storage_key),
         media_type=attachment.mime if inline else "application/octet-stream",
-        headers={
-            "Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(attachment.filename)}",
-            "Cache-Control": f"private, max-age={settings.FILE_URL_TTL_MIN * 60}",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "sandbox",
-        },
+        headers=headers,
     )

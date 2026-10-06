@@ -33,12 +33,24 @@ function Thumb({ attachment }: { attachment: Attachment }) {
   )
 }
 
-type Props = { ownerType: AttachmentOwner; ownerId: string }
+type Props = {
+  ownerType: AttachmentOwner
+  ownerId: string
+  /** Показывать только часть файлов (у фото-конспекта страницы — отдельно). */
+  filter?: (a: Attachment) => boolean
+  /** PDF прямо на странице (на ноутбуке; на телефоне — открыть во внешнем просмотрщике). */
+  pdfPreview?: boolean
+  uploadLabel?: string
+}
+
+const isPdf = (a: Attachment) => a.mime === 'application/pdf'
 
 /** Файлы объекта: загрузка (несколько сразу), открыть, скачать, удалить. */
-export function AttachmentList({ ownerType, ownerId }: Props) {
+export function AttachmentList({ ownerType, ownerId, filter, pdfPreview, uploadLabel = 'Файл или фото' }: Props) {
   const input = useRef<HTMLInputElement>(null)
-  const { data: attachments, isPending } = useAttachments(ownerType, ownerId)
+  const query = useAttachments(ownerType, ownerId)
+  const { isPending } = query
+  const attachments = filter ? query.data?.filter(filter) : query.data
   const upload = useUploadAttachment(ownerType, ownerId)
   const remove = useDeleteAttachment(ownerType, ownerId)
 
@@ -55,24 +67,29 @@ export function AttachmentList({ ownerType, ownerId }: Props) {
       {attachments && attachments.length > 0 && (
         <ul className="flex flex-col gap-1">
           {attachments.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-muted/50">
-              <a href={a.url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-3">
-                <Thumb attachment={a} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm">{a.filename}</span>
-                  <span className="block text-xs text-muted-foreground">{formatSize(a.size)}</span>
-                </span>
-              </a>
-              <Button asChild variant="ghost" size="icon" aria-label="Скачать">
-                <a href={a.download_url}>
-                  <DownloadIcon />
+            <li key={a.id} className="flex flex-col gap-2">
+              <div className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-muted/50">
+                <a href={a.url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-3">
+                  <Thumb attachment={a} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm">{a.filename}</span>
+                    <span className="block text-xs text-muted-foreground">{formatSize(a.size)}</span>
+                  </span>
                 </a>
-              </Button>
-              <ConfirmButton title={`Удалить «${a.filename}»?`} onConfirm={() => remove.mutate(a.id)}>
-                <Button variant="ghost" size="icon" aria-label="Удалить файл" className="text-muted-foreground">
-                  <Trash2Icon />
+                <Button asChild variant="ghost" size="icon" aria-label="Скачать">
+                  <a href={a.download_url}>
+                    <DownloadIcon />
+                  </a>
                 </Button>
-              </ConfirmButton>
+                <ConfirmButton title={`Удалить «${a.filename}»?`} onConfirm={() => remove.mutate(a.id)}>
+                  <Button variant="ghost" size="icon" aria-label="Удалить файл" className="text-muted-foreground">
+                    <Trash2Icon />
+                  </Button>
+                </ConfirmButton>
+              </div>
+              {pdfPreview && isPdf(a) && (
+                <iframe src={a.url} title={a.filename} className="hidden h-[80dvh] w-full rounded-lg border lg:block" />
+              )}
             </li>
           ))}
         </ul>
@@ -87,7 +104,7 @@ export function AttachmentList({ ownerType, ownerId }: Props) {
         onClick={() => input.current?.click()}
       >
         {upload.isPending ? <Loader2Icon className="animate-spin" /> : <PaperclipIcon />}
-        {upload.isPending ? 'Загружаем…' : 'Файл или фото'}
+        {upload.isPending ? 'Загружаем…' : uploadLabel}
       </Button>
     </div>
   )

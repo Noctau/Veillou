@@ -28,8 +28,17 @@ export function useAttachments(ownerType: AttachmentOwner, ownerId: string | und
   })
 }
 
-export function useUploadAttachment(ownerType: AttachmentOwner, ownerId: string) {
+/** Список файлов и всё, что показывает их сводку (обложка и число страниц конспекта). */
+function useInvalidateOwner(ownerType: AttachmentOwner, ownerId: string) {
   const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.attachments(ownerType, ownerId) })
+    if (ownerType === 'note') queryClient.invalidateQueries({ queryKey: queryKeys.notesAll })
+  }
+}
+
+export function useUploadAttachment(ownerType: AttachmentOwner, ownerId: string) {
+  const invalidate = useInvalidateOwner(ownerType, ownerId)
   return useMutation({
     mutationFn: async (file: File) => {
       const form = new FormData()
@@ -44,13 +53,66 @@ export function useUploadAttachment(ownerType: AttachmentOwner, ownerId: string)
       if (error) throw error
       return data
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.attachments(ownerType, ownerId) }),
+    onSuccess: invalidate,
     onError: (error) => toast.error(errorMessage(error, 'Не удалось загрузить файл')),
+  })
+}
+
+/** Новое содержимое того же файла (повёрнутая страница). */
+export function useReplaceAttachment(ownerType: AttachmentOwner, ownerId: string) {
+  const invalidate = useInvalidateOwner(ownerType, ownerId)
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData()
+      form.append('file', file)
+      const { data, error } = await api.POST('/api/v1/attachments/{attachment_id}/replace', {
+        params: { path: { attachment_id: id } },
+        body: { file: '' },
+        bodySerializer: () => form,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error, 'Не удалось сохранить страницу')),
+  })
+}
+
+export function useReorderAttachments(ownerType: AttachmentOwner, ownerId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidateOwner(ownerType, ownerId)
+  const key = queryKeys.attachments(ownerType, ownerId)
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data, error } = await api.PUT('/api/v1/attachments/order', {
+        body: { owner_type: ownerType, owner_id: ownerId, ids },
+      })
+      if (error) throw error
+      return data
+    },
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      const prev = queryClient.getQueryData<Attachment[]>(key)
+      if (prev) {
+        const byId = new Map(prev.map((a) => [a.id, a]))
+        const moved = ids.flatMap((id, position) => (byId.has(id) ? [{ ...byId.get(id)!, position }] : []))
+        // Файлы, которых нет в ids (другой тип в том же объекте), остаются в конце
+        const rest = prev.filter((a) => !ids.includes(a.id))
+        queryClient.setQueryData<Attachment[]>(key, [...moved, ...rest])
+      }
+      return { prev }
+    },
+    onError: (error, _ids, context) => {
+      queryClient.setQueryData(key, context?.prev)
+      toast.error(errorMessage(error))
+    },
+    onSettled: invalidate,
   })
 }
 
 export function useDeleteAttachment(ownerType: AttachmentOwner, ownerId: string) {
   const queryClient = useQueryClient()
+  const invalidate = useInvalidateOwner(ownerType, ownerId)
   const key = queryKeys.attachments(ownerType, ownerId)
   return useMutation({
     mutationFn: async (id: string) => {
@@ -69,6 +131,6 @@ export function useDeleteAttachment(ownerType: AttachmentOwner, ownerId: string)
       queryClient.setQueryData(key, context?.prev)
       toast.error(errorMessage(error))
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: invalidate,
   })
 }

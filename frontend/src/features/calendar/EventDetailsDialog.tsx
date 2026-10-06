@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { paletteColor } from '@/lib/colors'
@@ -227,6 +228,7 @@ function EventDetails({
           {event.source_type === 'subtask' && event.source_id && (
             <OpenTaskButton subtaskId={event.source_id} />
           )}
+          {isClass && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
           {!fromTemplate && (
             <ConfirmButton title="Удалить событие?" onConfirm={() => remove.mutate(event.id, { onSuccess: onClose })}>
               <Button variant="ghost" className="text-destructive">

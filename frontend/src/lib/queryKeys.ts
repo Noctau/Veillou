@@ -23,4 +23,8 @@ export const queryKeys = {
   attachments: (ownerType: string, ownerId: string) => ['attachments', ownerType, ownerId] as const,
   projects: ['projects'] as const,
   project: (id: string) => ['projects', 'detail', id] as const,
+  notesAll: ['notes'] as const,
+  notesList: ['notes', 'list'] as const,
+  noteList: (params: object) => ['notes', 'list', params] as const,
+  note: (id: string) => ['notes', 'detail', id] as const,
 }

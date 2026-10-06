@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
+import { useCreateNote } from '@/features/notes/useNotes'
 import { type ActionTypeKey, useActionTypes } from '@/features/catalog/useCatalog'
 import { WorkTaskDialog } from '@/features/projects/WorkTaskDialog'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
@@ -91,6 +92,7 @@ export function QuickAdd() {
   const createTask = useCreateTask()
   const createBacklog = useCreateBacklog()
   const createEvent = useCreateEvent()
+  const createNote = useCreateNote()
 
   const live = text.trim() ? parsed : undefined
   const kind: Kind = kindOverride ?? live?.kind_hint ?? 'backlog'
@@ -112,7 +114,7 @@ export function QuickAdd() {
 
   const save = async () => {
     const raw = text.trim()
-    if (!raw || kind === 'note') return
+    if (!raw) return
     let p: QuickParse
     try {
       p = await parseNow(raw)
@@ -135,6 +137,15 @@ export function QuickAdd() {
       createEvent.mutate(
         { kind: 'personal', title, start, end: eventEnd(p, start, tz), note: '', subject_id: subjectId },
         { onSuccess: (e) => remember({ id: e.id, kind, title, link: '/calendar' }), onError: restore },
+      )
+      return
+    }
+
+    if (kind === 'note') {
+      reset()
+      createNote.mutate(
+        { title, kind: 'text', subject_id: subjectId, class_date: day, body_md: '' },
+        { onSuccess: (n) => navigate(`/notes/${n.id}`), onError: restore },
       )
       return
     }
@@ -216,7 +227,7 @@ export function QuickAdd() {
               aria-label="Что добавить"
               className="min-h-14 resize-none text-base"
             />
-            <Button type="submit" size="icon" className="size-11 shrink-0" aria-label="Добавить" disabled={!text.trim() || kind === 'note' || needsTime}>
+            <Button type="submit" size="icon" className="size-11 shrink-0" aria-label="Добавить" disabled={!text.trim() || needsTime}>
               <SendIcon />
             </Button>
           </form>
@@ -230,7 +241,7 @@ export function QuickAdd() {
             onValueChange={(v) => v && setKindOverride(v as Kind)}
           >
             {KINDS.map(({ value, label, icon: Icon }) => (
-              <ToggleGroupItem key={value} value={value} className="flex-1 gap-1" disabled={value === 'note'}>
+              <ToggleGroupItem key={value} value={value} className="flex-1 gap-1">
                 <Icon className="size-4" />
                 <span className="hidden sm:inline">{label}</span>
                 <span className="sm:hidden">{label.replace('В ящик', 'Ящик')}</span>
@@ -267,7 +278,6 @@ export function QuickAdd() {
               {needsTime && <p className="text-xs text-destructive">Для события напишите время: «завтра в 14».</p>}
             </div>
           )}
-          {kind === 'note' && <p className="text-xs text-muted-foreground">Конспекты появятся в следующем обновлении.</p>}
         </CardContent>
       </Card>
 

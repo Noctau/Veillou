@@ -168,10 +168,23 @@ class BacklogCondition(StrEnum):
 
 
 class AttachmentOwner(StrEnum):
-    """К чему приложен файл. note / source появятся в M5.2 / M5.5."""
+    """К чему приложен файл."""
 
     task = "task"
     project = "project"
+    note = "note"  # страницы фото-конспекта, PDF
+
+
+# ---------- конспекты (M5.2) ----------
+
+
+class NoteKind(StrEnum):
+    """Чем в основном является конспект — от этого зависит экран просмотра."""
+
+    text = "text"  # Markdown + формулы
+    photo = "photo"  # фото страниц тетради
+    file = "file"  # PDF и другие файлы
+    link = "link"  # ссылка на Диск / сайт
 
 
 # ---------- проекты (M4.7) ----------

@@ -14,6 +14,14 @@ class AttachmentUpdate(InputModel):
     position: Annotated[int, Field(ge=0, le=10_000)] | None = None
 
 
+class AttachmentOrder(InputModel):
+    """Новый порядок файлов объекта (страниц конспекта): все id по порядку."""
+
+    owner_type: AttachmentOwner
+    owner_id: uuid.UUID
+    ids: list[uuid.UUID] = Field(max_length=500)
+
+
 class AttachmentRead(ReadModel):
     id: uuid.UUID
     owner_type: AttachmentOwner

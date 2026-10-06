@@ -13,6 +13,8 @@ import { PersonalEventDialog } from '@/features/calendar/PersonalEventDialog'
 import { type CalendarEvent, useCalendar, useUpdateEvent } from '@/features/calendar/useCalendar'
 import { PARITY_LABEL, weekParity } from '@/features/schedule/parity'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
+import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
+import { useNotes } from '@/features/notes/useNotes'
 import { DeadlinesCard } from '@/features/tasks/DeadlinesCard'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
@@ -46,6 +48,8 @@ function ClassNowCard({
   const live = classes.filter((e) => e.status !== 'cancelled')
   const current = live.find((e) => parseISO(e.start) <= now && now < parseISO(e.end))
   const next = live.find((e) => parseISO(e.start) > now)
+  const { data: notes } = useNotes({ event_id: current ? [current.id] : [] }, !!current)
+  const notedEventIds = new Set(notes?.map((n) => n.event_id))
 
   if (!current && !next) {
     const text = dayOff
@@ -60,34 +64,33 @@ function ClassNowCard({
     )
   }
 
-  const row = (e: CalendarEvent, label: string, hint: string) => (
-    <button
-      type="button"
-      onClick={() => onOpen(e)}
-      className={cn('flex w-full gap-3 border-l-4 pl-3 text-left', paletteColor(eventColor(e)).border)}
-    >
-      <div className="flex-1">
-        <div className="text-xs text-muted-foreground uppercase">{label}</div>
-        <div className="text-lg leading-tight font-semibold">{e.title}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-          {e.location && (
-            <span className="flex items-center gap-1 text-base font-medium text-foreground">
-              <MapPinIcon className="size-4" />
-              {e.location}
-            </span>
-          )}
-          <span>{timeRange(e, tz)}</span>
-          <span>{classDetails({ ...e, location: null })}</span>
+  const row = (e: CalendarEvent, label: string, hint: string, withNote = false) => (
+    <div className={cn('flex flex-col gap-2 border-l-4 pl-3', paletteColor(eventColor(e)).border)}>
+      <button type="button" onClick={() => onOpen(e)} className="flex w-full gap-3 text-left">
+        <div className="flex-1">
+          <div className="text-xs text-muted-foreground uppercase">{label}</div>
+          <div className="text-lg leading-tight font-semibold">{e.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+            {e.location && (
+              <span className="flex items-center gap-1 text-base font-medium text-foreground">
+                <MapPinIcon className="size-4" />
+                {e.location}
+              </span>
+            )}
+            <span>{timeRange(e, tz)}</span>
+            <span>{classDetails({ ...e, location: null })}</span>
+          </div>
         </div>
-      </div>
-      <div className="self-center text-right text-sm whitespace-nowrap text-muted-foreground">{hint}</div>
-    </button>
+        <div className="self-center text-right text-sm whitespace-nowrap text-muted-foreground">{hint}</div>
+      </button>
+      {withNote && <NoteForEventButton eventId={e.id} hasNote={notedEventIds.has(e.id)} variant="secondary" className="self-start" />}
+    </div>
   )
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 py-4">
-        {current && row(current, 'Сейчас', `ещё ${inMinutes(differenceInMinutes(parseISO(current.end), now))}`)}
+        {current && row(current, 'Сейчас', `ещё ${inMinutes(differenceInMinutes(parseISO(current.end), now))}`, true)}
         {next &&
           row(next, current ? 'Дальше' : 'Следующая', `через ${inMinutes(differenceInMinutes(parseISO(next.start), now))}`)}
       </CardContent>
