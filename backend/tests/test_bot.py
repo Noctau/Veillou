@@ -202,6 +202,24 @@ async def test_today(tg, session, linked):
     assert "Из долгого ящика" in reply and "стоматологу" in reply
 
 
+async def test_today_shows_overdue(tg, session, linked):
+    today = now_utc().astimezone(TZ).date()
+    for title, days in (("Эссе", -1), ("Лаба", 2)):
+        session.add(
+            Task(
+                user_id=linked.id,
+                title=title,
+                deadline=wall_to_utc(today + timedelta(days=days), time(23, 59), TZ),
+                status=TaskStatus.active,
+            )
+        )
+    await session.commit()
+    [reply] = await tg.send("/today")
+    overdue, week = reply.split("Дедлайны недели")
+    assert "Просрочено" in overdue and "Эссе" in overdue and "Лаба" not in overdue
+    assert "Лаба" in week and "Эссе" not in week
+
+
 async def test_today_empty(tg, linked):
     [reply] = await tg.send("/today")
     assert "Пар и дел в календаре нет" in reply

@@ -1,10 +1,10 @@
 """Утренняя сводка (M6.4) и планы для бота: /today, /week.
 
-Сводка v1: пары с аудиториями, события дня, дедлайны недели и одно самое
-старое дело из ящика. План подзадач появится в v2 (M11.6).
+Сводка v1: пары с аудиториями, события дня, просроченные задания, дедлайны
+недели и одно самое старое дело из ящика. План подзадач появится в v2 (M11.6).
 """
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
@@ -30,6 +30,9 @@ from app.notify.message import (
     fmt_range,
     plural,
 )
+
+# Просроченных в сводке — не больше, остальные «…и ещё N»
+OVERDUE_LIMIT = 5
 
 CLASS_TYPE_SHORT = {
     ClassType.lecture: "лекция",
@@ -120,17 +123,18 @@ class Digest:
             )
         )
 
-    async def _deadline_section(self, start: datetime, end: datetime, title: str) -> list[Section]:
+    async def _deadline_section(
+        self, start: datetime, end: datetime, title: str, limit: int | None = None
+    ) -> list[Section]:
         tasks = await self._deadlines(start, end)
         if not tasks:
             return []
-        shares = await task_progress(self.db, tasks)
-        return [
-            Section(
-                title,
-                tuple(deadline_line(t, shares[t.id], self.tz, self.today) for t in tasks),
-            )
-        ]
+        shown = tasks[:limit] if limit else tasks
+        shares = await task_progress(self.db, shown)
+        lines = [deadline_line(t, shares[t.id], self.tz, self.today) for t in shown]
+        if rest := len(tasks) - len(shown):
+            lines.append(f"…и ещё {rest}")
+        return [Section(title, tuple(lines))]
 
     async def _oldest_backlog(self) -> BacklogItem | None:
         return await self.db.scalar(
@@ -162,8 +166,12 @@ class Digest:
         sections = self._day_sections(await self._events(start, end))
         if not sections:
             sections.append(Section(None, ("Пар и дел в календаре нет.",)))
+        # Несданное к сроку не пропадает из сводки, пока его не закроют
         sections += await self._deadline_section(
-            start, start + timedelta(days=7), "Дедлайны недели"
+            datetime.min.replace(tzinfo=UTC), self.now, "Просрочено", limit=OVERDUE_LIMIT
+        )
+        sections += await self._deadline_section(
+            max(start, self.now), start + timedelta(days=7), "Дедлайны недели"
         )
         if item := await self._oldest_backlog():
             waiting = (self.today - local_date(item.created_at, self.tz)).days

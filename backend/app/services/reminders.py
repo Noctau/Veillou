@@ -11,7 +11,7 @@
 
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -20,7 +20,14 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import get_tz, local_date, now_utc
-from app.domain.enums import EventKind, EventStatus, ReminderStatus, SourceType, TaskStatus
+from app.domain.enums import (
+    EventKind,
+    EventStatus,
+    ReminderKind,
+    ReminderStatus,
+    SourceType,
+    TaskStatus,
+)
 from app.models import ActionType, Event, Job, Reminder, Subtask, Task, User
 from app.notify import builder
 from app.notify.builder import Candidate, Planned, TimeRange, Window, windows_from_json
@@ -194,7 +201,14 @@ async def sync_user_reminders(
     if user is None or user.deleted_at is not None:
         return stats
     frozen_until = now + FREEZE
-    desired = {p.key: p for p in await desired_reminders(db, user, now) if p.fire_at > frozen_until}
+    desired: dict[str, Planned] = {}
+    for p in await desired_reminders(db, user, now):
+        if p.fire_at > frozen_until:
+            desired[p.key] = p
+        elif p.kind == ReminderKind.morning_digest and p.expires_at and p.expires_at > now:
+            # Время сводки сдвинули на уже прошедшее (8:00 → 7:00 в 7:30) — сегодняшняя
+            # уходит сейчас, а не теряется. Уже отправленную не продублирует dedupe_key.
+            desired[p.key] = replace(p, fire_at=now)
 
     existing = {
         r.dedupe_key: r

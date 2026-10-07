@@ -33,7 +33,7 @@ from app.services.settings import effective_settings
 from app.services.tasks import TaskService
 
 SNOOZE = timedelta(minutes=15)
-# Сколько живёт токен кнопок пуша после создания напоминания
+# Сколько живёт токен кнопок пуша после срока напоминания
 TOKEN_TTL = timedelta(days=7)
 
 
@@ -154,7 +154,8 @@ async def perform_by_token(db: AsyncSession, token: str, action: ReminderAction)
             Reminder.deleted_at.is_(None),
         )
     )
-    if r is None or r.created_at < now_utc() - TOKEN_TTL:
+    # Срок — от времени отправки, а не создания: напоминания создаются за 8 дней вперёд
+    if r is None or r.fire_at < now_utc() - TOKEN_TTL:
         raise NotFoundError("Ссылка устарела")
     user = await db.get(User, r.user_id)
     if user is None or user.deleted_at is not None:

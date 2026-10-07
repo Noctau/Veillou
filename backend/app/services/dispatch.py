@@ -20,7 +20,7 @@ from collections import defaultdict
 from dataclasses import replace
 from datetime import datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.security import hash_token, new_token
@@ -68,11 +68,16 @@ async def claim_due(db: AsyncSession, now: datetime, limit: int = BATCH) -> list
 
 
 async def next_due_at(db: AsyncSession) -> datetime | None:
-    """Когда ближайшее неотправленное — чтобы воркер не спал дольше нужного."""
+    """Когда ближайшее неотправленное — чтобы воркер не спал дольше нужного.
+
+    Захваченное (аренда ещё идёт) раньше конца аренды не взять — иначе после
+    упавшей доставки воркер две минуты опрашивал бы базу каждые полсекунды.
+    """
+    ready_at = func.greatest(Reminder.due_at, func.coalesce(Reminder.locked_until, Reminder.due_at))
     return await db.scalar(
-        select(Reminder.due_at)
+        select(ready_at)
         .where(Reminder.status == ReminderStatus.pending, Reminder.deleted_at.is_(None))
-        .order_by(Reminder.due_at)
+        .order_by(ready_at)
         .limit(1)
     )
 
@@ -127,6 +132,9 @@ async def deliver_user(
         ready.append((r, msg))
 
     channels = list(dict.fromkeys(ch for r, _ in ready for ch in r.channels))
+    # Один токен на напоминание на весь цикл: иначе следующий канал перезапишет хэш
+    # и кнопки уже отправленного пуша перестанут работать
+    tokens: dict[uuid.UUID, str] = {}
     for channel in channels:
         items = [
             (r, m) for r, m in ready if channel in r.channels and channel not in r.sent_channels
@@ -136,10 +144,12 @@ async def deliver_user(
         msg = combine([m for _, m in items])
         if len(items) == 1 and msg.actions:
             # Кнопки пуша: одноразовый токен на это напоминание
-            token = new_token()
-            items[0][0].action_token_hash = hash_token(token)
-            items[0][0].action_used_at = None
-            msg = replace(msg, action_token=token)
+            r = items[0][0]
+            if r.id not in tokens:
+                tokens[r.id] = new_token()
+                r.action_token_hash = hash_token(tokens[r.id])
+                r.action_used_at = None
+            msg = replace(msg, action_token=tokens[r.id])
         delivery = await notifier.send(db, user, channel, msg, _ttl([r for r, _ in items], now))
         if delivery.status == DeliveryStatus.failed:
             log.warning("Канал %s: %s", channel, delivery.error)

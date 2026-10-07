@@ -293,7 +293,8 @@ async def test_quiet_hours_and_minutes_from_settings(auth_client, session, user)
 
 
 async def test_deadline_reminders_at_digest_time(auth_client, session, user):
-    deadline = tomorrow_at(23, 59) + timedelta(days=2)
+    # Дедлайн послезавтра: «за 3 дня» — вчера в 8:00, прошло при любом времени запуска
+    deadline = tomorrow_at(23, 59) + timedelta(days=1)
     resp = await auth_client.post(
         f"{API}/tasks", json={"title": "Реферат", "deadline": deadline.isoformat()}
     )
@@ -301,13 +302,56 @@ async def test_deadline_reminders_at_digest_time(auth_client, session, user):
     await sync_user_reminders(session, user.id)
     rs = await pending(session, user, ReminderKind.deadline)
     assert [r.fire_at for r in rs] == [
+        tomorrow_at(8),
         tomorrow_at(8) + timedelta(days=1),
-        tomorrow_at(8) + timedelta(days=2),
-    ]  # «за 3 дня» уже прошло
+    ]
 
     await auth_client.patch(f"{API}/tasks/{resp.json()['id']}", json={"status": "done"})
     await sync_user_reminders(session, user.id)
     assert await pending(session, user, ReminderKind.deadline) == []
+
+
+async def test_digest_moved_to_past_time_fires_now_once(auth_client, session, user):
+    """Сводку перенесли с 10:00 на 9:00 в 9:30 — сегодняшняя уходит сразу, без дублей."""
+    today = now_utc().astimezone(TZ).date()
+    now = wall_to_utc(today, time(9, 30), TZ)
+    key = f"morning_digest:{today.isoformat()}"
+
+    async def todays() -> list[Reminder]:
+        rs = await pending(session, user, ReminderKind.morning_digest)
+        return [r for r in rs if r.dedupe_key == key]
+
+    async def set_digest(at: str) -> None:
+        resp = await auth_client.patch(
+            f"{API}/me/settings", json={"schedule": {"morning_digest": at}}
+        )
+        assert resp.status_code == 200, resp.text
+        await session.refresh(user)
+
+    await set_digest("10:00")
+    await sync_user_reminders(session, user.id, now)
+    assert [r.fire_at for r in await todays()] == [wall_to_utc(today, time(10), TZ)]
+
+    await set_digest("09:00")
+    await sync_user_reminders(session, user.id, now)
+    [r] = await todays()
+    assert r.fire_at == now
+
+    r.status = ReminderStatus.sent
+    await session.commit()
+    await sync_user_reminders(session, user.id, now + timedelta(minutes=5))
+    assert await todays() == []
+
+
+async def test_next_due_at_waits_for_lease(session, user):
+    """Захваченное напоминание не будит воркер раньше конца аренды."""
+    from app.services.dispatch import next_due_at
+
+    now = now_utc()
+    await add_reminder(
+        session, user, fire_at=now - timedelta(minutes=1), locked_until=now + timedelta(minutes=2)
+    )
+    assert await next_due_at(session) == now + timedelta(minutes=2)
 
 
 # ---------- триггеры ----------
@@ -439,6 +483,32 @@ async def test_push_action_snooze_creates_reminder(session, user):
     )
     assert snoozed is not None and not snoozed.is_auto
     assert snoozed.fire_at >= now_utc() + timedelta(minutes=14)
+
+
+async def test_push_token_survives_telegram_on_same_reminder(session, user):
+    """Push и Telegram в одном цикле: кнопки пуша работают (токен не перезаписан)."""
+    _, r, _ = await make_deadline_reminder(session, user)
+    r.action_token_hash = None
+    await session.commit()
+    push, tg = FakeSender(), FakeSender()
+    await dispatch_due(session_factory, notifier(push=push, telegram=tg))
+    [msg] = push.sent
+    assert msg.action_token
+    result = await perform_by_token(session, msg.action_token, ReminderAction.snooze)
+    assert result.message.startswith("Напомню")
+
+
+async def test_push_token_valid_for_reminder_created_long_ago(session, user):
+    """Напоминания создаются за 8 дней до отправки — срок токена считается от отправки."""
+    _, r, _ = await make_deadline_reminder(session, user)
+    r.action_token_hash = None
+    r.created_at = now_utc() - timedelta(days=8)
+    await session.commit()
+    push = FakeSender()
+    await dispatch_due(session_factory, notifier(push=push))
+    [msg] = push.sent
+    result = await perform_by_token(session, msg.action_token, ReminderAction.snooze)
+    assert result.message.startswith("Напомню")
 
 
 async def test_bad_token_404(client):

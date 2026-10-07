@@ -17,6 +17,8 @@ NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
 @pytest.fixture(autouse=True)
 def clock(monkeypatch):
     monkeypatch.setattr("app.services.notes.now_utc", lambda: NOW)
+    # Пары материализуются с «сегодня» — без этого вторник 06.10 со временем уходит в прошлое
+    monkeypatch.setattr("app.services.schedule_sync.now_utc", lambda: NOW)
 
 
 @pytest.fixture(autouse=True)
