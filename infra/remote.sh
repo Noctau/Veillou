@@ -26,7 +26,11 @@ COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
 
 # remote "команда" — выполнить в DEPLOY_DIR на сервере; remote -t … — с терминалом (пароль, логи)
 remote() {
-  local tty=()
-  if [ "${1:-}" = "-t" ]; then tty=(-t); shift; fi
-  ssh "${tty[@]}" "$DEPLOY_HOST" "cd '$DEPLOY_DIR' && $*"
+  # Без массивов: bash 3.2 на маке с `set -u` падает на пустом "${arr[@]}"
+  if [ "${1:-}" = "-t" ]; then
+    shift
+    ssh -t "$DEPLOY_HOST" "cd '$DEPLOY_DIR' && $*"
+  else
+    ssh "$DEPLOY_HOST" "cd '$DEPLOY_DIR' && $*"
+  fi
 }
