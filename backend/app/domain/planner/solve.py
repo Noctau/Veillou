@@ -1,0 +1,121 @@
+"""`solve(PlanInput) -> PlanResult` — точка входа планировщика.
+
+1. grid.prepare: сетка, доступность каждого блока, кандидаты отдыха.
+2. Жадное решение (быстро, всегда есть) — подсказка для CP-SAT.
+3. CP-SAT с остатком бюджета времени. Берём его решение, если оно есть,
+   проходит проверку и ставит не меньше блоков (с учётом приоритета), чем жадное.
+4. at_risk, diff с прошлым планом, статистика.
+"""
+
+from collections.abc import Iterable
+from datetime import timedelta
+from time import perf_counter
+
+from app.domain.planner.check import violations
+from app.domain.planner.contracts import (
+    AtRisk,
+    Placement,
+    PlanDiff,
+    PlanInput,
+    PlanResult,
+    PlanStats,
+    RiskReason,
+)
+from app.domain.planner.cpsat import Solution, effective_priority, solve_cp
+from app.domain.planner.greedy import solve_greedy
+from app.domain.planner.grid import Prepared, prepare
+
+# Запас на извлечение решения и сборку результата
+RESERVE_S = 0.15
+
+
+def _weight(prep: Prepared, solution: Solution) -> int:
+    return sum(effective_priority(prep.by_id[b]) for b in solution)
+
+
+def _placements(prep: Prepared, solution: Solution) -> list[Placement]:
+    result = []
+    for pb in prep.blocks:
+        parts = solution.get(pb.id)
+        if not parts:
+            continue
+        for k, (lo, hi) in enumerate(parts):
+            start = prep.grid.dt(lo)
+            # Целый блок — точной длины; части разрезанного — по сетке
+            end = (
+                start + timedelta(minutes=pb.block.duration_min)
+                if len(parts) == 1
+                else prep.grid.dt(hi)
+            )
+            result.append(Placement(pb.id, k, start, end))
+    return result
+
+
+def _at_risk(prep: Prepared, solution: Solution) -> list[AtRisk]:
+    result = []
+    for pb in prep.blocks:
+        reason: RiskReason | None = None
+        parts = solution.get(pb.id)
+        if parts is None:
+            if any(d in prep.by_id and d not in solution for d in pb.block.depends_on):
+                reason = RiskReason.dependency
+            elif not pb.starts and not (pb.split and pb.part_free(prep.min_part)):
+                reason = RiskReason.no_slots
+            else:
+                reason = RiskReason.no_time
+        elif pb.overdue:
+            reason = RiskReason.overdue
+        elif pb.due is not None and parts[-1][1] > pb.due:
+            reason = RiskReason.late
+        if reason:
+            result.append(AtRisk(pb.id, pb.block.group_id, reason))
+    return result
+
+
+def diff(previous: Iterable[Placement], current: Iterable[Placement]) -> PlanDiff:
+    before = {(p.block_id, p.part): p for p in previous}
+    after = {(p.block_id, p.part): p for p in current}
+    return PlanDiff(
+        added=tuple(p for k, p in after.items() if k not in before),
+        removed=tuple(p for k, p in before.items() if k not in after),
+        moved=tuple(
+            (before[k], p)
+            for k, p in after.items()
+            if k in before and (before[k].start, before[k].end) != (p.start, p.end)
+        ),
+    )
+
+
+def solve(inp: PlanInput) -> PlanResult:
+    started = perf_counter()
+    prep = prepare(inp)
+    solution = solve_greedy(prep)
+    engine, status = "greedy", "greedy"
+
+    deadline = started + inp.time_limit_s - RESERVE_S
+    if prep.blocks and deadline - perf_counter() > 0.05:
+        status, cp = solve_cp(prep, solution, deadline)
+        if (
+            cp is not None
+            and _weight(prep, cp) >= _weight(prep, solution)
+            and not violations(prep, cp)
+        ):
+            solution, engine = cp, "cp_sat"
+
+    placements = _placements(prep, solution)
+    ids = {b.id for b in inp.blocks}
+    return PlanResult(
+        placements=tuple(placements),
+        at_risk=tuple(_at_risk(prep, solution)),
+        diff=diff((p for p in inp.previous if p.block_id in ids), placements),
+        stats=PlanStats(
+            engine=engine,
+            status=status,
+            blocks=len(prep.blocks),
+            placed=len(solution),
+            split=sum(1 for parts in solution.values() if len(parts) > 1),
+            elapsed_ms=round((perf_counter() - started) * 1000),
+            horizon_start=prep.grid.t0,
+            horizon_end=prep.grid.end,
+        ),
+    )
