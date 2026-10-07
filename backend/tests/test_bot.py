@@ -289,3 +289,14 @@ def test_callback_data_fits_telegram_limit():
 @pytest.mark.parametrize("data", ["qa:", "qa:to:b:zz", "qa:to:b:" + "0" * 32, "qa:x:t:" + "0" * 32])
 def test_bad_callback_data(data):
     assert cards.parse_quick_add(data) is None
+
+
+async def test_create_bot_real_constructor() -> None:
+    # Прод падал на старте бота и воркера: в dev токена нет, и create_bot не вызывался нигде
+    from app.bot.app import create_bot
+
+    bot = create_bot("123456:TEST-token")
+    try:
+        assert bot.default.link_preview_is_disabled is True
+    finally:
+        await bot.session.close()

@@ -13,4 +13,4 @@ def create_dispatcher() -> Dispatcher:
 
 
 def create_bot(token: str) -> Bot:
-    return Bot(token, default=DefaultBotProperties(link_preview_is_first=False))
+    return Bot(token, default=DefaultBotProperties(link_preview_is_disabled=True))
