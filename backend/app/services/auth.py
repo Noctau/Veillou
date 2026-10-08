@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
-from app.core.security import hash_token, new_token, verify_password
+from app.core.security import hash_token, new_token, verify_password_async
 from app.core.time import now_utc
 from app.models import User, UserSession
+from app.services import login_guard
 from app.services.users import get_user_by_email
 
 # Срок жизни сессии продлевается не чаще раза в сутки, чтобы не писать в БД на каждый запрос
@@ -39,10 +40,19 @@ async def login(
     user_agent: str | None = None,
     ip: str | None = None,
 ) -> tuple[User, str]:
-    """Проверяет пароль и создаёт сессию. Возвращает пользователя и токен для cookie."""
+    """Проверяет пароль и создаёт сессию. Возвращает пользователя и токен для cookie.
+
+    Перебор ограничен (`login_guard`): после серии ошибок — 429 без проверки пароля.
+    """
+    await login_guard.check(db, ip=ip, email=email)
     user = await get_user_by_email(db, email)
-    if not verify_password(password, user.password_hash if user else None) or user is None:
+    # Соединение — обратно в пул: в очереди на argon2 запрос не должен его держать
+    await db.commit()
+    ok = await verify_password_async(password, user.password_hash if user else None)
+    if not ok or user is None:
+        await login_guard.record_failure(db, ip=ip, email=email)
         raise InvalidCredentialsError()
+    await login_guard.clear_account(db, email)
 
     token = new_token()
     now = now_utc()

@@ -11,7 +11,7 @@ from app.models.notify import Job, PushSubscription, Reminder
 from app.models.plan import Calibration, PlanRevision, StudyDayLimit
 from app.models.project import Milestone, Project
 from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
-from app.models.session import UserSession
+from app.models.session import LoginFailure, UserSession
 from app.models.source import Source
 from app.models.task import Subtask, Task
 from app.models.telegram import TelegramLinkCode
@@ -33,6 +33,7 @@ __all__ = [
     "ExamQuestion",
     "ExamSession",
     "Job",
+    "LoginFailure",
     "Milestone",
     "Note",
     "PlanRevision",

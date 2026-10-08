@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # В проде фронт и /api на одном HTTPS-домене -> Secure. В dev по LAN — http.
     SESSION_COOKIE_SECURE: bool = False
 
+    # Перебор пароля: неудачные входы за окно — с одного адреса и в один аккаунт
+    LOGIN_WINDOW_MIN: int = 15
+    LOGIN_MAX_FAILURES_PER_IP: int = 20
+    LOGIN_MAX_FAILURES_PER_ACCOUNT: int = 50
+
     # Подпись ссылок на файлы. В проде — длинная случайная строка в .env
     SECRET_KEY: SecretStr = SecretStr(DEV_SECRET)
 

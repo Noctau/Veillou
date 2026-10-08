@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import ConflictError
-from app.core.security import hash_password
+from app.core.security import MAX_PASSWORD_LENGTH, hash_password_async
 from app.core.time import is_valid_tz
 from app.models import User
 from app.services.catalog import ensure_defaults
@@ -34,6 +34,8 @@ def normalize_email(email: str) -> str:
 def validate_password(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов")
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError(f"Пароль должен быть не длиннее {MAX_PASSWORD_LENGTH} символов")
 
 
 async def create_user(
@@ -50,7 +52,7 @@ async def create_user(
     if await session.scalar(select(User.id).where(func.lower(User.email) == email)):
         raise ConflictError("Пользователь с таким email уже есть", code="email_taken")
 
-    user = User(email=email, password_hash=hash_password(password), timezone=timezone)
+    user = User(email=email, password_hash=await hash_password_async(password), timezone=timezone)
     session.add(user)
     await session.flush()
     await ensure_defaults(session, user.id)
@@ -60,5 +62,5 @@ async def create_user(
 
 async def set_password(session: AsyncSession, user: User, password: str) -> None:
     validate_password(password)
-    user.password_hash = hash_password(password)
+    user.password_hash = await hash_password_async(password)
     await session.commit()

@@ -29,12 +29,21 @@ class AppError(Exception):
     status_code: int = status.HTTP_400_BAD_REQUEST
     code: str = "bad_request"
     message: str = "Bad request"
+    headers: dict[str, str] | None = None
 
-    def __init__(self, message: str | None = None, *, code: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        code: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         if message is not None:
             self.message = message
         if code is not None:
             self.code = code
+        if headers is not None:
+            self.headers = headers
         super().__init__(self.message)
 
 
@@ -62,10 +71,17 @@ class ForbiddenError(AppError):
     message = "Недостаточно прав"
 
 
+class TooManyRequestsError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "too_many_requests"
+    message = "Слишком много запросов — попробуйте позже"
+
+
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message}},
+        headers=exc.headers,
     )
 
 

@@ -31,7 +31,7 @@ from app.core.time import get_tz, now_utc
 from app.domain.enums import AI_JOB_KINDS, JobKind, ReminderStatus
 from app.models import Reminder
 from app.notify.notifier import Notifier, Sender, TelegramSender, WebPushSender
-from app.services import jobs
+from app.services import jobs, login_guard
 from app.services.ai import prune_log
 from app.services.dispatch import dispatch_due, next_due_at
 from app.services.project_ai import handle_milestones_job
@@ -73,6 +73,7 @@ async def nightly() -> None:
         subtasks = await roll_all_recurring_tasks(db)
         await jobs.prune(db)
         await prune_log(db)
+        await login_guard.prune(db)
         await db.execute(
             delete(Reminder).where(
                 Reminder.status != ReminderStatus.pending,
