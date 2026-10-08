@@ -58,6 +58,8 @@ services:
   worker:
     <<: *backend
     command: ["python", "-m", "app.worker"]
+    # + сеть llm: через её шлюз (хост) воркер ходит в SSH-туннель до домашней Ollama
+    networks: [default, llm]
 
   bot:
     <<: *backend
@@ -108,3 +110,16 @@ volumes:
   files:
   caddy_data:
   caddy_config:
+
+networks:
+  default:
+  # Обратный SSH-туннель с домашнего компьютера слушает на шлюзе этой сети
+  # (LLM_GATEWAY:11434, Docs/DEPLOY.md §6): виден только контейнерам в ней, не снаружи.
+  # Имя моста — для правила ufw. Подсеть занята? Поменять здесь и в LLM_BASE_URL.
+  llm:
+    driver_opts:
+      com.docker.network.bridge.name: veillou-llm
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
