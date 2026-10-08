@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
 import { NotificationsSection } from '@/features/notifications/NotificationsSection'
+import { CalibrationSection } from '@/features/plan/CalibrationSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
 import { AccountSection } from '@/features/settings/sections/AccountSection'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
@@ -38,6 +39,7 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           <DayModeSection settings={settings} />
           <StudySection settings={settings} />
+          <CalibrationSection />
           <RestSection settings={settings} />
           <ActionTypesSection />
           <CategoriesSection />

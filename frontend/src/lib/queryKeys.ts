@@ -33,4 +33,7 @@ export const queryKeys = {
   search: (q: string, subjectId?: string) => ['search', q, subjectId ?? ''] as const,
   sourcesAll: ['sources'] as const,
   sources: (subjectId: string) => ['sources', subjectId] as const,
+  plan: ['plan'] as const,
+  dayLimits: ['plan', 'day-limits'] as const,
+  calibration: ['calibration'] as const,
 }

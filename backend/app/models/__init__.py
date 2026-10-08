@@ -6,6 +6,7 @@ from app.models.catalog import ActionType, Category
 from app.models.event import Event, RecurringEvent
 from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
+from app.models.plan import Calibration, PlanRevision, StudyDayLimit
 from app.models.project import Milestone, Project
 from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
 from app.models.session import UserSession
@@ -19,6 +20,7 @@ __all__ = [
     "Attachment",
     "BacklogItem",
     "BellSchedule",
+    "Calibration",
     "Category",
     "ClassRule",
     "DayOff",
@@ -26,12 +28,14 @@ __all__ = [
     "Job",
     "Milestone",
     "Note",
+    "PlanRevision",
     "Project",
     "PushSubscription",
     "RecurringEvent",
     "Reminder",
     "Semester",
     "Source",
+    "StudyDayLimit",
     "Subject",
     "Subtask",
     "Task",
@@ -40,7 +44,9 @@ __all__ = [
     "UserSession",
 ]
 
-# Пересчёт напоминаний при изменениях — во всех процессах (api, worker, bot, тесты)
+# Пересчёт напоминаний и превью плана при изменениях — во всех процессах (api, worker, bot, тесты)
 from app.notify import triggers
+from app.services import plan_triggers
 
 triggers.install()
+plan_triggers.install()

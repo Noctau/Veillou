@@ -209,6 +209,7 @@ class Prepared:
     halves_required: dict[tuple[int, int], int]
     min_part: int
     study_limit: int  # слотов в день
+    study_limit_by_day: dict[int, int]  # разовые лимиты: день → слотов
     max_per_group: int
     fixed_study: dict[int, int] = field(default_factory=dict)  # день → слотов
     fixed_per_group: dict[tuple[BlockId, int], int] = field(default_factory=dict)
@@ -222,6 +223,10 @@ class Prepared:
     def day_of(self, slot: int) -> int:
         """Индекс дня, к которому относится слот (-1 — до первого дня)."""
         return bisect.bisect_right(self._day_starts, slot) - 1
+
+    def limit(self, day: int) -> int:
+        """Лимит учёбы дня в слотах."""
+        return self.study_limit_by_day.get(day, self.study_limit)
 
     def pad_for(self, length: int) -> int:
         s = self.inp.settings
@@ -349,6 +354,11 @@ def _required(windows: Iterable[RestWindow], per_week: int) -> dict[tuple[int, i
     return {week: min(per_week, c) for week, c in count.items()}
 
 
+def _day_limits(inp: PlanInput, days: Sequence[Day]) -> dict[int, int]:
+    by_date = dict(inp.study_limits)
+    return {d.index: by_date[d.date] // inp.grid_min for d in days if d.date in by_date}
+
+
 def prepare(inp: PlanInput) -> Prepared:
     s, tz = inp.settings, inp.tz
     grid = Grid.build(inp.now, _horizon_end(inp), inp.grid_min)
@@ -372,7 +382,8 @@ def prepare(inp: PlanInput) -> Prepared:
         due = None
         if b.deadline is not None and not overdue:
             latest_end = min(grid.floor(b.deadline), grid.n)
-            due_dt = b.deadline - timedelta(days=s.deadline_buffer_days)
+            buffer = s.deadline_buffer_days if b.buffer_days is None else b.buffer_days
+            due_dt = b.deadline - timedelta(days=buffer)
             due = max(grid.floor(due_dt), 0)
         earliest = max(grid.ceil(b.earliest), 0) if b.earliest else 0
         free = [
@@ -412,6 +423,7 @@ def prepare(inp: PlanInput) -> Prepared:
         halves_required=_required(halves, s.weekend_half_days),
         min_part=min_part,
         study_limit=s.study_limit_min_per_day // grid.step_min,
+        study_limit_by_day=_day_limits(inp, days),
         max_per_group=s.max_subtasks_per_task_per_day,
     )
     # Закреплённое и сделанное сегодня до `now` тоже считается в лимиты сегодняшнего дня

@@ -6,7 +6,7 @@
 
 from collections.abc import Hashable
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import StrEnum
 from zoneinfo import ZoneInfo
 
@@ -103,6 +103,10 @@ class Block:
     prefer_morning: bool = False
     # Не раньше этого момента
     earliest: datetime | None = None
+    # Свой «закончить за N дней до дедлайна»; None — из настроек
+    buffer_days: int | None = None
+    # Порядок внутри задания (group_id): мягко — шаг с меньшим номером лучше раньше
+    sequence: int | None = None
 
 
 @dataclass(frozen=True)
@@ -124,6 +128,8 @@ class PlanInput:
     fixed: tuple[FixedBlock, ...] = ()
     previous: tuple[Placement, ...] = ()
     settings: PlanSettings = PlanSettings()
+    # Разовый лимит учёбы на день (дата дня планировщика → минут) вместо общего
+    study_limits: tuple[tuple[date, int], ...] = ()
     # Горизонт: от now до самого дальнего дедлайна, но не меньше min и не больше max
     max_horizon_days: int = 60
     min_horizon_days: int = 14

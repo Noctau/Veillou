@@ -45,7 +45,7 @@ export function useTask(id: string | undefined) {
   })
 }
 
-/** Задания, календарь (блоки подзадач) и проекты после любой правки. */
+/** Задания, календарь (блоки подзадач), проекты и калибровка после любой правки. */
 export function useInvalidateTasks() {
   const queryClient = useQueryClient()
   return () => {
@@ -53,6 +53,8 @@ export function useInvalidateTasks() {
     queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
     // Прогресс проекта считается по его заданиям
     queryClient.invalidateQueries({ queryKey: queryKeys.projects })
+    // Отметки «быстрее / дольше» меняют калибровку оценок
+    queryClient.invalidateQueries({ queryKey: queryKeys.calibration })
   }
 }
 

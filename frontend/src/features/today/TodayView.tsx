@@ -15,6 +15,7 @@ import { PARITY_LABEL, weekParity } from '@/features/schedule/parity'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useNotes } from '@/features/notes/useNotes'
+import { useAskFeel } from '@/features/plan/useAskFeel'
 import { DeadlinesCard } from '@/features/tasks/DeadlinesCard'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
@@ -119,6 +120,7 @@ function FeedRow({
   const past = end <= now
   const cancelled = event.status === 'cancelled'
   const done = event.status === 'done'
+  const missed = event.status === 'missed'
   const details = event.kind === 'class' ? classDetails(event) : event.location
 
   return (
@@ -126,7 +128,7 @@ function FeedRow({
       className={cn(
         'flex items-center gap-3 rounded-lg px-2 py-2',
         isNow && 'bg-muted',
-        (past || cancelled || done) && 'opacity-60',
+        (past || cancelled || done || missed) && 'opacity-60',
       )}
     >
       <span className="w-[5.5rem] shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -138,7 +140,7 @@ function FeedRow({
           {event.title}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
-          {cancelled ? 'отменено' : details}
+          {cancelled ? 'отменено' : missed ? 'не сделано' : details}
           {event.detached && !cancelled && ' · изменено'}
         </span>
       </button>
@@ -174,8 +176,15 @@ export function TodayView() {
   const inClasses = semester && semester.start_date <= today && today <= semester.classes_end
   const parity = inClasses ? weekParity(today, semester.start_date, semester.first_week_parity) : null
 
-  const toggle = (e: CalendarEvent) =>
-    update.mutate({ id: e.id, body: { status: e.status === 'done' ? 'planned' : 'done' } })
+  const askFeel = useAskFeel()
+
+  const toggle = (e: CalendarEvent) => {
+    const status = e.status === 'done' ? 'planned' : 'done'
+    update.mutate(
+      { id: e.id, body: { status } },
+      { onSuccess: () => status === 'done' && e.source_type === 'subtask' && e.source_id && askFeel(e.source_id) },
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">

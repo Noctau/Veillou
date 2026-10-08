@@ -21,3 +21,8 @@ export function errorMessage(error: unknown, fallback = 'Что-то пошло 
   if (error instanceof Error) return error.message
   return fallback
 }
+
+/** Машинный код ошибки API (`plan_stale`, `not_found`…), если есть. */
+export function errorCode(error: unknown): string | undefined {
+  return error && typeof error === 'object' && isErrorResponse(error) ? error.error.code : undefined
+}

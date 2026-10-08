@@ -379,7 +379,9 @@ async def test_sync_job_runs_through_queue(auth_client, session, user):
     later = now_utc() + timedelta(seconds=10)
     assert await jobs.run_one(session_factory, handlers, now=later)
     assert await pending(session, user, ReminderKind.deadline)
-    job = await session.scalar(select(Job).where(Job.user_id == user.id))
+    job = await session.scalar(
+        select(Job).where(Job.user_id == user.id, Job.kind == JobKind.reminders_sync)
+    )
     assert job is not None and job.status == JobStatus.done
 
 

@@ -46,6 +46,8 @@ class Task(UserOwnedMixin, Base):
     done_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # Оценка всего задания, пока нет подзадач
     estimate_min: Mapped[int | None] = mapped_column(Integer)
+    # Свой «закончить за N дней до дедлайна» (сдвинутый внутренний срок); NULL — из настроек
+    deadline_buffer_days: Mapped[int | None] = mapped_column(Integer)
     # Дата выдачи (задания с работы: дедлайн = выдача + 14 дней)
     issued_at: Mapped[date | None] = mapped_column(Date)
     project_id: Mapped[uuid.UUID | None] = mapped_column(

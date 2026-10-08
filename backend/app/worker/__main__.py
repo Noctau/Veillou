@@ -4,7 +4,9 @@
 - джобы из `jobs` (пересборка напоминаний после правок);
 - отправка готовых напоминаний из `reminders` (push + Telegram);
 - раз в час — пересборка напоминаний всех пользователей (окно едет вперёд);
-- в 3:00 по DEFAULT_TIMEZONE — докатка повторов и регулярных заданий, чистка очередей.
+- джобы превью плана (после правок заданий, расписания, «не сделано»);
+- в 3:00 по DEFAULT_TIMEZONE — докатка повторов и регулярных заданий, чистка очередей,
+  прошедшие неотмеченные блоки → missed и превью плана к утру.
 
 При старте сразу выполняется ночная джоба и пересборка: окна не отстают,
 а неотправленное за время простоя досылается в первом же цикле.
@@ -28,6 +30,7 @@ from app.services import jobs
 from app.services.dispatch import dispatch_due, next_due_at
 from app.services.recurring_tasks import roll_all_recurring_tasks
 from app.services.reminders import handle_sync_job, sync_all_users
+from app.services.replan import handle_preview_job, nightly_replan
 from app.services.schedule_sync import roll_all_users
 
 log = logging.getLogger("app.worker")
@@ -35,7 +38,10 @@ NIGHTLY_AT = time(3, 0)
 RESYNC_EVERY = timedelta(hours=1)
 KEEP_REMINDERS = timedelta(days=30)
 
-HANDLERS: dict[str, jobs.Handler] = {JobKind.reminders_sync: handle_sync_job}
+HANDLERS: dict[str, jobs.Handler] = {
+    JobKind.reminders_sync: handle_sync_job,
+    JobKind.plan_preview: handle_preview_job,
+}
 
 
 def seconds_until(at: time, now: datetime) -> float:
@@ -65,6 +71,9 @@ async def nightly() -> None:
         created,
         subtasks,
     )
+    async with session_factory() as db:
+        users = await nightly_replan(db)
+    log.info("Ночное перепланирование: %d польз.", users)
 
 
 async def resync_all() -> None:

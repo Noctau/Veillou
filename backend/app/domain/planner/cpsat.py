@@ -9,11 +9,13 @@
 в день, ≤ N подзадач одного задания в день, минимум отдыха.
 Мягко (минимизируем): приоритет × время завершения, огромный штраф за
 непостановку, опоздание к внутреннему сроку, сдвиг относительно прошлого плана
-(сегодня/завтра — дорого), утро для «связи с людьми», разрезание.
+(сегодня/завтра — дорого), утро для «связи с людьми», разрезание, порядок шагов
+задания (`sequence`).
 """
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import pairwise
 from time import perf_counter
 
 from ortools.sat.python import cp_model
@@ -29,6 +31,7 @@ W_STABLE_NEAR = 40  # сдвиг блока, который стоял на се
 W_STABLE_FAR = 1  # сдвиг остальных
 W_MORNING = 1  # «связь с людьми»: позже от начала дня
 W_SPLIT = 200  # блок разрезан: только если иначе заметно хуже
+W_ORDER = 300  # шаг задания начат раньше конца предыдущего по порядку
 OVERDUE_BOOST = 3  # приоритет просроченного
 
 # Больше переменных — presolve не успевает за 2 с, решаем без него
@@ -249,10 +252,29 @@ class _Builder:
                         m.add(y >= x)
                     per_group[(group, day)].append(y)
         for day, exprs in study.items():
-            m.add(sum(exprs) <= max(0, prep.study_limit - prep.fixed_study.get(day, 0)))
+            m.add(sum(exprs) <= max(0, prep.limit(day) - prep.fixed_study.get(day, 0)))
         for key, exprs in per_group.items():
             if len(exprs) + prep.fixed_per_group.get(key, 0) > prep.max_per_group:
                 m.add(sum(exprs) <= max(0, prep.max_per_group - prep.fixed_per_group.get(key, 0)))
+
+    def add_order(self) -> None:
+        """Мягкий порядок шагов: соседние по `sequence` в задании — штраф, если
+        следующий начат раньше конца предыдущего (оба размещены)."""
+        by_group: dict[BlockId, list[_Block]] = defaultdict(list)
+        for b in self.blocks.values():
+            if b.pb.block.group_id is not None and b.pb.block.sequence is not None:
+                by_group[b.pb.block.group_id].append(b)
+        for items in by_group.values():
+            items.sort(key=lambda b: (b.pb.block.sequence, b.pb.index))
+            for a, b in pairwise(items):
+                if a.pb.id in b.pb.block.depends_on:
+                    continue  # и так жёстко
+                inv = self.m.new_bool_var(f"ord{a.pb.index}_{b.pb.index}")
+                for p in a.parts:
+                    self.m.add(b.parts[0].start >= p.end).only_enforce_if(
+                        [b.pres, p.pres, inv.Not()]
+                    )
+                self.objective.append(W_ORDER * inv)
 
     def add_no_overlap(self) -> None:
         self.m.add_no_overlap(self.padded)
@@ -380,6 +402,7 @@ def solve_cp(
     builder.add_rest()
     builder.add_dependencies()
     builder.add_daily()
+    builder.add_order()
     builder.add_objective()
     if hint is not None:
         remaining = deadline - perf_counter()

@@ -15,6 +15,7 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 Description = Annotated[str, StringConstraints(max_length=20_000)]
 SubtaskEstimate = Annotated[int, Field(ge=5, le=600, description="Минуты")]
 TaskEstimate = Annotated[int, Field(ge=5, le=10_000, description="Минуты")]
+BufferDays = Annotated[int, Field(ge=0, le=14, description="Закончить за N дней до дедлайна")]
 RRule = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
@@ -141,6 +142,7 @@ class TaskUpdate(InputModel):
     priority: Priority | None = None
     status: TaskStatus | None = None
     estimate_min: TaskEstimate | None = None
+    deadline_buffer_days: BufferDays | None = None
     issued_at: date | None = None
     project_id: uuid.UUID | None = None
     milestone_id: uuid.UUID | None = None
@@ -177,6 +179,9 @@ class TaskRead(ReadModel):
     status: TaskStatus
     done_at: UTCMoment | None
     estimate_min: int | None
+    deadline_buffer_days: int | None = Field(
+        description="Свой «закончить за N дней до дедлайна»; null — из настроек"
+    )
     issued_at: date | None
     project_id: uuid.UUID | None
     milestone_id: uuid.UUID | None

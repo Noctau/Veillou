@@ -1,10 +1,11 @@
 """Жадный планировщик: fallback, если CP-SAT не успел, и стартовая подсказка для него.
 
 Порядок — EDF: просроченные, затем ближе внутренний срок, затем узкие окна
-(«связь с людьми» раньше учёбы), затем приоритет. Блок ставится в самое раннее
-допустимое место: сначала целиком до внутреннего срока, потом разрезанным,
-потом то же самое до настоящего дедлайна. Отдых резервируется заранее — самые
-поздние вечера и половины выходных недели (EDF заполняет начало недели).
+(«связь с людьми» раньше учёбы), затем приоритет, затем порядок шагов задания.
+Блок ставится в самое раннее допустимое место: сначала целиком до внутреннего
+срока, потом разрезанным, потом то же самое до настоящего дедлайна. Отдых
+резервируется заранее — самые поздние вечера и половины выходных недели (EDF
+заполняет начало недели).
 """
 
 from collections import defaultdict
@@ -53,7 +54,7 @@ class _State:
             return hit + 1
         day = prep.day_of(s)
         next_day = prep.days[day + 1].lo if day + 1 < len(prep.days) else prep.grid.n
-        if pb.block.counts_as_study and self.study.get(day, 0) + length > prep.study_limit:
+        if pb.block.counts_as_study and self.study.get(day, 0) + length > prep.limit(day):
             return next_day
         group = pb.block.group_id
         if (
@@ -144,7 +145,8 @@ class _State:
 def _order_key(pb: PreparedBlock) -> tuple:
     due = pb.due if pb.due is not None else pb.latest_end
     narrow = sum(hi - lo for lo, hi in pb.free)
-    return (not pb.overdue, due, narrow, -effective_priority(pb), pb.index)
+    seq = pb.block.sequence if pb.block.sequence is not None else 0
+    return (not pb.overdue, due, narrow, -effective_priority(pb), seq, pb.index)
 
 
 def solve_greedy(prep: Prepared) -> Solution:

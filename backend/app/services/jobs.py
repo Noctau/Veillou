@@ -27,6 +27,8 @@ RETRY_DELAYS = (timedelta(seconds=30), timedelta(minutes=2), timedelta(minutes=1
 KEEP_FINISHED = timedelta(days=14)
 # Пауза перед пересборкой напоминаний: серия правок схлопывается в одну джобу
 REMINDERS_DEBOUNCE = timedelta(seconds=3)
+# То же для пересчёта превью плана (солвер дороже — ждём дольше)
+PLAN_DEBOUNCE = timedelta(seconds=5)
 
 Handler = Callable[[AsyncSession, Job], Awaitable[None]]
 
@@ -109,6 +111,23 @@ def enqueue_reminders_sync_sync(conn: Connection, user_ids: set[uuid.UUID]) -> N
                 dedupe_key=reminders_sync_key(user_id),
             )
         )
+
+
+def plan_preview_key(user_id: uuid.UUID) -> str:
+    return f"{JobKind.plan_preview}:{user_id}"
+
+
+def enqueue_plan_preview_sync(conn: Connection, user_id: uuid.UUID, reason: str) -> None:
+    """Пересчитать превью плана (из обработчика after_flush)."""
+    conn.execute(
+        _insert(
+            JobKind.plan_preview,
+            user_id=user_id,
+            payload={"reasons": [reason]},
+            run_at=now_utc() + PLAN_DEBOUNCE,
+            dedupe_key=plan_preview_key(user_id),
+        )
+    )
 
 
 async def _claim(db: AsyncSession, now: datetime) -> Job | None:

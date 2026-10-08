@@ -135,6 +135,29 @@ def test_dependency_order():
     assert end(result, "a") <= start(result, "b")
 
 
+def test_sequence_is_soft_order():
+    # Без зависимостей шаги задания идут по порядку
+    result = plan(
+        Block("c", 60, group_id="t", sequence=2),
+        Block("a", 60, group_id="t", sequence=0),
+        Block("b", 60, group_id="t", sequence=1),
+        settings=PlanSettings(max_subtasks_per_task_per_day=3),
+    )
+    assert start(result, "a") < start(result, "b") < start(result, "c")
+
+
+def test_sequence_yields_to_narrow_window():
+    # Порядок мягкий: шаг с узким окном может встать раньше предыдущего
+    window = (Window(frozenset({1}), time(9), time(10)),)
+    result = plan(
+        Block("a", 120, group_id="t", sequence=0, deadline=at(MON, 23)),
+        Block("b", 60, group_id="t", sequence=1, windows=window, deadline=at(MON, 23)),
+        settings=PlanSettings(deadline_buffer_days=0),
+    )
+    assert start(result, "b") == at(MON, 9)
+    assert risks(result) == {}
+
+
 def test_dependency_on_unplaceable_block():
     short = (Window(WEEKDAYS, time(9), time(9, 30)),)
     result = plan(Block("a", 60, windows=short), Block("b", 30, depends_on=("a",)))
@@ -190,6 +213,13 @@ def test_late_inside_buffer_is_at_risk():
     assert risks(result) == {"a": RiskReason.late}
 
 
+def test_block_buffer_overrides_settings():
+    # Внутренний срок сдвинут к самому дедлайну — блок не «опаздывает»
+    result = plan(Block("a", 60, deadline=at(TUE, 21), buffer_days=0), now=at(MON, 20, 30))
+    assert start(result, "a") == at(TUE, 9)
+    assert risks(result) == {}
+
+
 def test_overdue_is_placed_asap():
     result = plan(
         Block("old", 60, deadline=at(MON - timedelta(days=2), 12)),
@@ -218,6 +248,22 @@ def test_daily_study_limit():
     result = plan(*(Block(f"b{i}", 60) for i in range(3)), settings=settings)
     days = sorted(start(result, f"b{i}").date() for i in range(3))
     assert days == [MON, MON, TUE]
+
+
+def test_study_limit_override_for_one_day():
+    settings = PlanSettings(study_limit_min_per_day=120)
+    result = plan(
+        *(Block(f"b{i}", 60) for i in range(4)),
+        settings=settings,
+        study_limits=((MON, 240),),
+    )
+    assert {start(result, f"b{i}").date() for i in range(4)} == {MON}
+
+
+def test_study_limit_override_can_lower_limit():
+    settings = PlanSettings(study_limit_min_per_day=120)
+    result = plan(Block("a", 60), settings=settings, study_limits=((MON, 0),))
+    assert start(result, "a").date() == TUE
 
 
 def test_non_study_blocks_ignore_limit():

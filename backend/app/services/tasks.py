@@ -50,6 +50,7 @@ from app.schemas.task import (
 )
 from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
+from app.services.calibration import recalibrate
 from app.services.catalog import ensure_defaults
 from app.services.recurring_tasks import sync_recurring_task
 
@@ -423,11 +424,16 @@ class TaskService:
         if "time_window" in changes:
             changes["time_window"] = patch.model_dump(mode="json")["time_window"]
         new_status = changes.pop("status", None)
+        feel_before = subtask.actual_feel
         for name, value in changes.items():
             setattr(subtask, name, value)
         if new_status is not None and new_status != subtask.status:
             self._set_subtask_status(subtask, new_status)
             await self._sync_events_status(subtask)
+        if subtask.status != SubtaskStatus.done:
+            subtask.actual_feel = None
+        if subtask.actual_feel != feel_before:
+            await recalibrate(self.db, self.user_id)
         if changes.keys() & {"title", "category_id"}:
             task = await self.tasks.get_or_404(subtask.task_id)
             await self._refresh_events(task, [subtask])
@@ -538,7 +544,7 @@ async def on_subtask_event_status(
         current = SubtaskStatus.done
     else:
         return
-    await db.execute(
+    result = await db.execute(
         update(Subtask)
         .where(
             Subtask.id == subtask_id,
@@ -547,4 +553,8 @@ async def on_subtask_event_status(
             Subtask.status == current,
         )
         .values(**values)
+        .returning(Subtask.id)
     )
+    if status == EventStatus.planned and result.first() is not None:
+        # Сняли «сделано» — отметка «быстрее / дольше» больше не в счёт
+        await recalibrate(db, user_id)

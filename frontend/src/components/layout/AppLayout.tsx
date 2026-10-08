@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router'
 import { OfflineBanner } from '@/features/offline/OfflineBanner'
 import { useOfflinePrefetch } from '@/features/offline/useOfflinePrefetch'
 import { useOnline } from '@/features/offline/useOnline'
+import { PlanSheet } from '@/features/plan/PlanSheet'
 import { useSettings } from '@/features/settings/useSettings'
 import { cn } from '@/lib/utils'
 
@@ -85,6 +86,7 @@ export function AppLayout() {
       <main className="mx-auto w-full max-w-3xl px-4 pt-4 pb-24 lg:pb-8">
         <OfflineBanner />
         <Outlet />
+        <PlanSheet />
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">

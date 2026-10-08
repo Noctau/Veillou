@@ -67,7 +67,7 @@ def violations(prep: Prepared, solution: Solution) -> list[str]:
             errors.append(f"пересечение {name_a} и {name_b}")
 
     for day, used in study.items():
-        if used + prep.fixed_study.get(day, 0) > prep.study_limit and used:
+        if used + prep.fixed_study.get(day, 0) > prep.limit(day) and used:
             errors.append(f"день {day}: учёба {used} слотов сверх лимита")
     for (group, day), count in per_group.items():
         if count + prep.fixed_per_group.get((group, day), 0) > prep.max_per_group:

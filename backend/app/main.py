@@ -14,6 +14,7 @@ from app.api import (
     me,
     notes,
     notify,
+    plan,
     projects,
     quickadd,
     schedule,
@@ -67,6 +68,8 @@ def create_app() -> FastAPI:
     api.include_router(search.router)
     api.include_router(notify.router)
     api.include_router(notify.actions_router)
+    api.include_router(plan.router)
+    api.include_router(plan.calibration_router)
     api.include_router(attachments.router)
     api.include_router(attachments.files_router)
     app.include_router(api)

@@ -143,6 +143,7 @@ class SourceType(StrEnum):
     """Сущность-источник гибкого блока в `events`."""
 
     subtask = "subtask"
+    task = "task"  # задание без подзадач — одним блоком
     backlog_item = "backlog_item"
 
 
@@ -230,6 +231,7 @@ class JobStatus(StrEnum):
 
 class JobKind(StrEnum):
     reminders_sync = "reminders.sync"  # пересобрать будущие напоминания пользователя
+    plan_preview = "plan.preview"  # пересчитать превью плана после правок
 
 
 class ReminderKind(StrEnum):
@@ -253,3 +255,23 @@ class ReminderAction(StrEnum):
     done = "done"  # «Сделано»
     snooze = "snooze"  # «+15 мин»
     tomorrow = "tomorrow"  # «На завтра»
+
+
+# ---------- перепланирование (M9) ----------
+
+
+class PlanRevisionStatus(StrEnum):
+    proposed = "proposed"  # превью ждёт «Применить / Отменить»
+    applied = "applied"
+    undone = "undone"  # применили и откатили
+    dismissed = "dismissed"  # превью отклонено
+    superseded = "superseded"  # превью устарело: есть новое
+
+
+class PlanReason(StrEnum):
+    """Почему пересчитали план."""
+
+    manual = "manual"  # кнопка «Перепланировать»
+    changes = "changes"  # задания, расписание, настройки
+    missed = "missed"  # «не сделано»
+    nightly = "nightly"  # ночная джоба: прошедшее неотмеченное → missed

@@ -1,11 +1,11 @@
-import type { DatesSetArg, EventClickArg, EventContentArg, EventInput } from '@fullcalendar/core'
+import type { DatesSetArg, EventClickArg, EventContentArg, EventDropArg, EventInput } from '@fullcalendar/core'
 import ruLocale from '@fullcalendar/core/locales/ru'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin, { type DateClickArg } from '@fullcalendar/interaction'
+import interactionPlugin, { type DateClickArg, type EventResizeDoneArg } from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { fromZonedTime } from 'date-fns-tz'
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, PinIcon } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import { addDaysIso, toWallIso } from '@/lib/time'
 import { EventDetailsDialog } from './EventDetailsDialog'
 import { classDetails, eventColor, KIND_LABEL } from './eventUtils'
 import { type PersonalDraft, PersonalEventDialog } from './PersonalEventDialog'
-import { type CalendarEvent, type EventKind, useCalendar } from './useCalendar'
+import { type CalendarEvent, type EventKind, useCalendar, useUpdateEvent } from './useCalendar'
 
 /*
  * FullCalendar работает в «настенном» времени пользователя: timeZone='UTC', а
@@ -63,13 +63,21 @@ function defaultView(): View {
   return window.matchMedia('(min-width: 768px)').matches ? 'timeGridWeek' : 'timeGridDay'
 }
 
+/** Гибкий запланированный блок можно перетащить — он закрепится (планировщик его больше не двигает). */
+function isMovable(e: CalendarEvent): boolean {
+  return !e.is_fixed && e.status === 'planned'
+}
+
 function EventContent({ arg }: { arg: EventContentArg }) {
   const event = arg.event.extendedProps.source as CalendarEvent | undefined
   if (!event) return null
   const details = event.kind === 'class' ? classDetails(event) : event.location
   return (
     <div className="flex h-full flex-col overflow-hidden px-1 py-0.5 text-xs leading-tight">
-      <span className="truncate font-medium">{arg.event.title}</span>
+      <span className="flex items-center gap-1 truncate font-medium">
+        {!event.is_fixed && event.is_pinned && <PinIcon aria-label="Закреплено" className="size-3 shrink-0" />}
+        <span className="truncate">{arg.event.title}</span>
+      </span>
       <span className="truncate opacity-80">
         {arg.timeText}
         {details && ` · ${details}`}
@@ -90,6 +98,7 @@ export function CalendarView() {
   const view = prefs.view ?? defaultView()
   const hidden = useMemo(() => new Set(prefs.hidden ?? []), [prefs.hidden])
   const { data } = useCalendar(range?.from, range?.to)
+  const update = useUpdateEvent()
 
   const updatePrefs = (next: Prefs) => {
     setPrefs(next)
@@ -102,7 +111,7 @@ export function CalendarView() {
       .filter((e) => !hidden.has(e.kind))
       .map((e) => {
         const color = eventColor(e)
-        const muted = e.status === 'cancelled' || e.status === 'done'
+        const muted = e.status === 'cancelled' || e.status === 'done' || e.status === 'missed'
         return {
           id: e.id,
           title: e.title,
@@ -111,6 +120,7 @@ export function CalendarView() {
           backgroundColor: color,
           borderColor: color,
           textColor: '#fff',
+          editable: isMovable(e),
           classNames: [
             muted ? 'opacity-50' : '',
             e.status === 'cancelled' ? 'line-through' : '',
@@ -150,6 +160,16 @@ export function CalendarView() {
   const onDateClick = (arg: DateClickArg) => {
     const iso = arg.date.toISOString()
     setDraft(arg.allDay ? { date: iso.slice(0, 10) } : { date: iso.slice(0, 10), start: iso.slice(11, 16) })
+  }
+
+  // Перетаскивание / растягивание гибкого блока: бэкенд ставит pin, план пересчитается
+  const onEventMove = (arg: EventDropArg | EventResizeDoneArg) => {
+    const { start, end } = arg.event
+    if (!start || !end) return arg.revert()
+    update.mutate(
+      { id: arg.event.id, body: { start: fcToUtc(start, tz), end: fcToUtc(end, tz) } },
+      { onError: () => arg.revert() },
+    )
   }
 
   const changeView = (v: View) => {
@@ -231,6 +251,10 @@ export function CalendarView() {
           datesSet={onDatesSet}
           eventClick={onEventClick}
           dateClick={onDateClick}
+          eventDrop={onEventMove}
+          eventResize={onEventMove}
+          snapDuration="00:15:00"
+          eventLongPressDelay={400}
           eventContent={(arg) => (arg.event.display === 'background' ? undefined : <EventContent arg={arg} />)}
         />
       </div>

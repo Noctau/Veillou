@@ -1,8 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BanIcon, CheckIcon, ExternalLinkIcon, PencilIcon, RepeatIcon, RotateCcwIcon, Trash2Icon, Undo2Icon } from 'lucide-react'
+import {
+  BanIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+  PencilIcon,
+  PinOffIcon,
+  RepeatIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+  Undo2Icon,
+  XIcon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { z } from 'zod'
 
 import { ConfirmButton } from '@/components/common/ConfirmButton'
@@ -12,6 +23,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
+import { useAskFeel } from '@/features/plan/useAskFeel'
+import { usePreviewPlan } from '@/features/plan/usePlan'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { paletteColor } from '@/lib/colors'
@@ -105,12 +118,17 @@ function EventDetails({
   const update = useUpdateEvent()
   const remove = useDeleteEvent()
   const reset = useResetEvent()
+  const preview = usePreviewPlan()
+  const askFeel = useAskFeel()
   const [editing, setEditing] = useState(false)
 
   const isClass = event.kind === 'class'
   const fromTemplate = !!event.template_id
   const cancelled = event.status === 'cancelled'
   const done = event.status === 'done'
+  const missed = event.status === 'missed'
+  // Гибкий блок (подзадача и т. п.): его двигает планировщик
+  const flexible = !event.is_fixed
   const day = wallDate(event.start, tz)
 
   const form = useForm<FormValues>({
@@ -126,6 +144,29 @@ function EventDetails({
   const { errors } = form.formState
 
   const patch = (body: EventUpdate) => update.mutate({ id: event.id, body }, { onSuccess: onClose })
+
+  const markDone = () =>
+    update.mutate(
+      { id: event.id, body: { status: 'done' } },
+      {
+        onSuccess: () => {
+          onClose()
+          if (event.source_type === 'subtask' && event.source_id) askFeel(event.source_id)
+        },
+      },
+    )
+
+  // «Не сделано» — блок уходит в историю, а подзадача сразу получает новое место в превью
+  const markMissed = () =>
+    update.mutate(
+      { id: event.id, body: { status: 'missed' } },
+      {
+        onSuccess: () => {
+          onClose()
+          preview.mutate({ reason: 'missed', quiet: true })
+        },
+      },
+    )
 
   const onSave = form.handleSubmit((v) => {
     const endDay = v.end > v.start ? v.date : addDaysIso(v.date, 1)
@@ -155,6 +196,8 @@ function EventDetails({
           {event.pair_number && <Badge variant="outline">{event.pair_number} пара</Badge>}
           {cancelled && <Badge variant="destructive">Отменено</Badge>}
           {done && <Badge variant="outline">Сделано</Badge>}
+          {missed && <Badge variant="destructive">Не сделано</Badge>}
+          {flexible && event.is_pinned && <Badge variant="outline">Закреплено</Badge>}
           {event.detached && !cancelled && <Badge variant="outline">Изменено вручную</Badge>}
         </div>
         {isClass ? (
@@ -199,10 +242,24 @@ function EventDetails({
         </form>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {isDoable(event) && (
-            <Button onClick={() => patch({ status: done ? 'planned' : 'done' })}>
-              {done ? <Undo2Icon /> : <CheckIcon />}
-              {done ? 'Не сделано' : 'Сделано'}
+          {isDoable(event) && !done && (
+            <Button onClick={markDone}>
+              <CheckIcon /> Сделано
+            </Button>
+          )}
+          {isDoable(event) && flexible && event.status === 'planned' && (
+            <Button variant="outline" onClick={markMissed}>
+              <XIcon /> Не сделано
+            </Button>
+          )}
+          {isDoable(event) && (done || missed) && (
+            <Button variant="outline" onClick={() => patch({ status: 'planned' })}>
+              <Undo2Icon /> Снять отметку
+            </Button>
+          )}
+          {flexible && event.is_pinned && event.status === 'planned' && (
+            <Button variant="ghost" onClick={() => patch({ is_pinned: false })}>
+              <PinOffIcon /> Открепить
             </Button>
           )}
           {!cancelled && (
@@ -227,6 +284,13 @@ function EventDetails({
           )}
           {event.source_type === 'subtask' && event.source_id && (
             <OpenTaskButton subtaskId={event.source_id} />
+          )}
+          {event.source_type === 'task' && event.source_id && (
+            <Button variant="ghost" asChild>
+              <Link to={`/tasks/${event.source_id}`}>
+                <ExternalLinkIcon /> Задание
+              </Link>
+            </Button>
           )}
           {isClass && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
           {!fromTemplate && (
