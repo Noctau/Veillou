@@ -9,9 +9,14 @@
 в день, ≤ N подзадач одного задания в день, минимум отдыха.
 Мягко (минимизируем): приоритет × время завершения, огромный штраф за
 непостановку (у дел из ящика — на порядки меньше: только в оставшееся время),
-опоздание к внутреннему сроку, сдвиг относительно прошлого плана
-(сегодня/завтра — дорого), утро для «связи с людьми», разрезание, порядок шагов
-задания (`sequence`).
+недобор недельной нормы проекта (дороже дел из ящика; резервные блоки нормы
+своего штрафа за непостановку не имеют), опоздание к внутреннему сроку,
+сдвиг относительно прошлого плана (сегодня/завтра — дорого), утро для «связи
+с людьми», разрезание, порядок шагов задания (`sequence`).
+
+Норма не должна отнимать время у сроков: если есть нормы, блок, который в
+жадном решении (там резерв ставится после основного) успевает к внутреннему
+сроку, успевает и здесь — жёстко.
 """
 
 from collections import defaultdict
@@ -28,6 +33,7 @@ from app.domain.planner.grid import Interval, Prepared, PreparedBlock
 W_END = 4  # × приоритет: раньше закончить
 W_MISS = 10_000_000  # × приоритет: блок не поставлен
 W_MISS_FILLER = 20_000  # × приоритет: дело из ящика не поставлено
+W_QUOTA = 30_000  # слот недобора нормы: час (4 слота) дороже любого дела из ящика
 W_LATE = 400  # × приоритет: позже внутреннего срока
 W_STABLE_NEAR = 40  # сдвиг блока, который стоял на сегодня/завтра
 W_STABLE_FAR = 1  # сдвиг остальных
@@ -52,7 +58,8 @@ class _Part:
     length: cp_model.IntVar | int
     pres: cp_model.IntVar
     days: dict[int, LinearExpr] = field(default_factory=dict)  # день → 0/1
-    study: dict[int, LinearExpr] = field(default_factory=dict)  # день → слотов учёбы
+    # день → слотов (только у блоков, которые считаются в учёбу или в норму)
+    minutes: dict[int, LinearExpr] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,8 +74,16 @@ def effective_priority(pb: PreparedBlock) -> int:
 
 
 def miss_weight(pb: PreparedBlock) -> int:
-    """Штраф за непостановку: дела из ящика — только в оставшееся время."""
+    """Штраф за непостановку: дела из ящика — только в оставшееся время,
+    резерв нормы — без штрафа (за него платит недобор нормы)."""
+    if pb.block.reserve:
+        return 0
     return effective_priority(pb) * (W_MISS_FILLER if pb.block.filler else W_MISS)
+
+
+def counted(pb: PreparedBlock) -> bool:
+    """Нужны ли минуты блока по дням: для лимита учёбы или для нормы."""
+    return pb.block.counts_as_study or pb.block.quota is not None
 
 
 class _Builder:
@@ -79,6 +94,8 @@ class _Builder:
         self.padded: list[cp_model.IntervalVar] = []
         self.plain: list[cp_model.IntervalVar] = []
         self.objective: list[LinearExpr] = []
+        # Блоки, которые обязаны успеть к внутреннему сроку (см. docstring модуля)
+        self.on_time: set[BlockId] = set()
 
     # ---------- части ----------
 
@@ -115,8 +132,8 @@ class _Builder:
             m.add(start <= hi).only_enforce_if(x)
             xs.append(x)
             part.days[day] = x
-            if pb.block.counts_as_study:
-                part.study[day] = pb.dur * x
+            if counted(pb):
+                part.minutes[day] = pb.dur * x
         m.add(sum(xs) == pres)
         return part
 
@@ -157,12 +174,12 @@ class _Builder:
         for day, vs in by_day.items():
             x = sum(vs)
             part.days[day] = x
-            if pb.block.counts_as_study:
+            if counted(pb):
                 minutes = m.new_int_var(0, pb.dur, f"m{name}_{day}")
                 m.add(minutes <= pb.dur * x)
                 m.add(minutes <= length)
                 m.add(minutes >= length - pb.dur * (1 - x))
-                part.study[day] = minutes
+                part.minutes[day] = minutes
         return part
 
     def _split(self, pb: PreparedBlock, pres: cp_model.IntVar) -> list[_Part]:
@@ -242,9 +259,10 @@ class _Builder:
         study: dict[int, list[LinearExpr]] = defaultdict(list)
         per_group: dict[tuple[BlockId, int], list[LinearExpr]] = defaultdict(list)
         for b in self.blocks.values():
-            for p in b.parts:
-                for day, expr in p.study.items():
-                    study[day].append(expr)
+            if b.pb.block.counts_as_study:
+                for p in b.parts:
+                    for day, expr in p.minutes.items():
+                        study[day].append(expr)
             group = b.pb.block.group_id
             if group is None:
                 continue
@@ -263,6 +281,25 @@ class _Builder:
         for key, exprs in per_group.items():
             if len(exprs) + prep.fixed_per_group.get(key, 0) > prep.max_per_group:
                 m.add(sum(exprs) <= max(0, prep.max_per_group - prep.fixed_per_group.get(key, 0)))
+
+    def add_quotas(self) -> None:
+        """Недобор нормы: `short ≥ need − Σ слотов блоков с меткой в дни нормы`."""
+        for q in self.prep.quotas:
+            if q.need <= 0:
+                continue
+            exprs = [
+                expr
+                for b in self.blocks.values()
+                if b.pb.block.quota == q.tag
+                for p in b.parts
+                for day, expr in p.minutes.items()
+                if day in q.days
+            ]
+            if not exprs:
+                continue  # недобор не зависит от решения
+            short = self.m.new_int_var(0, q.need, f"short{q.id}")
+            self.m.add(short + sum(exprs) >= q.need)
+            self.objective.append(W_QUOTA * short)
 
     def add_order(self) -> None:
         """Мягкий порядок шагов: соседние по `sequence` в задании — штраф, если
@@ -306,6 +343,8 @@ class _Builder:
                 m.add(last == p2.end).only_enforce_if(p2.pres)
             m.add(last == 0).only_enforce_if(b.pres.Not())
             self.objective.append(prio * W_END * last)
+            if pb.id in self.on_time and pb.due is not None:
+                m.add(last <= pb.due).only_enforce_if(b.pres)
             self.objective.append(miss_weight(pb) * (1 - b.pres))
             if pb.due is not None:
                 late = m.new_int_var(0, n, f"late{pb.index}")
@@ -356,6 +395,18 @@ class _Builder:
                 if solver.boolean_value(p.pres)
             ]
         return solution
+
+
+def on_time(prep: Prepared, solution: Solution) -> set[BlockId]:
+    """Основные блоки, которые в решении успевают к внутреннему сроку."""
+    return {
+        pb.id
+        for pb in prep.blocks
+        if not (pb.block.reserve or pb.block.filler)
+        and pb.due is not None
+        and (parts := solution.get(pb.id))
+        and parts[-1][1] <= pb.due
+    }
 
 
 def _params(solver: cp_model.CpSolver, time_limit_s: float, workers: int, presolve: bool) -> None:
@@ -410,6 +461,9 @@ def solve_cp(
     builder.add_dependencies()
     builder.add_daily()
     builder.add_order()
+    builder.add_quotas()
+    if hint is not None and prep.quotas:
+        builder.on_time = on_time(prep, hint)
     builder.add_objective()
     if hint is not None:
         remaining = deadline - perf_counter()

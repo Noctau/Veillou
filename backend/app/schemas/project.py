@@ -21,13 +21,18 @@ Contact = Teacher
 # ---------- этапы ----------
 
 
+MilestoneNote = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+
+
 class MilestoneCreate(InputModel):
     title: Title
     date: dt.date | None = None
+    note: MilestoneNote = ""
 
 
 class MilestoneUpdate(InputModel):
     title: Title | None = None
+    note: MilestoneNote | None = None
     date: dt.date | None = None
     status: MilestoneStatus | None = None
     position: Annotated[int, Field(ge=0, le=10_000)] | None = None
@@ -37,6 +42,7 @@ class MilestoneRead(ReadModel):
     id: uuid.UUID
     project_id: uuid.UUID
     title: str
+    note: str
     date: dt.date | None
     status: MilestoneStatus
     done_at: UTCMoment | None
@@ -88,6 +94,11 @@ class ProjectRead(ReadModel):
     milestones_total: int = 0
     milestones_done: int = 0
     next_milestone: MilestoneRead | None = None
+    # Отставание: на сколько дней просрочен самый старый невыполненный этап
+    behind_days: int = 0
+    # Время проекта на этой неделе (блоки шагов заданий проекта и работы над ним)
+    week_done_min: int = Field(default=0, description="Отмечено «сделано»")
+    week_planned_min: int = Field(default=0, description="Сделано и запланировано")
 
 
 class ProjectDetail(ProjectRead):

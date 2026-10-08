@@ -175,6 +175,17 @@ class RestWindow:
     week: tuple[int, int]  # ISO (год, неделя)
 
 
+@dataclass(frozen=True)
+class PreparedQuota:
+    """Норма на сетке: блокам с меткой `tag` в дни `days` не хватает `need` слотов
+    (закреплённое уже вычтено)."""
+
+    id: BlockId
+    tag: BlockId
+    days: frozenset[int]
+    need: int
+
+
 @dataclass
 class PreparedBlock:
     block: Block
@@ -213,6 +224,7 @@ class Prepared:
     max_per_group: int
     fixed_study: dict[int, int] = field(default_factory=dict)  # день → слотов
     fixed_per_group: dict[tuple[BlockId, int], int] = field(default_factory=dict)
+    quotas: list[PreparedQuota] = field(default_factory=list)
     _day_starts: list[int] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -446,7 +458,28 @@ def prepare(inp: PlanInput) -> Prepared:
         if f.group_id is not None:
             key = (f.group_id, day)
             prepared.fixed_per_group[key] = prepared.fixed_per_group.get(key, 0) + 1
+    prepared.quotas = _quotas(inp, grid, prepared)
     return prepared
+
+
+def _quotas(inp: PlanInput, grid: Grid, prep: Prepared) -> list[PreparedQuota]:
+    """Нормы минус закреплённое в их дни (в т. ч. сделанное сегодня до `now`)."""
+    if not inp.quotas or not prep.days:
+        return []
+    fixed: dict[tuple[BlockId, int], int] = defaultdict(int)
+    for f in inp.fixed:
+        lo, hi = grid.floor(f.start), grid.ceil(f.end)
+        if f.quota is None or lo >= grid.n or hi <= lo:
+            continue
+        fixed[(f.quota, max(prep.day_of(max(lo, 0)), 0))] += hi - lo
+    result = []
+    for q in inp.quotas:
+        days = frozenset(d.index for d in prep.days if q.start <= d.date < q.end)
+        if not days:
+            continue
+        need = grid.slots(q.minutes) - sum(fixed[(q.tag, d)] for d in days)
+        result.append(PreparedQuota(q.id, q.tag, days, max(need, 0)))
+    return result
 
 
 def available_slots(inp: PlanInput) -> dict[BlockId, Domain]:

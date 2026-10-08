@@ -3,6 +3,7 @@
     cd backend && uv run python -m app.ai.evals            # всё
     uv run python -m app.ai.evals breakdown --only essay-monsoon
     uv run python -m app.ai.evals parse --model qwen2.5:7b-instruct --out /tmp/report.md
+    uv run python -m app.ai.evals milestones          # этапы проекта (M13.2)
     uv run python -m app.ai.evals --fallback          # запасной провайдер (LLM_FALLBACK_*)
 
 Провайдер и модели — из `.env` (`--model` переопределяет текстовую модель).
@@ -21,10 +22,19 @@ from pathlib import Path
 from typing import Any
 
 from app.ai import LLMError, build_provider
-from app.ai.prompts import BreakdownContext, ParseContext, breakdown_messages, parse_messages
+from app.ai.prompts import (
+    BreakdownContext,
+    ExistingMilestone,
+    MilestonesContext,
+    ParseContext,
+    breakdown_messages,
+    milestones_messages,
+    parse_messages,
+)
 from app.ai.provider import ChatProvider, FallbackProvider, LLMProvider
-from app.ai.schemas import AIBreakdown, AIParsed, with_subjects
+from app.ai.schemas import AIBreakdown, AIMilestones, AIParsed, with_subjects
 from app.domain.breakdown import RawStep, fmt_minutes, normalize_steps, time_warning
+from app.domain.projects import RawMilestone, normalize_milestones
 
 HERE = Path(__file__).parent
 
@@ -127,6 +137,64 @@ async def parse_case(
     return Case(raw["text"][:40], not failures, seconds, report, failures)
 
 
+async def milestones_case(provider: LLMProvider, raw: dict[str, Any], today: date) -> Case:
+    deadline = date.fromisoformat(raw["deadline"]) if raw.get("deadline") else None
+    existing = [
+        ExistingMilestone(m["title"], date.fromisoformat(m["date"]), m["done"])
+        for m in raw.get("existing", [])
+    ]
+    ctx = MilestonesContext(
+        title=raw["title"],
+        today=today,
+        description=raw.get("description", ""),
+        deadline=deadline,
+        weekly_norm_min=raw.get("weekly_norm_min"),
+        existing=existing,
+    )
+    started = time.monotonic()
+    try:
+        completion = await provider.complete_json(milestones_messages(ctx), AIMilestones)
+    except LLMError as exc:
+        return Case(raw["id"], False, time.monotonic() - started, [], [exc.message])
+    seconds = time.monotonic() - started
+    answer = completion.value
+    items = normalize_milestones(
+        (RawMilestone(m.title, m.date, m.note) for m in answer.milestones),
+        today=today,
+        deadline=deadline,
+        existing=[m.title for m in existing],
+    )
+    expect = raw.get("expect", {})
+    failures = []
+    if "count" in expect and not _in(len(items), expect["count"]):
+        failures.append(f"этапов {len(items)}, ждали {expect['count']}")
+    text = " ".join(f"{m.title} {m.note}" for m in items).lower()
+    for word in expect.get("keywords", []):
+        if word.lower() not in text:
+            failures.append(f"нет «{word}»")
+    raw_titles = [m.title for m in answer.milestones]
+    for title in expect.get("skip", []):
+        if title in raw_titles:
+            failures.append(f"повторил существующий этап «{title}»")
+    raw_dates = [m.date for m in answer.milestones if m.date]
+    if raw_dates != sorted(raw_dates):
+        failures.append("даты не по порядку")
+    if deadline and any(d > deadline or d < today for d in raw_dates):
+        failures.append("даты вне [сегодня, итоговый срок]")
+    if sum(m.date is None for m in answer.milestones):
+        failures.append("есть этапы без даты")
+    if expect.get("warning") and not answer.warning:
+        failures.append("нет warning (просили указать срок)")
+    if len(completion.attempts) > 1:
+        failures.append("понадобился повтор")
+
+    report = [f"{i}. {m.date or '—'} · {m.title}" + (f" — _{m.note}_" if m.note else "")
+              for i, m in enumerate(items, 1)]  # fmt: skip
+    if answer.warning:
+        report.append(f"⚠️ ИИ: {answer.warning}")
+    return Case(raw["id"], not failures, seconds, report, failures)
+
+
 def _print(title: str, cases: list[Case]) -> list[str]:
     lines = [f"## {title}", ""]
     for c in cases:
@@ -144,9 +212,11 @@ def _print(title: str, cases: list[Case]) -> list[str]:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", nargs="?", choices=["breakdown", "parse", "all"], default="all")
+    parser.add_argument(
+        "suite", nargs="?", choices=["breakdown", "parse", "milestones", "all"], default="all"
+    )
     parser.add_argument("--model", help="Текстовая модель вместо LLM_MODEL")
-    parser.add_argument("--only", help="id задания разбивки")
+    parser.add_argument("--only", help="id задания разбивки или проекта")
     parser.add_argument("--fallback", action="store_true", help="Оценить запасной провайдер")
     parser.add_argument("--out", type=Path, help="Сохранить отчёт в Markdown")
     args = parser.parse_args()
@@ -176,6 +246,15 @@ async def main() -> None:
         )
         cases = [await parse_case(provider, c, now, data["subjects"]) for c in data["cases"]]
         lines += _print("Разбор текста", cases)
+
+    if args.suite in ("milestones", "all"):
+        data = json.loads((HERE / "milestones.json").read_text())
+        projects = data["cases"]
+        if args.only:
+            projects = [p for p in projects if p["id"] == args.only]
+        today = date.fromisoformat(data["today"])
+        cases = [await milestones_case(provider, p, today) for p in projects]
+        lines += _print("Этапы проекта", cases)
 
     text = "\n".join(lines)
     print(text)

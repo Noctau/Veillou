@@ -18,32 +18,35 @@ function Row({ milestone, projectId, today }: { milestone: Milestone; projectId:
   const done = milestone.status === 'done'
   const late = !done && milestone.date && milestone.date < today
   return (
-    <li className="flex items-center gap-2">
-      <Checkbox
-        aria-label={done ? 'Не выполнен' : 'Выполнен'}
-        className="size-5"
-        checked={done}
-        onCheckedChange={() => update.mutate({ id: milestone.id, body: { status: done ? 'planned' : 'done' } })}
-      />
-      <Input
-        value={title}
-        aria-label="Этап"
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={() => title.trim() && title !== milestone.title && update.mutate({ id: milestone.id, body: { title: title.trim() } })}
-        className={cn('border-transparent bg-transparent! shadow-none', done && 'text-muted-foreground line-through')}
-      />
-      <Input
-        type="date"
-        aria-label="Дата этапа"
-        value={milestone.date ?? ''}
-        onChange={(e) => update.mutate({ id: milestone.id, body: { date: e.target.value || null } })}
-        className={cn('w-36 shrink-0', late && 'text-destructive')}
-      />
-      <ConfirmButton title={`Удалить этап «${milestone.title}»?`} description="Задания этапа останутся в проекте." onConfirm={() => remove.mutate(milestone.id)}>
-        <Button variant="ghost" size="icon" aria-label="Удалить этап" className="shrink-0 text-muted-foreground">
-          <Trash2Icon />
-        </Button>
-      </ConfirmButton>
+    <li className="flex flex-col">
+      <div className="flex items-center gap-2">
+        <Checkbox
+          aria-label={done ? 'Не выполнен' : 'Выполнен'}
+          className="size-5"
+          checked={done}
+          onCheckedChange={() => update.mutate({ id: milestone.id, body: { status: done ? 'planned' : 'done' } })}
+        />
+        <Input
+          value={title}
+          aria-label="Этап"
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title.trim() && title !== milestone.title && update.mutate({ id: milestone.id, body: { title: title.trim() } })}
+          className={cn('border-transparent bg-transparent! shadow-none', done && 'text-muted-foreground line-through')}
+        />
+        <Input
+          type="date"
+          aria-label="Дата этапа"
+          value={milestone.date ?? ''}
+          onChange={(e) => update.mutate({ id: milestone.id, body: { date: e.target.value || null } })}
+          className={cn('w-36 shrink-0', late && 'text-destructive')}
+        />
+        <ConfirmButton title={`Удалить этап «${milestone.title}»?`} description="Задания этапа останутся в проекте." onConfirm={() => remove.mutate(milestone.id)}>
+          <Button variant="ghost" size="icon" aria-label="Удалить этап" className="shrink-0 text-muted-foreground">
+            <Trash2Icon />
+          </Button>
+        </ConfirmButton>
+      </div>
+      {milestone.note && <p className="pl-7 text-xs text-muted-foreground">{milestone.note}</p>}
     </li>
   )
 }
@@ -56,7 +59,7 @@ export function MilestoneList({ project }: { project: ProjectDetail }) {
   const [date, setDate] = useState('')
   const submit = () => {
     if (!title.trim()) return
-    add.mutate({ title: title.trim(), date: date || null })
+    add.mutate({ title: title.trim(), date: date || null, note: '' })
     setTitle('')
     setDate('')
   }

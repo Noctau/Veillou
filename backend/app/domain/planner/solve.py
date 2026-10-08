@@ -6,6 +6,8 @@
    проходит проверку и ставит не меньше блоков (с учётом приоритета), чем жадное.
 4. at_risk, diff с прошлым планом, статистика. Если что-то не влезло, жадное
    решение без минимума отдыха показывает, не отдых ли тому причина (`rest`).
+   Недобор нормы проекта (от получаса) — угроза `quota` на саму норму;
+   неразмещённый резерв нормы угрозой не считается.
 """
 
 from collections.abc import Iterable
@@ -24,7 +26,7 @@ from app.domain.planner.contracts import (
     RiskReason,
 )
 from app.domain.planner.cpsat import Solution, miss_weight, solve_cp
-from app.domain.planner.greedy import solve_greedy
+from app.domain.planner.greedy import quota_shortfalls, solve_greedy
 from app.domain.planner.grid import Prepared, prepare
 
 # Запас на извлечение решения и сборку результата
@@ -56,6 +58,8 @@ def _placements(prep: Prepared, solution: Solution) -> list[Placement]:
 def _at_risk(prep: Prepared, solution: Solution) -> list[AtRisk]:
     result = []
     for pb in prep.blocks:
+        if pb.block.reserve:
+            continue
         reason: RiskReason | None = None
         parts = solution.get(pb.id)
         if parts is None:
@@ -71,6 +75,10 @@ def _at_risk(prep: Prepared, solution: Solution) -> list[AtRisk]:
             reason = RiskReason.late
         if reason:
             result.append(AtRisk(pb.id, pb.block.group_id, reason))
+    tags = {q.id: q.tag for q in prep.quotas}
+    for quota_id, short in quota_shortfalls(prep, solution).items():
+        if short >= prep.min_part:
+            result.append(AtRisk(quota_id, tags[quota_id], RiskReason.quota))
     return result
 
 

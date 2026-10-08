@@ -81,6 +81,8 @@ class FixedBlock:
     end: datetime
     group_id: BlockId | None = None  # задание
     counts_as_study: bool = True
+    # Метка нормы (проект): засчитывается в `Quota` с этой меткой
+    quota: BlockId | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,27 @@ class Block:
     filler: bool = False
     # Только в эти дни (дата дня планировщика); None — в любые
     days: frozenset[date] | None = None
+    # Метка нормы (проект): время блока засчитывается в `Quota` с этой меткой
+    quota: BlockId | None = None
+    # Резерв нормы: ставится, только если норма иначе не набирается
+    # (штрафа за непостановку нет — только за недобор нормы)
+    reserve: bool = False
+
+
+@dataclass(frozen=True)
+class Quota:
+    """Норма (M13.1): в дни [start, end) блоков с меткой `tag` — не меньше `minutes`.
+
+    Мягко, с высоким весом: важнее дел из ящика, но задание, которое без
+    нормы встаёт до внутреннего срока, ради неё не опаздывает. Дни — даты
+    дней планировщика; закреплённое (`FixedBlock.quota`) в эти дни уже засчитано.
+    """
+
+    id: BlockId
+    tag: BlockId
+    start: date
+    end: date
+    minutes: int
 
 
 @dataclass(frozen=True)
@@ -135,6 +158,7 @@ class PlanInput:
     settings: PlanSettings = PlanSettings()
     # Разовый лимит учёбы на день (дата дня планировщика → минут) вместо общего
     study_limits: tuple[tuple[date, int], ...] = ()
+    quotas: tuple[Quota, ...] = ()
     # Горизонт: от now до самого дальнего дедлайна, но не меньше min и не больше max
     max_horizon_days: int = 60
     min_horizon_days: int = 14
@@ -149,6 +173,7 @@ class RiskReason(StrEnum):
     late = "late"  # размещено, но позже внутреннего срока (дедлайн − буфер)
     overdue = "overdue"  # дедлайн уже прошёл — ставим как можно раньше
     rest = "rest"  # влезло бы, если отдать минимум отдыха (no_time / late из-за отдыха)
+    quota = "quota"  # норма недели не набирается (block_id — id нормы, group_id — метка)
 
 
 @dataclass(frozen=True)

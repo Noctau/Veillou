@@ -1,10 +1,11 @@
-import { BriefcaseIcon, FlagIcon, PlusIcon } from 'lucide-react'
+import { AlertTriangleIcon, BriefcaseIcon, ClockIcon, FlagIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatMinutes } from '@/features/tasks/labels'
 import { errorMessage } from '@/lib/errors'
 import { formatDay } from '@/lib/time'
 
@@ -45,7 +46,11 @@ export function ProjectList() {
                   <span className="truncate font-medium">{p.title}</span>
                   {p.deadline && (
                     <span className="ml-auto text-xs whitespace-nowrap text-muted-foreground">
-                      до {formatDay(p.deadline, { weekday: undefined, year: 'numeric' })}
+                      до{' '}
+                      {formatDay(p.deadline, {
+                        weekday: undefined,
+                        year: 'numeric',
+                      })}
                     </span>
                   )}
                 </div>
@@ -57,6 +62,17 @@ export function ProjectList() {
                   <span>
                     этапы {p.milestones_done}/{p.milestones_total}
                   </span>
+                  {!!p.weekly_norm_min && (
+                    <span className="flex items-center gap-1">
+                      <ClockIcon className="size-3" /> {formatMinutes(p.week_done_min)} из{' '}
+                      {formatMinutes(p.weekly_norm_min)}
+                    </span>
+                  )}
+                  {p.behind_days > 0 && (
+                    <span className="flex items-center gap-1 text-destructive">
+                      <AlertTriangleIcon className="size-3" /> отставание {p.behind_days} дн.
+                    </span>
+                  )}
                   {p.is_work_default && (
                     <span className="flex items-center gap-1">
                       <BriefcaseIcon className="size-3" /> работа

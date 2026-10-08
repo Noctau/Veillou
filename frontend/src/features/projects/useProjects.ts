@@ -21,7 +21,9 @@ export function useProjects(status: ProjectStatus[] = ['active']) {
   return useQuery({
     queryKey: [...queryKeys.projects, 'list', status],
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/projects', { params: { query: { status } } })
+      const { data, error } = await api.GET('/api/v1/projects', {
+        params: { query: { status } },
+      })
       if (error) throw error
       return data
     },
@@ -76,7 +78,11 @@ export function useUpdateProject() {
       const key = queryKeys.project(id)
       await queryClient.cancelQueries({ queryKey: key })
       const prev = queryClient.getQueryData<ProjectDetail>(key)
-      if (prev) queryClient.setQueryData<ProjectDetail>(key, { ...prev, ...(body as Partial<ProjectDetail>) })
+      if (prev)
+        queryClient.setQueryData<ProjectDetail>(key, {
+          ...prev,
+          ...(body as Partial<ProjectDetail>),
+        })
       return { prev }
     },
     onError: (error, { id }, context) => {
@@ -184,6 +190,84 @@ export function useCreateWorkTask() {
     onSuccess: () => {
       invalidate()
       invalidateTasks()
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+// ---------- этапы от ИИ (M13.2) ----------
+
+export type MilestoneSuggestion = components['schemas']['MilestoneSuggestion']
+export type MilestonesRequest = components['schemas']['MilestonesRequest']
+export type MilestonesApply = components['schemas']['MilestonesApply']
+
+/** «Предложить этапы» / «Перегенерировать»: возвращает id джобы, черновик — через useJob. */
+export function useSuggestMilestones(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: MilestonesRequest) => {
+      const { data, error } = await api.POST('/api/v1/projects/{project_id}/milestones/suggest', {
+        params: { path: { project_id: projectId } },
+        body,
+      })
+      if (error) throw error
+      return data.job_id
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.latestMilestones(projectId),
+      }),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+/** Несохранённый черновик этапов: ждёт ИИ, считается или готов (можно было уйти со страницы). */
+export function useLatestMilestones(projectId: string) {
+  return useQuery({
+    queryKey: queryKeys.latestMilestones(projectId),
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/projects/{project_id}/milestones/suggest/latest', {
+        params: { path: { project_id: projectId } },
+      })
+      if (error) throw error
+      return data ?? null
+    },
+    refetchInterval: (query) => (query.state.data && query.state.data.status !== 'done' ? 15_000 : false),
+  })
+}
+
+export function useDismissMilestones(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error } = await api.POST('/api/v1/projects/{project_id}/milestones/suggest/{job_id}/dismiss', {
+        params: { path: { project_id: projectId, job_id: jobId } },
+      })
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.setQueryData(queryKeys.latestMilestones(projectId), null),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+/** «Сохранить»: этапы добавляются к существующим. */
+export function useApplyMilestones(projectId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidateProjects()
+  return useMutation({
+    mutationFn: async (body: MilestonesApply) => {
+      const { data, error } = await api.POST('/api/v1/projects/{project_id}/milestones/bulk', {
+        params: { path: { project_id: projectId } },
+        body,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.project(projectId), data)
+      queryClient.setQueryData(queryKeys.latestMilestones(projectId), null)
+      invalidate()
+      toast.success('Этапы добавлены')
     },
     onError: (error) => toast.error(errorMessage(error)),
   })

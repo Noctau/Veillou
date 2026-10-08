@@ -1,22 +1,28 @@
 """Проекты и этапы. Задания проекта — обычные Task с project_id (services/tasks.py)."""
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
+from datetime import time, timedelta
 from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
-from app.core.time import now_utc
+from app.core.time import get_tz, local_date, now_utc, wall_to_utc
+from app.domain.backlog import week_start
 from app.domain.enums import (
     AttachmentOwner,
     CategoryKey,
+    EventStatus,
     MilestoneStatus,
     ProjectStatus,
+    SourceType,
     TaskStatus,
 )
-from app.models import Category, Milestone, Project, Task, User
+from app.domain.projects import MilestoneDates, behind_days
+from app.models import Category, Event, Milestone, Project, Subtask, Task, User
 from app.schemas.project import (
     MilestoneCreate,
     MilestoneRead,
@@ -54,6 +60,7 @@ class ProjectService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
         self.user_id = user.id
+        self.tz = get_tz(user.timezone)
         self.projects = ProjectRepo(db, user.id)
         self.milestones = MilestoneRepo(db, user.id)
         self.categories = _CategoryRepo(db, user.id)
@@ -81,6 +88,69 @@ class ProjectService:
         )
         return {pid: (total, done) for pid, total, done in rows.all()}
 
+    async def _week_minutes(self, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
+        """Проект → (сделано, сделано + запланировано) минут на этой неделе.
+
+        Считаются блоки работы над проектом и блоки шагов / заданий проекта.
+        """
+        if not ids:
+            return {}
+        week = week_start(local_date(now_utc(), self.tz))
+        start = wall_to_utc(week, time(0), self.tz)
+        end = wall_to_utc(week + timedelta(days=7), time(0), self.tz)
+        task_project = dict(
+            (
+                await self.db.execute(
+                    select(Task.id, Task.project_id).where(
+                        Task.user_id == self.user_id,
+                        Task.deleted_at.is_(None),
+                        Task.project_id.in_(ids),
+                    )
+                )
+            ).all()
+        )
+        sub_task = (
+            dict(
+                (
+                    await self.db.execute(
+                        select(Subtask.id, Subtask.task_id).where(
+                            Subtask.user_id == self.user_id,
+                            Subtask.task_id.in_(task_project),
+                        )
+                    )
+                ).all()
+            )
+            if task_project
+            else {}
+        )
+        rows = await self.db.execute(
+            select(Event.source_type, Event.source_id, Event.status, Event.start, Event.end).where(
+                Event.user_id == self.user_id,
+                Event.deleted_at.is_(None),
+                Event.status.in_([EventStatus.planned, EventStatus.done]),
+                Event.start >= start,
+                Event.start < end,
+                Event.source_id.in_([*ids, *task_project, *sub_task]),
+                Event.source_type.in_([SourceType.project, SourceType.task, SourceType.subtask]),
+            )
+        )
+        done: dict[uuid.UUID, int] = defaultdict(int)
+        planned: dict[uuid.UUID, int] = defaultdict(int)
+        for kind, sid, status, e_start, e_end in rows.all():
+            if kind == SourceType.project:
+                pid = sid
+            elif kind == SourceType.task:
+                pid = task_project.get(sid)
+            else:
+                pid = task_project.get(sub_task.get(sid))
+            if pid is None:
+                continue
+            minutes = round((e_end - e_start).total_seconds() / 60)
+            planned[pid] += minutes
+            if status == EventStatus.done:
+                done[pid] += minutes
+        return {pid: (done[pid], planned[pid]) for pid in planned}
+
     async def _milestones_by_project(
         self, ids: Sequence[uuid.UUID]
     ) -> dict[uuid.UUID, list[Milestone]]:
@@ -93,11 +163,19 @@ class ProjectService:
             result.setdefault(m.project_id, []).append(m)
         return result
 
-    @staticmethod
     def _read(
-        project: Project, counts: tuple[int, int] | None, milestones: list[Milestone]
+        self,
+        project: Project,
+        counts: tuple[int, int] | None,
+        milestones: list[Milestone],
+        week: tuple[int, int] | None,
     ) -> ProjectRead:
         read = ProjectRead.model_validate(project)
+        read.week_done_min, read.week_planned_min = week or (0, 0)
+        read.behind_days = behind_days(
+            (MilestoneDates(m.date, m.status == MilestoneStatus.done) for m in milestones),
+            local_date(now_utc(), self.tz),
+        )
         read.tasks_total, read.tasks_done = counts or (0, 0)
         read.milestones_total = len(milestones)
         read.milestones_done = sum(m.status == MilestoneStatus.done for m in milestones)
@@ -113,14 +191,19 @@ class ProjectService:
         ids = [p.id for p in projects]
         counts = await self._task_counts(ids)
         milestones = await self._milestones_by_project(ids)
-        return [self._read(p, counts.get(p.id), milestones.get(p.id, [])) for p in projects]
+        weeks = await self._week_minutes(ids)
+        return [
+            self._read(p, counts.get(p.id), milestones.get(p.id, []), weeks.get(p.id))
+            for p in projects
+        ]
 
     async def get_detail(self, id: uuid.UUID) -> ProjectDetail:
         project = await self.projects.get_or_404(id)
         counts = await self._task_counts([id])
         milestones = (await self._milestones_by_project([id])).get(id, [])
+        weeks = await self._week_minutes([id])
         return ProjectDetail(
-            **self._read(project, counts.get(id), milestones).model_dump(),
+            **self._read(project, counts.get(id), milestones, weeks.get(id)).model_dump(),
             milestones=[MilestoneRead.model_validate(m) for m in milestones],
         )
 
@@ -178,7 +261,8 @@ class ProjectService:
         return await self.get_detail(id)
 
     async def delete(self, id: uuid.UUID) -> None:
-        """Проект удаляется с этапами и файлами; задания остаются, но без проекта."""
+        """Проект удаляется с этапами, файлами и запланированной работой над ним;
+        задания остаются, но без проекта."""
         project = await self.projects.get_or_404(id)
         for m in await self.milestones.find_all(Milestone.project_id == id):
             self.milestones.soft_delete(m)
@@ -186,6 +270,18 @@ class ProjectService:
             update(Task)
             .where(Task.user_id == self.user_id, Task.project_id == id)
             .values(project_id=None, milestone_id=None)
+        )
+        # Запланированные блоки работы над проектом больше не к чему относить
+        await self.db.execute(
+            update(Event)
+            .where(
+                Event.user_id == self.user_id,
+                Event.deleted_at.is_(None),
+                Event.source_type == SourceType.project,
+                Event.source_id == id,
+                Event.status == EventStatus.planned,
+            )
+            .values(deleted_at=now_utc())
         )
         await delete_for_owners(self.db, self.user_id, AttachmentOwner.project, [id])
         self.projects.soft_delete(project)
@@ -203,6 +299,7 @@ class ProjectService:
         milestone = Milestone(
             project_id=project_id,
             title=data.title,
+            note=data.note,
             date=data.date,
             status=MilestoneStatus.planned,
             position=(last if last is not None else -1) + 1,
@@ -214,7 +311,7 @@ class ProjectService:
     async def update_milestone(self, id: uuid.UUID, patch: MilestoneUpdate) -> MilestoneRead:
         milestone = await self.milestones.get_or_404(id)
         changes = patch.model_dump(exclude_unset=True)
-        for name in {"title", "status", "position"} & changes.keys():
+        for name in {"title", "note", "status", "position"} & changes.keys():
             if changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
         if (status := changes.get("status")) and status != milestone.status:

@@ -1,4 +1,4 @@
-import { CalendarClockIcon, InboxIcon, ScissorsIcon, SofaIcon, TimerIcon } from 'lucide-react'
+import { CalendarClockIcon, ClockIcon, InboxIcon, ScissorsIcon, SofaIcon, TimerIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -28,7 +28,8 @@ type Props = {
  * Варианты, когда что-то под угрозой (ТЗ §6, шаг 4): урезать оценки, больше учёбы
  * в конкретный день, убрать дела из ящика с недели, сдвинуть внутренний срок.
  * Решает пользователь; после выбора — новое превью. Дело из ящика, которое не
- * влезло, можно снять с недели.
+ * влезло, можно снять с недели. Норма проекта не набирается — уменьшить её
+ * или дать больше часов в конкретный день.
  */
 export function AtRiskDialog({ risk, onOpenChange }: Props) {
   const isTask = risk?.group_kind === 'task'
@@ -42,11 +43,15 @@ export function AtRiskDialog({ risk, onOpenChange }: Props) {
           <DialogDescription>
             {risk?.group_kind === 'backlog'
               ? 'Дело из ящика не влезает в свободное время этой недели.'
-              : `Под угрозой: ${risk ? RISK_LABEL[risk.reason] : ''}. Что можно сделать:`}
+              : risk?.group_kind === 'project'
+                ? `Не набирается недельная норма проекта (${risk.title}).`
+                : `Под угрозой: ${risk ? RISK_LABEL[risk.reason] : ''}. Что можно сделать:`}
           </DialogDescription>
         </DialogHeader>
         {risk?.group_kind === 'backlog' ? (
           <BacklogOptions risk={risk} onDone={close} />
+        ) : risk?.group_kind === 'project' ? (
+          <ProjectOptions risk={risk} onDone={close} />
         ) : risk?.group_kind === 'exam' ? (
           <div className="flex flex-col gap-4">
             {risk.reason === 'rest' && <RestNote />}
@@ -221,8 +226,8 @@ function DayLimitSection({ deadline, onDone }: { deadline: string | null; onDone
         <TimerIcon className="size-4" /> Больше учёбы в один день
       </h3>
       <p className="text-xs text-muted-foreground">Обычно — до {limitHours} ч в день. Разово можно больше.</p>
-      <div className="flex items-end gap-2">
-        <div className="flex flex-1 flex-col gap-1">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex min-w-36 flex-1 flex-col gap-1">
           <Label htmlFor="risk-day">День</Label>
           <Input id="risk-day" type="date" min={today} max={lastDay} value={day} onChange={(e) => setDay(e.target.value)} />
         </div>
@@ -309,6 +314,29 @@ function BacklogOptions({ risk, onDone }: { risk: PlanRisk; onDone: () => void }
           Снять с недели
         </Button>
       </div>
+    </div>
+  )
+}
+
+/** Норма проекта не набирается: сроки заданий важнее нормы, ящик — уступает ей. */
+function ProjectOptions({ risk, onDone }: { risk: PlanRisk; onDone: () => void }) {
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <p className="text-muted-foreground">
+        Сначала план ставит задания со сроками, потом — время на проект, дела из ящика — после. На этой неделе свободного
+        времени на всю норму не осталось.
+      </p>
+      <section className="flex flex-col gap-2">
+        <h3 className="flex items-center gap-2 font-medium">
+          <ClockIcon className="size-4" /> Поменять норму
+        </h3>
+        <p className="text-xs text-muted-foreground">Норма — в карточке проекта, раздел «Время на проект».</p>
+        <Button asChild size="sm" variant="outline" className="self-end" onClick={onDone}>
+          <Link to={`/projects/${risk.group_id}`}>Открыть проект</Link>
+        </Button>
+      </section>
+      <Separator />
+      <DayLimitSection deadline={risk.deadline} onDone={onDone} />
     </div>
   )
 }

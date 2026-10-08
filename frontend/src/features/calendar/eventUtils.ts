@@ -12,6 +12,7 @@ export const KIND_LABEL: Record<EventKind, string> = {
   backlog: 'Ящик',
   exam_prep: 'Подготовка',
   exam: 'Экзамены',
+  project: 'Проекты',
 }
 
 /** Тип одного события — для карточки. */
@@ -23,10 +24,11 @@ export const KIND_SINGLE: Record<EventKind, string> = {
   backlog: 'Дело из ящика',
   exam_prep: 'Подготовка к экзамену',
   exam: 'Экзамен',
+  project: 'Работа над проектом',
 }
 
 /** То, что отмечают «сделано» и что входит в прогресс дня (пары и отдых — нет). */
-export const DOABLE_KINDS: ReadonlySet<EventKind> = new Set(['personal', 'subtask', 'backlog', 'exam_prep'])
+export const DOABLE_KINDS: ReadonlySet<EventKind> = new Set(['personal', 'subtask', 'backlog', 'exam_prep', 'project'])
 
 export function isDoable(e: CalendarEvent): boolean {
   return DOABLE_KINDS.has(e.kind) && e.status !== 'cancelled'

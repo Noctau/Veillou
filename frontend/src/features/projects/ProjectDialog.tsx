@@ -34,6 +34,9 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [workDefault, setWorkDefault] = useState(false)
+  const [hours, setHours] = useState('')
+  const norm = hours ? Math.round(Number(hours) * 60) : null
+  const normValid = norm === null || (norm >= 0 && norm <= 60 * 60)
 
   const submit = () =>
     create.mutate(
@@ -45,6 +48,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         contacts: [],
         links: [],
         is_work_default: workDefault,
+        weekly_norm_min: norm || null,
       },
       {
         onSuccess: (project) => {
@@ -59,7 +63,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault()
-        if (title.trim()) submit()
+        if (title.trim() && normValid) submit()
       }}
     >
       <Field>
@@ -77,6 +81,20 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         </Field>
       </div>
       <Field>
+        <FieldLabel htmlFor="pr-norm">Часов в неделю</FieldLabel>
+        <Input
+          id="pr-norm"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={60}
+          step={0.5}
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+          placeholder="Необязательно — план зарезервирует это время"
+        />
+      </Field>
+      <Field>
         <FieldLabel htmlFor="pr-desc">Описание</FieldLabel>
         <Textarea id="pr-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
@@ -85,7 +103,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         Сюда по умолчанию идут задания с работы
       </label>
       <DialogFooter>
-        <Button type="submit" disabled={!title.trim() || create.isPending}>
+        <Button type="submit" disabled={!title.trim() || !normValid || create.isPending}>
           Создать
         </Button>
       </DialogFooter>

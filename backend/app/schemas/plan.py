@@ -34,12 +34,13 @@ class PlanChange(ReadModel):
 class PlanRisk(ReadModel):
     """Под угрозой. no_slots / no_time — не влезает до дедлайна; dependency — не
     поставлено то, от чего зависит; late — позже внутреннего срока; overdue — просрочено;
-    rest — влезло бы, если отдать минимум отдыха.
+    rest — влезло бы, если отдать минимум отдыха; quota — не набирается недельная
+    норма проекта (block_id — id нормы).
 
-    Группа — к чему относится блок: задание, дело из ящика (не влезло в неделю)
-    или экзамен (день подготовки)."""
+    Группа — к чему относится блок: задание, дело из ящика (не влезло в неделю),
+    экзамен (день подготовки) или проект (норма недели)."""
 
-    group_kind: Literal["task", "backlog", "exam"]
+    group_kind: Literal["task", "backlog", "exam", "project"]
     group_id: uuid.UUID
     group_title: str
     task_id: uuid.UUID | None

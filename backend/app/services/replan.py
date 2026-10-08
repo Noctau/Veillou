@@ -6,7 +6,10 @@
 - вхождение регулярного задания — только в свой день, без разрезания;
 - дела из ящика, взятые на неделю (M11.2): только в оставшееся после учёбы
   время своей недели, в окна по условиям (`domain/backlog.py`);
-- дни подготовки к экзамену (M12.2): каждый — в свой день, до начала экзамена.
+- дни подготовки к экзамену (M12.2): каждый — в свой день, до начала экзамена;
+- недельная норма проекта (M13.1) на текущую и следующую неделю: шаги заданий
+  проекта засчитываются в норму, на недостающее — резервные блоки «работа над
+  проектом» (ставятся, только если без них норма не набирается).
 
 Что не трогаем: жёсткие события, закреплённые блоки, уже начавшиеся и
 сделанные сегодня (они занимают время, считаются в дневные лимиты и уменьшают
@@ -27,7 +30,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -37,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppError, NotFoundError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain import backlog as box
+from app.domain import projects as proj
 from app.domain.calibration import calibrated
 from app.domain.enums import (
     FIXED_KINDS,
@@ -50,6 +54,7 @@ from app.domain.enums import (
     PlanReason,
     PlanRevisionStatus,
     Priority,
+    ProjectStatus,
     SourceType,
     SubtaskStatus,
     TaskStatus,
@@ -63,6 +68,7 @@ from app.domain.planner import (
     PlanInput,
     PlanResult,
     PlanSettings,
+    Quota,
     TimeRange,
     Window,
     solve,
@@ -77,6 +83,7 @@ from app.models import (
     ExamSession,
     Job,
     PlanRevision,
+    Project,
     StudyDayLimit,
     Subject,
     Subtask,
@@ -98,6 +105,7 @@ PLANNED_SOURCES = (
     SourceType.task,
     SourceType.backlog_item,
     SourceType.exam_session,
+    SourceType.project,
 )
 # Подготовка к экзамену: день не сдвинуть — важнее обычных шагов
 EXAM_PRIORITY = 3
@@ -158,6 +166,19 @@ def block_id(source_type: SourceType, source_id: uuid.UUID) -> str:
 
 def fixed_id(event_id: uuid.UUID) -> str:
     return f"event:{event_id}"
+
+
+def project_tag(project_id: uuid.UUID) -> str:
+    """Метка нормы проекта и группа его резервных блоков (≤ N в день)."""
+    return f"project:{project_id}"
+
+
+def quota_id(project_id: uuid.UUID, week: date) -> str:
+    return f"quota:{project_id}:{week.isoformat()}"
+
+
+def reserve_id(project_id: uuid.UUID, week: date, k: int) -> str:
+    return f"{project_tag(project_id)}:{week.isoformat()}:{k}"
 
 
 @dataclass
@@ -286,6 +307,20 @@ class _Builder:
         subjects = {
             x.id: x for x in await self._scalars(Subject) if x.id in {e.subject_id for e in exams}
         }
+        # Проекты с недельной нормой (итоговый срок ещё не прошёл)
+        projects = {
+            p.id: p
+            for p in await self._scalars(
+                Project,
+                Project.status == ProjectStatus.active,
+                Project.weekly_norm_min > 0,
+                order_by=[Project.created_at, Project.id],
+            )
+            if p.deadline is None or p.deadline >= self.today
+        }
+
+        def task_quota(task: Task) -> str | None:
+            return project_tag(task.project_id) if task.project_id in projects else None
 
         def type_key(type_id: uuid.UUID | None) -> str:
             at = action_types.get(type_id) if type_id else None
@@ -307,8 +342,9 @@ class _Builder:
             at = action_types.get(type_id) if type_id else None
             return windows_from_json(at.windows) if at else ()
 
-        def owner_of(e: Event) -> tuple[str | None, bool]:
-            """(группа для «≤ N в день», считается ли учёбой) — для занятого времени."""
+        def owner_of(e: Event) -> tuple[str | None, bool, str | None]:
+            """(группа для «≤ N в день», считается ли учёбой, метка нормы) — для
+            занятого времени."""
             if e.source_type == SourceType.subtask:
                 st = subtask_by_id.get(e.source_id)  # type: ignore[arg-type]
                 task = task_by_id.get(st.task_id) if st else None
@@ -316,19 +352,24 @@ class _Builder:
                 task, st = task_by_id.get(e.source_id), None  # type: ignore[arg-type]
             elif e.source_type == SourceType.exam_session:
                 sess = session_by_id.get(e.source_id)  # type: ignore[arg-type]
-                return (f"exam:{sess.exam_id}" if sess else None), True
+                return (f"exam:{sess.exam_id}" if sess else None), True, None
             elif e.source_type == SourceType.backlog_item:
                 item = item_by_id.get(e.source_id)  # type: ignore[arg-type]
-                return None, item is not None and type_key(item.action_type_id) == "study"
+                return None, item is not None and type_key(item.action_type_id) == "study", None
+            elif e.source_type == SourceType.project and e.source_id is not None:
+                tag = project_tag(e.source_id)
+                return tag, True, (tag if e.source_id in projects else None)
             else:
-                return None, False
+                return None, False, None
             if task is None:
-                return None, False
-            return str(task.id), action_key(task, st) == ActionTypeKey.study
+                return None, False, None
+            return str(task.id), action_key(task, st) == ActionTypeKey.study, task_quota(task)
 
         # ---------- гибкие события: что занято, что можно двигать ----------
         fixed: list[FixedBlock] = []
         fixed_by_source: dict[str, list[str]] = defaultdict(list)
+        # (метка нормы, неделя) → минут закреплено/сделано с сегодняшнего дня
+        fixed_quota: dict[tuple[str, date], int] = defaultdict(int)
         # Минут уже стоит намертво (закреплено, идёт, сделано) — блок планируем на остаток
         consumed: dict[str, int] = defaultdict(int)
         movable: dict[str, list[Event]] = defaultdict(list)
@@ -343,12 +384,20 @@ class _Builder:
             minutes = round((e.end - e.start).total_seconds() / 60)
             is_fixed = not ours or e.status == EventStatus.done or e.is_pinned or e.start < self.now
             if is_fixed:
-                group, study = owner_of(e)
+                group, study, quota = owner_of(e)
                 fixed.append(
                     FixedBlock(
-                        fixed_id(e.id), e.start, e.end, group_id=group, counts_as_study=study
+                        fixed_id(e.id),
+                        e.start,
+                        e.end,
+                        group_id=group,
+                        counts_as_study=study,
+                        quota=quota,
                     )
                 )
+                if quota is not None:
+                    week = box.week_start(local_date(e.start, self.tz))
+                    fixed_quota[(quota, week)] += minutes
                 if key:
                     fixed_by_source[key].append(fixed_id(e.id))
                     consumed[key] += minutes
@@ -449,6 +498,7 @@ class _Builder:
                         earliest=earliest,
                         buffer_days=buffer,
                         sequence=st.position if st else None,
+                        quota=task_quota(task),
                     ),
                     Source(
                         source_type,
@@ -558,6 +608,80 @@ class _Builder:
                 ),
             )
 
+        # Недельная норма проекта: текущая и следующая неделя
+        quotas: list[Quota] = []
+        done_before = await self._project_done_before_today(projects, this_week)
+        for project in projects.values():
+            tag = project_tag(project.id)
+            norm = project.weekly_norm_min or 0
+            # Резервные блоки проекта — по неделям, по порядку: k-й блок недели ↔ k-е событие
+            by_week: dict[date, list[Event]] = defaultdict(list)
+            for e in movable.pop(block_id(SourceType.project, project.id), []):
+                by_week[box.week_start(local_date(e.start, self.tz))].append(e)
+            last = project.deadline + timedelta(days=1) if project.deadline else None
+            for i in range(proj.QUOTA_WEEKS):
+                week = this_week + timedelta(weeks=i)
+                end = min(week + timedelta(days=7), last or date.max)
+                if end <= max(week, self.today):
+                    break
+                target = (
+                    proj.week_target(norm, done_before.get(project.id, 0), 7 - self.today.weekday())
+                    if i == 0
+                    else norm
+                )
+                events = sorted(by_week.pop(week, []), key=lambda e: (e.start, e.id))
+                if target <= 0:
+                    by_week[week] = events
+                    continue
+                qid = quota_id(project.id, week)
+                quotas.append(Quota(qid, tag, week, end, target))
+                week_end = wall_to_utc(end, time(0), self.tz)
+                color = colors.get(project.category_id) if project.category_id else None
+                sources[qid] = Source(
+                    SourceType.project,
+                    project.id,
+                    EventKind.project,
+                    f"неделя с {week:%d.%m}",
+                    color,
+                    "project",
+                    project.id,
+                    project.title,
+                    deadline=week_end,
+                )
+                chunks = proj.reserve_chunks(target - fixed_quota[(tag, week)])
+                for k, minutes in enumerate(chunks):
+                    key = reserve_id(project.id, week, k)
+                    if k < len(events):
+                        movable[key] = [events[k]]
+                    add(
+                        Block(
+                            id=key,
+                            duration_min=minutes,
+                            group_id=tag,
+                            deadline=week_end,
+                            earliest=wall_to_utc(week, time(0), self.tz),
+                            buffer_days=0,
+                            windows=study_windows,
+                            quota=tag,
+                            reserve=True,
+                        ),
+                        Source(
+                            SourceType.project,
+                            project.id,
+                            EventKind.project,
+                            proj.reserve_title(project.title),
+                            color,
+                            "project",
+                            project.id,
+                            project.title,
+                        ),
+                    )
+                by_week[week] = events[len(chunks) :]
+            # Лишние резервные блоки (норму уменьшили, неделя вне горизонта) — убрать
+            for week, events in by_week.items():
+                if events:
+                    movable[f"{tag}:{week.isoformat()}:rest"] = events
+
         # Зависимость от подзадачи, у которой нет блока (уже идёт / вне плана), — не держим
         known = set(sources) | {f.id for f in fixed}
         blocks = [
@@ -578,6 +702,7 @@ class _Builder:
             previous=previous,
             settings=plan_settings(s),
             study_limits=tuple((lim.date, lim.minutes) for lim in limits),
+            quotas=tuple(quotas),
             max_horizon_days=MAX_HORIZON_DAYS,
         )
         fingerprint = _hash(
@@ -588,6 +713,7 @@ class _Builder:
                 repr(inp.previous),
                 repr(inp.settings),
                 repr(inp.study_limits),
+                repr(inp.quotas),
                 sorted(str(e.id) for e in orphans),
                 sorted(str(e.id) for e in stale),
                 sorted(f"{k}:{src.title}" for k, src in sources.items()),
@@ -595,6 +721,66 @@ class _Builder:
             ]
         )
         return Snapshot(inp, sources, orphans, stale, fingerprint)
+
+    async def _project_done_before_today(
+        self, projects: dict[uuid.UUID, Project], week: date
+    ) -> dict[uuid.UUID, int]:
+        """Минуты, отмеченные «сделано» в проекте с начала недели до сегодня."""
+        if not projects:
+            return {}
+        rows = (
+            await self.db.execute(
+                select(Event.source_type, Event.source_id, Event.start, Event.end).where(
+                    Event.user_id == self.user_id,
+                    Event.deleted_at.is_(None),
+                    Event.status == EventStatus.done,
+                    Event.source_type.in_(
+                        [SourceType.project, SourceType.subtask, SourceType.task]
+                    ),
+                    Event.start >= wall_to_utc(week, time(0), self.tz),
+                    Event.start < self.day_start,
+                )
+            )
+        ).all()
+        sub_ids = {sid for kind, sid, *_ in rows if kind == SourceType.subtask}
+        sub_task = (
+            dict(
+                (
+                    await self.db.execute(
+                        select(Subtask.id, Subtask.task_id).where(Subtask.id.in_(sub_ids))
+                    )
+                ).all()
+            )
+            if sub_ids
+            else {}
+        )
+        task_ids = {sid for kind, sid, *_ in rows if kind == SourceType.task} | set(
+            sub_task.values()
+        )
+        task_project = (
+            dict(
+                (
+                    await self.db.execute(
+                        select(Task.id, Task.project_id).where(
+                            Task.user_id == self.user_id, Task.id.in_(task_ids)
+                        )
+                    )
+                ).all()
+            )
+            if task_ids
+            else {}
+        )
+        result: dict[uuid.UUID, int] = defaultdict(int)
+        for kind, sid, start, end in rows:
+            if kind == SourceType.project:
+                pid = sid
+            elif kind == SourceType.subtask:
+                pid = task_project.get(sub_task.get(sid))
+            else:
+                pid = task_project.get(sid)
+            if pid in projects:
+                result[pid] += round((end - start).total_seconds() / 60)
+        return result
 
 
 # ---------- превью ----------

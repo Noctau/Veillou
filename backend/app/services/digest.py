@@ -62,7 +62,7 @@ def event_line(e: Event, tz: ZoneInfo, context: str | None = None) -> str:
     return f"{mark}{fmt_range(e.start, e.end, tz)} {e.title}{ctx}{loc}"
 
 
-PLAN_KINDS = frozenset({EventKind.subtask, EventKind.exam_prep})
+PLAN_KINDS = frozenset({EventKind.subtask, EventKind.exam_prep, EventKind.project})
 
 
 async def task_progress(db: AsyncSession, tasks: list[Task]) -> dict[object, float]:

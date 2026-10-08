@@ -262,3 +262,86 @@ title — короткое название задания, до 80 символ
     if ctx.text.strip():
         lines.append(f"Подпись студентки к фото:\n{_block(ctx.text[:2000])}")
     return [Message("system", system), Message("user", "\n".join(lines))]
+
+
+# ---------- этапы проекта (M13.2) ----------
+
+
+@dataclass(frozen=True)
+class ExistingMilestone:
+    title: str
+    date: date | None
+    done: bool
+
+
+@dataclass(frozen=True)
+class MilestonesContext:
+    title: str
+    today: date
+    description: str = ""
+    deadline: date | None = None
+    weekly_norm_min: int | None = None
+    existing: Sequence[ExistingMilestone] = ()
+    tasks: Sequence[str] = ()
+    # Перегенерация: прошлый вариант («название — дата») и комментарий
+    previous: Sequence[str] = ()
+    comment: str | None = None
+
+
+MILESTONES_RULES = """Задача: предложить этапы (вехи) долгого проекта — от сегодня до итогового срока.
+
+Правила:
+1. Этап — проверяемый результат, а не мелкое действие: «Обзор литературы готов», «Глава 2 написана»,
+   а не «почитать статью». Обычно 4–8 этапов.
+2. Пример для ВКР: тема согласована → обзор литературы → данные и методика → расчёты и результаты →
+   текст глав → полный текст на проверке у научного руководителя → предзащита → защита.
+   Для других проектов (поступление в магистратуру и т. п.) — свои шаги, по описанию.
+3. date — ГГГГ-ММ-ДД, этапы по порядку дат, не раньше сегодняшнего дня и не позже итогового срока.
+   Последний этап — сам итог (защита, подача документов) в итоговый срок.
+   Оставь запас: полный текст — за 3–4 недели до защиты, предзащита — за 1–3 недели.
+4. Срок этапа соразмерен работе: обзор литературы, обработка данных, глава — от 3–4 недель
+   каждый; первый крупный этап — не раньше чем через 2–3 недели от сегодня.
+5. Учитывай учебный год: зимняя сессия — конец декабря и январь, летняя — июнь; на сессию
+   большие этапы не ставь. Приём документов и вступительные экзамены в магистратуру — летом
+   (июнь–июль). Этапы распределяй равномерно, без пустых месяцев.
+6. Этапы, которые уже есть в проекте, не повторяй; новые встраивай в их последовательность по датам.
+7. Итогового срока нет — распредели этапы на 3–6 месяцев и попроси в warning указать срок.
+8. note — что входит в этап, одной фразой, или пустая строка.
+9. warning — коротко, что уточнить, если описания мало для плана; иначе пустая строка.
+
+Ответ — только JSON:
+{"milestones": [{"title": "...", "date": "ГГГГ-ММ-ДД", "note": ""}], "warning": ""}"""
+
+
+def milestones_messages(ctx: MilestonesContext) -> list[Message]:
+    lines = [f"Проект: {ctx.title}", f"Сегодня: {fmt_date(ctx.today)}"]
+    if ctx.deadline is not None:
+        days = (ctx.deadline - ctx.today).days
+        lines.append(f"Итоговый срок: {fmt_date(ctx.deadline)} (через {days} дн.)")
+    else:
+        lines.append("Итоговый срок: не задан")
+    if ctx.weekly_norm_min:
+        lines.append(f"На проект в неделю: около {fmt_minutes(ctx.weekly_norm_min)}")
+    if ctx.description.strip():
+        lines.append(f"Описание проекта:\n{_block(ctx.description[:6000])}")
+    if ctx.existing:
+        items = []
+        for m in ctx.existing:
+            when = m.date.isoformat() if m.date else "без даты"
+            items.append(f"- {m.title} — {when}{' (выполнен)' if m.done else ''}")
+        lines.append("Этапы, которые уже есть:\n" + "\n".join(items))
+    if ctx.tasks:
+        lines.append("Задания проекта:\n" + "\n".join(f"- {t}" for t in ctx.tasks))
+    messages = [
+        Message("system", f"{WHO}\n\n{MILESTONES_RULES}"),
+        Message("user", "\n".join(lines)),
+    ]
+    if ctx.previous or ctx.comment:
+        redo = (
+            ["Прошлый вариант этапов:", *(f"- {p}" for p in ctx.previous)] if ctx.previous else []
+        )
+        if ctx.comment:
+            redo.append(f"Комментарий студентки: «{ctx.comment.strip()}»")
+        redo.append("Предложи этапы заново с учётом комментария.")
+        messages.append(Message("user", "\n".join(redo)))
+    return messages

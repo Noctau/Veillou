@@ -1,6 +1,7 @@
 """Жадный планировщик: fallback, если CP-SAT не успел, и стартовая подсказка для него.
 
-Порядок — EDF (дела из ящика — после всего остального): просроченные, затем
+Порядок — EDF (резерв нормы проекта — после основного, дела из ящика — после
+всего остального; резерв ставится, только пока норма недобрана): просроченные, затем
 ближе внутренний срок, затем узкие окна («связь с людьми» раньше учёбы), затем
 приоритет, затем порядок шагов задания.
 Блок ставится в самое раннее допустимое место: сначала целиком до внутреннего
@@ -13,7 +14,13 @@ from collections import defaultdict
 
 from app.domain.planner.contracts import BlockId
 from app.domain.planner.cpsat import Solution, effective_priority
-from app.domain.planner.grid import Interval, Prepared, PreparedBlock, RestWindow
+from app.domain.planner.grid import (
+    Interval,
+    Prepared,
+    PreparedBlock,
+    PreparedQuota,
+    RestWindow,
+)
 
 # Сколько стартов первой части пробовать при разрезании
 SPLIT_TRIES = 40
@@ -28,6 +35,7 @@ class _State:
         self.rest = bytearray(size)  # выбранные окна отдыха
         self.study: dict[int, int] = dict(prep.fixed_study)
         self.per_group: dict[tuple[BlockId, int], int] = dict(prep.fixed_per_group)
+        self.tagged: dict[tuple[BlockId, int], int] = defaultdict(int)  # (метка, день) → слотов
         for (lo, hi), _ in prep.fixed:
             if lo < hi:
                 self.padded[lo : hi + prep.pad_for(hi - lo)] = b"\x01" * (
@@ -119,6 +127,8 @@ class _State:
             days.add(day)
             if pb.block.counts_as_study:
                 self.study[day] = self.study.get(day, 0) + sign * (hi - lo)
+            if pb.block.quota is not None:
+                self.tagged[(pb.block.quota, day)] += sign * (hi - lo)
         if pb.block.group_id is not None:
             for day in days:
                 key = (pb.block.group_id, day)
@@ -129,6 +139,16 @@ class _State:
 
     def uncommit(self, pb: PreparedBlock, parts: list[Interval]) -> None:
         self._apply(pb, parts, -1)
+
+    def quota_met(self, pb: PreparedBlock) -> bool:
+        """Резерв не нужен: норма его недели уже набрана."""
+        if not pb.free:
+            return True
+        day = self.prep.day_of(pb.free[0][0])
+        quota = next(
+            (q for q in self.prep.quotas if q.tag == pb.block.quota and day in q.days), None
+        )
+        return quota is None or _short(self.tagged, quota) <= 0
 
     def place(self, pb: PreparedBlock, lower: int) -> list[Interval] | None:
         limits = [pb.latest_end]
@@ -143,11 +163,16 @@ class _State:
         return None
 
 
+def _short(tagged: dict[tuple[BlockId, int], int], quota: PreparedQuota) -> int:
+    return quota.need - sum(tagged.get((quota.tag, d), 0) for d in quota.days)
+
+
 def _order_key(pb: PreparedBlock) -> tuple:
     due = pb.due if pb.due is not None else pb.latest_end
     narrow = sum(hi - lo for lo, hi in pb.free)
     seq = pb.block.sequence if pb.block.sequence is not None else 0
-    return (pb.block.filler, not pb.overdue, due, narrow, -effective_priority(pb), seq, pb.index)
+    tier = 2 if pb.block.filler else 1 if pb.block.reserve else 0
+    return (tier, not pb.overdue, due, narrow, -effective_priority(pb), seq, pb.index)
 
 
 def solve_greedy(prep: Prepared) -> Solution:
@@ -170,6 +195,8 @@ def solve_greedy(prep: Prepared) -> Solution:
         if any(d in failed for d in deps(pb)):
             failed.add(pb.id)
             continue
+        if pb.block.reserve and state.quota_met(pb):
+            continue
         lower = 0
         for d in pb.block.depends_on:
             if d in solution:
@@ -183,3 +210,15 @@ def solve_greedy(prep: Prepared) -> Solution:
         state.commit(pb, parts)
         solution[pb.id] = parts
     return solution
+
+
+def quota_shortfalls(prep: Prepared, solution: Solution) -> dict[BlockId, int]:
+    """Норма → сколько слотов не хватает в решении (только недобранные)."""
+    tagged: dict[tuple[BlockId, int], int] = defaultdict(int)
+    for block_id, parts in solution.items():
+        pb = prep.by_id[block_id]
+        if pb.block.quota is None:
+            continue
+        for lo, hi in parts:
+            tagged[(pb.block.quota, prep.day_of(lo))] += hi - lo
+    return {q.id: short for q in prep.quotas if (short := _short(tagged, q)) > 0}

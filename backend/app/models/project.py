@@ -50,6 +50,8 @@ class Milestone(UserOwnedMixin, Base):
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(300))
+    # Что входит в этап (от ИИ или своё)
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
     date: Mapped[dt.date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(12), default=MilestoneStatus.planned)
     done_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)

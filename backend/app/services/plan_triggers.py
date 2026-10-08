@@ -5,7 +5,8 @@
 ставится джоба `plan.preview` (с дедупликацией и паузой — серия правок даёт
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
-Дела из ящика (взятые на неделю) и дни подготовки к экзаменам — тоже.
+Дела из ящика (взятые на неделю), дни подготовки к экзаменам и недельная
+норма проекта — тоже.
 
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
@@ -25,6 +26,7 @@ from app.models import (
     Event,
     Exam,
     ExamSession,
+    Project,
     StudyDayLimit,
     Subtask,
     Task,
@@ -41,6 +43,7 @@ TASK_FIELDS = {
     "action_type_id",
     "task_type",
     "deadline_buffer_days",
+    "project_id",
     "deleted_at",
 }
 SUBTASK_FIELDS = {"estimate_min", "depends_on", "time_window", "action_type_id", "deleted_at"}
@@ -57,6 +60,7 @@ BACKLOG_FIELDS = {
 }
 EXAM_FIELDS = {"starts_at", "duration_min", "plan_enabled", "deleted_at"}
 SESSION_FIELDS = {"question_ids", "minutes", "date", "deleted_at"}
+PROJECT_FIELDS = {"weekly_norm_min", "status", "deadline", "title", "deleted_at"}
 # Статусы события, переход в которые (или из которых) меняет занятость
 EVENT_STATUSES = {EventStatus.missed, EventStatus.cancelled}
 
@@ -105,6 +109,10 @@ def _relevant(obj: Any, is_new: bool) -> bool:
         return not is_new and bool(_changed(obj, EXAM_FIELDS))
     if isinstance(obj, ExamSession):
         return is_new or bool(_changed(obj, SESSION_FIELDS))
+    if isinstance(obj, Project):
+        if is_new:
+            return bool(obj.weekly_norm_min)
+        return bool(_changed(obj, PROJECT_FIELDS))
     return isinstance(obj, StudyDayLimit)
 
 

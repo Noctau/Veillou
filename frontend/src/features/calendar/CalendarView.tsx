@@ -31,7 +31,7 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'timeGridWeek', label: 'Неделя' },
   { value: 'dayGridMonth', label: 'Месяц' },
 ]
-const LAYERS: EventKind[] = ['class', 'exam', 'personal', 'rest', 'subtask', 'backlog', 'exam_prep']
+const LAYERS: EventKind[] = ['class', 'exam', 'personal', 'rest', 'subtask', 'backlog', 'exam_prep', 'project']
 // Слои, которые видны всегда; остальные — только когда в них есть события
 const BASE_LAYERS: ReadonlySet<EventKind> = new Set(['class', 'personal', 'rest'])
 const STORAGE_KEY = 'veillou.calendar'

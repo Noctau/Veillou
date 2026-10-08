@@ -202,3 +202,33 @@ def _one_of(value: str | None, names: list[str]) -> str | None:
 def _base_of(schema: type[BaseModel]) -> tuple[type, ...]:
     """Без самого BaseModel-класса со старыми полями: только примеси (`_Deadline`)."""
     return (*(b for b in schema.__bases__ if b is not BaseModel), BaseModel)
+
+
+# ---------- этапы проекта (M13.2) ----------
+
+MAX_MILESTONES = 12
+
+
+class AIMilestone(BaseModel):
+    title: Title = Field(
+        description="Этап — результат, а не действие: «Обзор литературы готов»", max_length=200
+    )
+    date: DeadlineDate
+    note: str = Field(description="Что входит в этап, коротко, или пустая строка", max_length=500)
+
+    @field_validator("note")
+    @classmethod
+    def _strip(cls, value: str) -> str:
+        return " ".join(value.split())
+
+
+class AIMilestones(BaseModel):
+    milestones: list[AIMilestone] = Field(min_length=1, max_length=MAX_MILESTONES)
+    warning: str = Field(
+        description="Что уточнить, если описания мало для плана, или пустая строка", max_length=500
+    )
+
+    @field_validator("warning")
+    @classmethod
+    def _blank(cls, value: str) -> str:
+        return (_blank(value) or "").strip()

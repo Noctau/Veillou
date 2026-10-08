@@ -3,6 +3,7 @@ import {
   ArrowRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ClockIcon,
   InboxIcon,
   MinusIcon,
   PlusIcon,
@@ -42,25 +43,32 @@ function ChangeRow({ change, tz }: { change: PlanChange; tz: string }) {
   )
 }
 
-/** Угрозы по заданиям / экзаменам / делам ящика: одна группа — одна строка с «Варианты». */
+/** Угрозы по заданиям / экзаменам / делам ящика / нормам проектов: одна группа — одна строка с «Варианты». */
 function RiskList({ risks, onOptions }: { risks: PlanRisk[]; onOptions: (risk: PlanRisk) => void }) {
   const byGroup = new Map<string, PlanRisk[]>()
   for (const r of risks) byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r])
   return (
     <ul className="flex flex-col gap-1">
       {[...byGroup.values()].map((items) => {
-        const soft = items[0].group_kind === 'backlog'
+        const kind = items[0].group_kind
+        const soft = kind === 'backlog' || kind === 'project'
         return (
           <li key={items[0].group_id} className="flex items-center gap-2 text-sm">
-            {soft ? (
+            {kind === 'backlog' ? (
               <InboxIcon className="size-4 shrink-0 text-muted-foreground" />
+            ) : kind === 'project' ? (
+              <ClockIcon className="size-4 shrink-0 text-muted-foreground" />
             ) : (
               <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
             )}
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{items[0].group_title}</div>
               <div className="text-xs text-muted-foreground">
-                {soft ? 'из ящика: не влезает в неделю' : [...new Set(items.map((r) => RISK_LABEL[r.reason]))].join('; ')}
+                {kind === 'backlog'
+                  ? 'из ящика: не влезает в неделю'
+                  : soft
+                    ? `${RISK_LABEL.quota}: ${items.map((r) => r.title).join(', ')}`
+                    : [...new Set(items.map((r) => RISK_LABEL[r.reason]))].join('; ')}
               </div>
             </div>
             <Button size="sm" variant="outline" onClick={() => onOptions(items[0])}>
@@ -132,7 +140,7 @@ export function PlanSheet() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setRisk(proposal.at_risk.find((r) => r.group_kind !== 'backlog') ?? proposal.at_risk[0])}
+                onClick={() => setRisk(proposal.at_risk.find((r) => r.group_kind === 'task' || r.group_kind === 'exam') ?? proposal.at_risk[0])}
               >
                 <AlertTriangleIcon /> Варианты
               </Button>

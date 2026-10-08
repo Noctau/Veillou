@@ -43,6 +43,7 @@ class EventKind(StrEnum):
     backlog = "backlog"  # дело из ящика (гибкое, M11)
     exam_prep = "exam_prep"  # подготовка к экзамену (гибкое, M12)
     exam = "exam"  # сам экзамен (жёсткое, из Exam)
+    project = "project"  # работа над проектом — резерв недельной нормы (гибкое, M13)
 
 
 FIXED_KINDS = frozenset({EventKind.class_, EventKind.personal, EventKind.rest, EventKind.exam})
@@ -148,6 +149,7 @@ class SourceType(StrEnum):
     backlog_item = "backlog_item"
     exam_session = "exam_session"  # день подготовки к экзамену (M12)
     exam = "exam"  # жёсткое событие самого экзамена
+    project = "project"  # резерв недельной нормы проекта (M13.1)
 
 
 # ---------- долгий ящик (M4.6) ----------
@@ -238,10 +240,13 @@ class JobKind(StrEnum):
     ai_breakdown = "ai.breakdown"  # разбить задание на шаги (черновик)
     ai_parse = "ai.parse"  # разобрать свободный текст (бот, ＋)
     ai_photo = "ai.photo"  # распознать фото задания
+    ai_milestones = "ai.milestones"  # предложить этапы проекта (черновик)
 
 
 # ИИ-джобы идут своей очередью: по одной, по порядку постановки, и ждут, если ИИ недоступен
-AI_JOB_KINDS = frozenset({JobKind.ai_breakdown, JobKind.ai_parse, JobKind.ai_photo})
+AI_JOB_KINDS = frozenset(
+    {JobKind.ai_breakdown, JobKind.ai_parse, JobKind.ai_photo, JobKind.ai_milestones}
+)
 
 
 class ReminderKind(StrEnum):
@@ -303,6 +308,7 @@ class AIPurpose(StrEnum):
     breakdown = "breakdown"
     parse = "parse"
     photo = "photo"
+    milestones = "milestones"
 
 
 class AIOrigin(StrEnum):

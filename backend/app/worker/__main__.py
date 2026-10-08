@@ -34,6 +34,7 @@ from app.notify.notifier import Notifier, Sender, TelegramSender, WebPushSender
 from app.services import jobs
 from app.services.ai import prune_log
 from app.services.dispatch import dispatch_due, next_due_at
+from app.services.project_ai import handle_milestones_job
 from app.services.recurring_tasks import roll_all_recurring_tasks
 from app.services.reminders import handle_sync_job, sync_all_users
 from app.services.replan import handle_preview_job, nightly_replan
@@ -51,6 +52,7 @@ def build_handlers(bot: Bot | None) -> dict[str, jobs.Handler]:
     return {
         JobKind.reminders_sync: handle_sync_job,
         JobKind.plan_preview: handle_preview_job,
+        JobKind.ai_milestones: handle_milestones_job,
         **make_handlers(bot),
     }
 

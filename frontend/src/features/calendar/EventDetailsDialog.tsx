@@ -301,6 +301,13 @@ function EventDetails({
               </Link>
             </Button>
           )}
+          {event.source_type === 'project' && event.source_id && (
+            <Button variant="ghost" asChild>
+              <Link to={`/projects/${event.source_id}`}>
+                <ExternalLinkIcon /> Проект
+              </Link>
+            </Button>
+          )}
           {event.source_type === 'task' && event.source_id && (
             <Button variant="ghost" asChild>
               <Link to={`/tasks/${event.source_id}`}>

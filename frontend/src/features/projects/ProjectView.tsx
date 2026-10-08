@@ -36,8 +36,11 @@ import { cn } from '@/lib/utils'
 
 import { ContactsEditor } from './ContactsEditor'
 import { MilestoneList } from './MilestoneList'
+import { MilestoneSuggest } from './MilestoneSuggest'
+import { ProjectTimeline } from './ProjectTimeline'
 import { RecurringTaskDialog } from './RecurringTaskDialog'
 import { type ProjectDetail, useDeleteProject, useProject, useUpdateProject } from './useProjects'
+import { WeeklyNorm } from './WeeklyNorm'
 import { WorkTaskDialog } from './WorkTaskDialog'
 
 function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
@@ -251,8 +254,15 @@ export function ProjectView({ projectId }: { projectId: string }) {
     <div className="flex flex-col gap-4">
       <Header project={project} />
 
-      <Section title="Этапы">
-        <MilestoneList project={project} />
+      <Section title="Этапы" action={<MilestoneSuggest project={project} />}>
+        <div className="flex flex-col gap-4">
+          <ProjectTimeline project={project} />
+          <MilestoneList project={project} />
+        </div>
+      </Section>
+
+      <Section title="Время на проект">
+        <WeeklyNorm key={project.weekly_norm_min ?? 0} project={project} />
       </Section>
 
       <Section title="Задания">

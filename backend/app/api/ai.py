@@ -1,4 +1,4 @@
-"""ИИ: джобы (поллинг), разбивка, шаблоны, разбор текста и фото.
+"""ИИ: джобы (поллинг), разбивка, шаблоны, разбор текста и фото, этапы проекта.
 
 Все вызовы ИИ — джобы в воркере: ручка отдаёт `job_id`, фронт поллит
 `GET /jobs/{id}` до `done` / `failed`.
@@ -21,12 +21,16 @@ from app.schemas.ai import (
     BreakdownRequest,
     JobRead,
     JobStarted,
+    MilestonesApply,
+    MilestonesRequest,
     TemplateCreate,
     TemplateRead,
     TemplateUpdate,
 )
+from app.schemas.project import ProjectDetail
 from app.services.ai_parse import AIParseService
 from app.services.breakdown import BreakdownService
+from app.services.project_ai import ProjectAIService
 from app.services.replan import ReplanService, plan_state
 from app.services.tasks import TaskService
 
@@ -139,3 +143,43 @@ async def recognize_photo(task_id: uuid.UUID, db: SessionDep, user: CurrentUser)
     """Распознать фото задания (его вложения-картинки): текст — в описание,
     дедлайн, предмет и тип — если их ещё нет."""
     return JobStarted(job_id=await AIParseService(db, user).start_photo(task_id))
+
+
+# ---------- этапы проекта ----------
+
+
+def get_project_ai(db: SessionDep, user: CurrentUser) -> ProjectAIService:
+    return ProjectAIService(db, user)
+
+
+ProjectAI = Annotated[ProjectAIService, Depends(get_project_ai)]
+
+
+@router.post("/projects/{project_id}/milestones/suggest", status_code=ACCEPTED)
+async def suggest_milestones(
+    project_id: uuid.UUID, data: MilestonesRequest, svc: ProjectAI
+) -> JobStarted:
+    """«Предложить этапы» / «Перегенерировать»: черновик придёт в `GET /jobs/{id}`.
+    Проект не меняется, пока не нажали «Сохранить»."""
+    return JobStarted(job_id=await svc.start(project_id, data))
+
+
+@router.get("/projects/{project_id}/milestones/suggest/latest")
+async def latest_milestones(project_id: uuid.UUID, svc: ProjectAI) -> JobRead | None:
+    """Несохранённый черновик этапов (ждёт ИИ, считается или готов) — или null."""
+    job = await svc.latest_job(project_id)
+    return job_read(job) if job else None
+
+
+@router.post("/projects/{project_id}/milestones/suggest/{job_id}/dismiss", status_code=NO_CONTENT)
+async def dismiss_milestones(project_id: uuid.UUID, job_id: uuid.UUID, svc: ProjectAI) -> None:
+    """«Отмена» на экране проверки — черновик больше не предлагается."""
+    await svc.dismiss(job_id)
+
+
+@router.post("/projects/{project_id}/milestones/bulk")
+async def apply_milestones(
+    project_id: uuid.UUID, data: MilestonesApply, svc: ProjectAI
+) -> ProjectDetail:
+    """«Сохранить»: этапы добавляются к уже существующим."""
+    return await svc.apply(project_id, data)

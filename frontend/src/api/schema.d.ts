@@ -1779,6 +1779,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/milestones/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest Milestones
+         * @description «Предложить этапы» / «Перегенерировать»: черновик придёт в `GET /jobs/{id}`.
+         *     Проект не меняется, пока не нажали «Сохранить».
+         */
+        post: operations["suggest_milestones"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/milestones/suggest/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest Milestones
+         * @description Несохранённый черновик этапов (ждёт ИИ, считается или готов) — или null.
+         */
+        get: operations["latest_milestones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/milestones/suggest/{job_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Milestones
+         * @description «Отмена» на экране проверки — черновик больше не предлагается.
+         */
+        post: operations["dismiss_milestones"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/milestones/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Milestones
+         * @description «Сохранить»: этапы добавляются к уже существующим.
+         */
+        post: operations["apply_milestones"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2545,7 +2626,7 @@ export interface components {
          * EventKind
          * @enum {string}
          */
-        EventKind: "class" | "personal" | "rest" | "subtask" | "backlog" | "exam_prep" | "exam";
+        EventKind: "class" | "personal" | "rest" | "subtask" | "backlog" | "exam_prep" | "exam" | "project";
         /** EventRead */
         EventRead: {
             /**
@@ -2969,7 +3050,7 @@ export interface components {
              */
             waiting?: string | null;
             /** Result */
-            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"]) | null;
+            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"] | components["schemas"]["MilestonesDraft"]) | null;
         };
         /** JobStarted */
         JobStarted: {
@@ -3002,6 +3083,11 @@ export interface components {
             title: string;
             /** Date */
             date?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** MilestoneRead */
         MilestoneRead: {
@@ -3017,6 +3103,8 @@ export interface components {
             project_id: string;
             /** Title */
             title: string;
+            /** Note */
+            note: string;
             /** Date */
             date: string | null;
             status: components["schemas"]["MilestoneStatus"];
@@ -3030,15 +3118,81 @@ export interface components {
          * @enum {string}
          */
         MilestoneStatus: "planned" | "done";
+        /**
+         * MilestoneSuggestion
+         * @description Этап черновика: на экране проверки правится и уходит в «Сохранить».
+         */
+        MilestoneSuggestion: {
+            /** Title */
+            title: string;
+            /** Date */
+            date?: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** MilestoneUpdate */
         MilestoneUpdate: {
             /** Title */
             title?: string | null;
+            /** Note */
+            note?: string | null;
             /** Date */
             date?: string | null;
             status?: components["schemas"]["MilestoneStatus"] | null;
             /** Position */
             position?: number | null;
+        };
+        /**
+         * MilestonesApply
+         * @description «Сохранить»: этапы добавляются к уже существующим.
+         */
+        MilestonesApply: {
+            /** Milestones */
+            milestones: components["schemas"]["MilestoneSuggestion"][];
+            /**
+             * Job Id
+             * @description Джоба черновика — пометить применённой
+             */
+            job_id?: string | null;
+        };
+        /**
+         * MilestonesDraft
+         * @description Этапы проекта от ИИ — ничего не сохранено, пока не нажали «Сохранить».
+         */
+        MilestonesDraft: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "milestones";
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Milestones */
+            milestones: components["schemas"]["MilestoneSuggestion"][];
+            /**
+             * Warning
+             * @description Что уточнить в описании проекта
+             */
+            warning: string | null;
+        };
+        /**
+         * MilestonesRequest
+         * @description «Предложить этапы» / «Перегенерировать с комментарием».
+         */
+        MilestonesRequest: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Previous
+             * @description Прошлый вариант — для перегенерации
+             */
+            previous?: components["schemas"]["MilestoneSuggestion"][];
         };
         /** NoteCreate */
         NoteCreate: {
@@ -3431,7 +3585,7 @@ export interface components {
              * Group Kind
              * @enum {string}
              */
-            group_kind: "task" | "backlog" | "exam";
+            group_kind: "task" | "backlog" | "exam" | "project";
             /**
              * Group Id
              * Format: uuid
@@ -3569,6 +3723,23 @@ export interface components {
              */
             milestones_done: number;
             next_milestone: components["schemas"]["MilestoneRead"] | null;
+            /**
+             * Behind Days
+             * @default 0
+             */
+            behind_days: number;
+            /**
+             * Week Done Min
+             * @description Отмечено «сделано»
+             * @default 0
+             */
+            week_done_min: number;
+            /**
+             * Week Planned Min
+             * @description Сделано и запланировано
+             * @default 0
+             */
+            week_planned_min: number;
             /** Milestones */
             milestones: components["schemas"]["MilestoneRead"][];
         };
@@ -3622,6 +3793,23 @@ export interface components {
              */
             milestones_done: number;
             next_milestone: components["schemas"]["MilestoneRead"] | null;
+            /**
+             * Behind Days
+             * @default 0
+             */
+            behind_days: number;
+            /**
+             * Week Done Min
+             * @description Отмечено «сделано»
+             * @default 0
+             */
+            week_done_min: number;
+            /**
+             * Week Planned Min
+             * @description Сделано и запланировано
+             * @default 0
+             */
+            week_planned_min: number;
         };
         /**
          * ProjectStatus
@@ -4032,7 +4220,7 @@ export interface components {
          * RiskReason
          * @enum {string}
          */
-        RiskReason: "no_slots" | "no_time" | "dependency" | "late" | "overdue" | "rest";
+        RiskReason: "no_slots" | "no_time" | "dependency" | "late" | "overdue" | "rest" | "quota";
         /**
          * RuleParity
          * @description Когда идёт пара: каждую неделю, по числителям или по знаменателям.
@@ -15512,6 +15700,317 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobStarted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_milestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestonesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStarted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_milestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"] | null;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_milestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_milestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MilestonesApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
                 };
             };
             /** @description Bad Request */

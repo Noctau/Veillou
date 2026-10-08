@@ -1,5 +1,6 @@
 """ИИ: джобы, черновик разбивки, шаблоны, разбор текста и фото."""
 
+import datetime as dt
 import uuid
 from typing import Annotated, Literal, Self
 
@@ -86,7 +87,26 @@ class PhotoDraft(BaseModel):
     updated: list[str] = Field(description="Какие поля задания заполнены с фото")
 
 
-JobResult = Annotated[BreakdownDraft | ParseDraft | PhotoDraft, Field(discriminator="type")]
+class MilestoneSuggestion(InputModel):
+    """Этап черновика: на экране проверки правится и уходит в «Сохранить»."""
+
+    title: Title
+    date: dt.date | None = None
+    note: Description = ""
+
+
+class MilestonesDraft(BaseModel):
+    """Этапы проекта от ИИ — ничего не сохранено, пока не нажали «Сохранить»."""
+
+    type: Literal["milestones"] = "milestones"
+    project_id: uuid.UUID
+    milestones: list[MilestoneSuggestion]
+    warning: str | None = Field(description="Что уточнить в описании проекта")
+
+
+JobResult = Annotated[
+    BreakdownDraft | ParseDraft | PhotoDraft | MilestonesDraft, Field(discriminator="type")
+]
 
 
 class JobRead(BaseModel):
@@ -169,3 +189,28 @@ class TemplateRead(ReadModel):
 
 class AIParseRequest(InputModel):
     text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=6000)]
+
+
+# ---------- этапы проекта (M13.2) ----------
+
+MAX_MILESTONES = 30
+
+
+class MilestonesRequest(InputModel):
+    """«Предложить этапы» / «Перегенерировать с комментарием»."""
+
+    comment: Comment | None = None
+    previous: list[MilestoneSuggestion] = Field(
+        default_factory=list,
+        max_length=MAX_MILESTONES,
+        description="Прошлый вариант — для перегенерации",
+    )
+
+
+class MilestonesApply(InputModel):
+    """«Сохранить»: этапы добавляются к уже существующим."""
+
+    milestones: list[MilestoneSuggestion] = Field(min_length=1, max_length=MAX_MILESTONES)
+    job_id: uuid.UUID | None = Field(
+        default=None, description="Джоба черновика — пометить применённой"
+    )
