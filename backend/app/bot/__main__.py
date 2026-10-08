@@ -14,6 +14,7 @@ COMMANDS = [
     BotCommand(command="today", description="План на сегодня"),
     BotCommand(command="week", description="План на неделю"),
     BotCommand(command="add", description="Добавить дело: /add текст"),
+    BotCommand(command="free", description="Есть N минут — что успеть"),
     BotCommand(command="help", description="Что я умею"),
 ]
 

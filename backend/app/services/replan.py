@@ -3,12 +3,14 @@
 Что планируется:
 - подзадачи `todo` активных заданий (оценка × коэффициент калибровки);
 - задание без подзадач, но с оценкой — одним блоком (`source_type=task`);
-- вхождение регулярного задания — только в свой день, без разрезания.
+- вхождение регулярного задания — только в свой день, без разрезания;
+- дела из ящика, взятые на неделю (M11.2): только в оставшееся после учёбы
+  время своей недели, в окна по условиям (`domain/backlog.py`);
+- дни подготовки к экзамену (M12.2): каждый — в свой день, до начала экзамена.
 
 Что не трогаем: жёсткие события, закреплённые блоки, уже начавшиеся и
 сделанные сегодня (они занимают время, считаются в дневные лимиты и уменьшают
-остаток оценки: перетащили одну часть разрезанного блока — вторая остаётся), блоки
-чужих источников (ящик, экзамены — пока их не планирует этот сервис).
+остаток оценки: перетащили одну часть разрезанного блока — вторая остаётся).
 Незакреплённые будущие блоки — это «прошлый план»: планировщик старается
 их не двигать. Неотмеченные блоки прошлых дней в превью становятся `missed`.
 
@@ -34,12 +36,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
+from app.domain import backlog as box
 from app.domain.calibration import calibrated
 from app.domain.enums import (
     FIXED_KINDS,
     ActionTypeKey,
+    BacklogCondition,
+    BacklogStatus,
     EventKind,
     EventStatus,
+    ExamSessionKind,
+    ExamSessionStatus,
     PlanReason,
     PlanRevisionStatus,
     Priority,
@@ -47,6 +54,7 @@ from app.domain.enums import (
     SubtaskStatus,
     TaskStatus,
 )
+from app.domain.exams import exam_title, session_title
 from app.domain.planner import (
     Block,
     Busy,
@@ -61,17 +69,23 @@ from app.domain.planner import (
 )
 from app.models import (
     ActionType,
+    BacklogItem,
     Category,
     Event,
+    Exam,
+    ExamQuestion,
+    ExamSession,
     Job,
     PlanRevision,
     StudyDayLimit,
+    Subject,
     Subtask,
     Task,
     User,
 )
 from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
+from app.services import exams
 from app.services.calibration import DEFAULT_ACTION, coefficients
 from app.services.settings import effective_settings
 
@@ -79,7 +93,15 @@ from app.services.settings import effective_settings
 SKIP_REPLAN = "skip_replan"
 
 PRIORITY_WEIGHT = {Priority.normal: 1, Priority.high: 3}
-PLANNED_SOURCES = (SourceType.subtask, SourceType.task)
+PLANNED_SOURCES = (
+    SourceType.subtask,
+    SourceType.task,
+    SourceType.backlog_item,
+    SourceType.exam_session,
+)
+# Подготовка к экзамену: день не сдвинуть — важнее обычных шагов
+EXAM_PRIORITY = 3
+SESSION_ORDER = {ExamSessionKind.learn: 0, ExamSessionKind.review: 1, ExamSessionKind.run: 2}
 MAX_HORIZON_DAYS = 60
 # Остаток короче — блок не нужен
 MIN_BLOCK_MIN = 15
@@ -144,11 +166,21 @@ class Source:
 
     source_type: SourceType
     source_id: uuid.UUID
-    task: Task
+    kind: EventKind  # каким событием встаёт в календарь
     title: str
     color: str | None
+    # К чему относится: задание / дело из ящика / экзамен — для угроз и шторки
+    group_kind: str
+    group_id: uuid.UUID
+    group_title: str
+    deadline: datetime | None = None
+    subject_id: uuid.UUID | None = None
     # Незакреплённые будущие блоки этого источника — «прошлый план»
     events: list[Event] = field(default_factory=list)
+
+    @property
+    def task_id(self) -> uuid.UUID | None:
+        return self.group_id if self.group_kind == "task" else None
 
 
 @dataclass
@@ -188,6 +220,7 @@ class _Builder:
     async def build(self) -> Snapshot:
         s = self.settings
         action_types = {a.id: a for a in await self._scalars(ActionType)}
+        types_by_key = {a.key: a for a in action_types.values() if a.key}
         colors = {c.id: c.color for c in await self._scalars(Category)}
         coefs = await coefficients(self.db, self.user_id)
         limits = await self._scalars(StudyDayLimit, StudyDayLimit.date >= self.today)
@@ -201,6 +234,9 @@ class _Builder:
             order_by=[Event.start, Event.id],
         )
         busy = tuple(Busy(e.start, e.end, is_class=e.kind == EventKind.class_) for e in hard)
+        class_days = frozenset(
+            local_date(e.start, self.tz) for e in hard if e.kind == EventKind.class_
+        )
 
         flexible = await self._scalars(
             Event,
@@ -223,11 +259,44 @@ class _Builder:
         for st in subtasks:
             subs_by_task[st.task_id].append(st)
         subtask_by_id = {st.id: st for st in subtasks}
+        this_week = box.week_start(self.today)
+        items = await self._scalars(
+            BacklogItem,
+            BacklogItem.status == BacklogStatus.active,
+            BacklogItem.planned_week >= this_week,
+            order_by=[BacklogItem.created_at, BacklogItem.id],
+        )
+        item_by_id = {i.id: i for i in items}
+        exams = await self._scalars(
+            Exam, Exam.plan_enabled.is_(True), Exam.starts_at > self.now, order_by=[Exam.starts_at]
+        )
+        exam_by_id = {e.id: e for e in exams}
+        sessions = await self._scalars(
+            ExamSession,
+            ExamSession.exam_id.in_(exam_by_id),
+            ExamSession.status == ExamSessionStatus.planned,
+            ExamSession.date >= self.today,
+            order_by=[ExamSession.date, ExamSession.kind, ExamSession.id],
+        )
+        session_by_id = {x.id: x for x in sessions}
+        numbers = {
+            str(q.id): q.number
+            for q in await self._scalars(ExamQuestion, ExamQuestion.exam_id.in_(exam_by_id))
+        }
+        subjects = {
+            x.id: x for x in await self._scalars(Subject) if x.id in {e.subject_id for e in exams}
+        }
 
-        def action_key(task: Task, st: Subtask | None) -> str:
-            type_id = (st.action_type_id if st else None) or task.action_type_id
+        def type_key(type_id: uuid.UUID | None) -> str:
             at = action_types.get(type_id) if type_id else None
             return at.key if at else DEFAULT_ACTION
+
+        def action_key(task: Task, st: Subtask | None) -> str:
+            return type_key((st.action_type_id if st else None) or task.action_type_id)
+
+        def type_windows(key: str) -> tuple[Window, ...]:
+            at = types_by_key.get(key)
+            return windows_from_json(at.windows) if at else ()
 
         def windows(task: Task, st: Subtask | None) -> tuple[Window, ...]:
             if st is not None and st.time_window:
@@ -238,13 +307,24 @@ class _Builder:
             at = action_types.get(type_id) if type_id else None
             return windows_from_json(at.windows) if at else ()
 
-        def task_of(e: Event) -> tuple[Task | None, Subtask | None]:
+        def owner_of(e: Event) -> tuple[str | None, bool]:
+            """(группа для «≤ N в день», считается ли учёбой) — для занятого времени."""
             if e.source_type == SourceType.subtask:
                 st = subtask_by_id.get(e.source_id)  # type: ignore[arg-type]
-                return (task_by_id.get(st.task_id) if st else None), st
-            if e.source_type == SourceType.task:
-                return task_by_id.get(e.source_id), None  # type: ignore[arg-type]
-            return None, None
+                task = task_by_id.get(st.task_id) if st else None
+            elif e.source_type == SourceType.task:
+                task, st = task_by_id.get(e.source_id), None  # type: ignore[arg-type]
+            elif e.source_type == SourceType.exam_session:
+                sess = session_by_id.get(e.source_id)  # type: ignore[arg-type]
+                return (f"exam:{sess.exam_id}" if sess else None), True
+            elif e.source_type == SourceType.backlog_item:
+                item = item_by_id.get(e.source_id)  # type: ignore[arg-type]
+                return None, item is not None and type_key(item.action_type_id) == "study"
+            else:
+                return None, False
+            if task is None:
+                return None, False
+            return str(task.id), action_key(task, st) == ActionTypeKey.study
 
         # ---------- гибкие события: что занято, что можно двигать ----------
         fixed: list[FixedBlock] = []
@@ -260,18 +340,13 @@ class _Builder:
                 if ours:
                     stale.append(e)
                 continue
-            task, st = task_of(e)
             minutes = round((e.end - e.start).total_seconds() / 60)
             is_fixed = not ours or e.status == EventStatus.done or e.is_pinned or e.start < self.now
             if is_fixed:
-                study = task is not None and action_key(task, st) == ActionTypeKey.study
+                group, study = owner_of(e)
                 fixed.append(
                     FixedBlock(
-                        fixed_id(e.id),
-                        e.start,
-                        e.end,
-                        group_id=str(task.id) if task else None,
-                        counts_as_study=study,
+                        fixed_id(e.id), e.start, e.end, group_id=group, counts_as_study=study
                     )
                 )
                 if key:
@@ -279,6 +354,20 @@ class _Builder:
                     consumed[key] += minutes
             else:
                 movable[key].append(e)  # type: ignore[index]
+
+        # «Не сделано» сегодня (вечерний разбор) — переносим не раньше завтра
+        missed_today = set(
+            await self.db.scalars(
+                select(Event.source_id).where(
+                    Event.user_id == self.user_id,
+                    Event.deleted_at.is_(None),
+                    Event.status == EventStatus.missed,
+                    Event.source_type.in_(PLANNED_SOURCES),
+                    Event.start >= self.day_start,
+                )
+            )
+        )
+        tomorrow = wall_to_utc(self.today + timedelta(days=1), time(0), self.tz)
 
         # Задание без подзадач: сделанные блоки прошлых дней тоже уменьшают остаток
         done_rows = await self.db.execute(
@@ -298,17 +387,28 @@ class _Builder:
         # ---------- блоки ----------
         blocks: list[Block] = []
         sources: dict[str, Source] = {}
+
+        def add(block: Block, source: Source) -> None:
+            # …если срок позволяет: сдать сегодня — пусть лучше сегодня же вечером
+            if source.source_id in missed_today and (
+                block.deadline is None or block.deadline > tomorrow
+            ):
+                block = replace(block, earliest=max(block.earliest or tomorrow, tomorrow))
+            blocks.append(block)
+            source.events = movable.pop(str(block.id), [])
+            sources[str(block.id)] = source
+
         for task in tasks:
             subs = subs_by_task.get(task.id, [])
-            items: list[tuple[SourceType, uuid.UUID, Subtask | None, int]] = []
+            todo: list[tuple[SourceType, uuid.UUID, Subtask | None, int]] = []
             if subs:
                 for st in subs:
                     if st.status == SubtaskStatus.todo:
-                        items.append((SourceType.subtask, st.id, st, st.estimate_min))
+                        todo.append((SourceType.subtask, st.id, st, st.estimate_min))
             elif task.estimate_min:
-                items.append((SourceType.task, task.id, None, task.estimate_min))
+                todo.append((SourceType.task, task.id, None, task.estimate_min))
 
-            for source_type, source_id, st, estimate in items:
+            for source_type, source_id, st, estimate in todo:
                 key = block_id(source_type, source_id)
                 occurrence = st.occurrence_date if st else None
                 if occurrence is not None and occurrence < self.today:
@@ -333,7 +433,8 @@ class _Builder:
                     # После всех её блоков: и закреплённых, и того, что ещё поставим
                     deps.append(dep_key)
                     deps.extend(fixed_by_source.get(dep_key, []))
-                blocks.append(
+                category_id = (st.category_id if st else None) or task.category_id
+                add(
                     Block(
                         id=key,
                         duration_min=remaining,
@@ -348,17 +449,114 @@ class _Builder:
                         earliest=earliest,
                         buffer_days=buffer,
                         sequence=st.position if st else None,
-                    )
+                    ),
+                    Source(
+                        source_type,
+                        source_id,
+                        EventKind.subtask,
+                        st.title if st else task.title,
+                        colors.get(category_id) if category_id else None,
+                        "task",
+                        task.id,
+                        task.title,
+                        deadline=task.deadline,
+                        subject_id=task.subject_id,
+                    ),
                 )
-                category_id = (st.category_id if st else None) or task.category_id
-                sources[key] = Source(
-                    source_type,
-                    source_id,
-                    task,
-                    st.title if st else task.title,
-                    colors.get(category_id) if category_id else None,
-                    events=movable.pop(key, []),
-                )
+
+        # Дела из ящика, взятые на неделю: только в своей неделе, после учёбы
+        work = (
+            Window(
+                frozenset({1, 2, 3, 4, 5}), s.work_hours.weekdays.start, s.work_hours.weekdays.end
+            ),
+            Window(frozenset({6, 7}), s.work_hours.weekends.start, s.work_hours.weekends.end),
+        )
+        for item in items:
+            key = block_id(SourceType.backlog_item, item.id)
+            remaining = (item.estimate_min or box.DEFAULT_ESTIMATE_MIN) - consumed.get(key, 0)
+            if remaining < MIN_BLOCK_MIN:
+                continue
+            act = type_key(item.action_type_id)
+            base = (
+                windows_from_json(item.time_window)
+                if item.time_window
+                else (type_windows(act) if item.action_type_id else ()) or work
+            )
+            week = item.planned_week
+            assert week is not None
+            add(
+                Block(
+                    id=key,
+                    duration_min=remaining,
+                    deadline=wall_to_utc(week + timedelta(days=7), time(0), self.tz),
+                    earliest=wall_to_utc(week, time(0), self.tz),
+                    buffer_days=0,
+                    priority=box.priority(
+                        local_date(item.created_at, self.tz), item.desired_by, self.today
+                    ),
+                    windows=box.condition_windows(
+                        base, item.conditions, type_windows(ActionTypeKey.institutions)
+                    ),
+                    days=class_days if BacklogCondition.on_class_days in item.conditions else None,
+                    counts_as_study=act == ActionTypeKey.study,
+                    prefer_morning=act == ActionTypeKey.people,
+                    filler=True,
+                ),
+                Source(
+                    SourceType.backlog_item,
+                    item.id,
+                    EventKind.backlog,
+                    item.title,
+                    colors.get(item.category_id) if item.category_id else None,
+                    "backlog",
+                    item.id,
+                    item.title,
+                ),
+            )
+
+        # Подготовка к экзаменам: каждый день плана — в свой день, до экзамена
+        study_windows = type_windows(ActionTypeKey.study)
+        for sess in sessions:
+            exam = exam_by_id[sess.exam_id]
+            key = block_id(SourceType.exam_session, sess.id)
+            remaining = sess.minutes - consumed.get(key, 0)
+            if remaining < MIN_BLOCK_MIN:
+                continue
+            subject = subjects.get(exam.subject_id)
+            name = subject.short_name or subject.name if subject else "экзамен"
+            day_end = wall_to_utc(sess.date + timedelta(days=1), time(0), self.tz)
+            add(
+                Block(
+                    id=key,
+                    duration_min=remaining,
+                    group_id=f"exam:{exam.id}",
+                    deadline=min(day_end, exam.starts_at),
+                    earliest=wall_to_utc(sess.date, time(0), self.tz),
+                    buffer_days=0,
+                    priority=EXAM_PRIORITY,
+                    windows=study_windows,
+                    splittable=True,
+                    # Сквозной порядок по дням: в день — сначала выучить, потом повторить
+                    sequence=sess.date.toordinal() * 3
+                    + SESSION_ORDER.get(ExamSessionKind(sess.kind), 0),
+                ),
+                Source(
+                    SourceType.exam_session,
+                    sess.id,
+                    EventKind.exam_prep,
+                    session_title(
+                        ExamSessionKind(sess.kind),
+                        name,
+                        [numbers[q] for q in sess.question_ids if q in numbers],
+                    ),
+                    None,  # цвет слоя «Экзамены», чтобы не путать с парами
+                    "exam",
+                    exam.id,
+                    exam_title(exam.title, subject.name if subject else None),
+                    deadline=exam.starts_at,
+                    subject_id=exam.subject_id,
+                ),
+            )
 
         # Зависимость от подзадачи, у которой нет блока (уже идёт / вне плана), — не держим
         known = set(sources) | {f.id for f in fixed}
@@ -392,6 +590,7 @@ class _Builder:
                 repr(inp.study_limits),
                 sorted(str(e.id) for e in orphans),
                 sorted(str(e.id) for e in stale),
+                sorted(f"{k}:{src.title}" for k, src in sources.items()),
                 self.tz.key,
             ]
         )
@@ -410,13 +609,15 @@ def _risk_dicts(result: PlanResult, sources: dict[str, Source]) -> list[dict[str
         risks.append(
             {
                 "block_id": str(r.block_id),
-                "task_id": str(src.task.id),
-                "task_title": src.task.title,
+                "group_kind": src.group_kind,
+                "group_id": str(src.group_id),
+                "group_title": src.group_title,
+                "task_id": str(src.task_id) if src.task_id else None,
                 "source_type": str(src.source_type),
                 "source_id": str(src.source_id),
                 "title": src.title,
                 "reason": str(r.reason),
-                "deadline": src.task.deadline.isoformat() if src.task.deadline else None,
+                "deadline": src.deadline.isoformat() if src.deadline else None,
             }
         )
     return risks
@@ -429,7 +630,8 @@ def _ops(snap: Snapshot, result: PlanResult) -> list[dict[str, Any]]:
     ops: list[dict[str, Any]] = []
     for key, src in snap.sources.items():
         base = {
-            "task_id": str(src.task.id),
+            "task_id": str(src.task_id) if src.task_id else None,
+            "kind": str(src.kind),
             "title": src.title,
             "source_type": str(src.source_type),
             "source_id": str(src.source_id),
@@ -456,7 +658,7 @@ def _ops(snap: Snapshot, result: PlanResult) -> list[dict[str, Any]]:
                         **base,
                         "before": None,
                         "after": _slot(p.start, p.end),
-                        "subject_id": str(src.task.subject_id) if src.task.subject_id else None,
+                        "subject_id": str(src.subject_id) if src.subject_id else None,
                         "color": src.color,
                     }
                 )
@@ -477,6 +679,7 @@ def _ops(snap: Snapshot, result: PlanResult) -> list[dict[str, Any]]:
                     "op": op,
                     "event_id": str(e.id),
                     "task_id": None,
+                    "kind": e.kind,
                     "title": e.title,
                     "source_type": e.source_type,
                     "source_id": str(e.source_id) if e.source_id else None,
@@ -686,7 +889,7 @@ class ReplanService:
                 after = op["after"]
                 event = Event(
                     user_id=self.user_id,
-                    kind=EventKind.subtask,
+                    kind=op.get("kind", EventKind.subtask),
                     title=op["title"],
                     start=_moment(after["start"]),
                     end=_moment(after["end"]),
@@ -814,7 +1017,8 @@ async def handle_preview_job(db: AsyncSession, job: Job) -> None:
 
 
 async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
-    """3:00: неотмеченное за прошлые дни → missed, превью плана готово к утру.
+    """3:00: неотмеченное за прошлые дни → missed, план подготовки к экзаменам
+    пересобран, превью плана готово к утру.
 
     Сегодняшнее не трогаем: его отмечают на вечернем разборе (и воркер, перезапущенный
     днём, не должен записать утренний блок в «не сделано»).
@@ -826,6 +1030,7 @@ async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
         db.info[SKIP_REPLAN] = True
         try:
             await mark_missed(db, user.id, wall_to_utc(local_date(now, tz), time(0), tz))
+            await exams.sync_all(db, user, now)
             await ReplanService(db, user, now).preview([PlanReason.nightly])
         finally:
             db.info.pop(SKIP_REPLAN, None)

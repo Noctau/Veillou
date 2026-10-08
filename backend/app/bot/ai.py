@@ -201,6 +201,10 @@ def breakdown_keyboard(job_id: uuid.UUID, task_id: uuid.UUID) -> InlineKeyboardM
     )
 
 
+def plan_keyboard(proposal_id: uuid.UUID) -> InlineKeyboardMarkup:
+    return _rows([_button("Применить план", "pa", proposal_id), _open("/")])
+
+
 def plan_text(state: PlanState) -> str:
     rev = state.proposal
     if rev is None:
@@ -214,7 +218,7 @@ def plan_text(state: PlanState) -> str:
         parts.append(f"убрано: {rev.removed}")
     text = "Превью плана: " + (", ".join(parts) if parts else "без переносов")
     if rev.at_risk:
-        titles = dict.fromkeys(r.task_title for r in rev.at_risk)
+        titles = dict.fromkeys(r.group_title for r in rev.at_risk if r.group_kind != "backlog")
         text += "\n⚠️ Под угрозой: " + html.escape(", ".join(titles))
     return text
 
@@ -445,7 +449,7 @@ async def _apply_breakdown(
         await callback.message.edit_reply_markup(reply_markup=None)
         markup = None
         if state.proposal is not None:
-            markup = _rows([_button("Применить план", "pa", state.proposal.id), _open("/calendar")])
+            markup = plan_keyboard(state.proposal.id)
         await callback.message.reply(plan_text(state), parse_mode="HTML", reply_markup=markup)
 
 

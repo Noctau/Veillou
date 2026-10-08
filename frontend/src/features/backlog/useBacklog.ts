@@ -59,6 +59,7 @@ export function useCreateBacklog() {
         conditions: body.conditions ?? [],
         time_window: null,
         status: 'active',
+        planned_week: null,
         done_at: null,
         archived_at: null,
         created_at: new Date().toISOString(),
@@ -119,6 +120,28 @@ export function useDeleteBacklog() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.backlogAll }),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+/** «Взять на неделю» / «Снять с недели»: дело попадает в план (или уходит из него). */
+export function useTakeForWeek() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, take }: { id: string; take: boolean }) => {
+      const params = { params: { path: { item_id: id } } }
+      const { data, error } = take
+        ? await api.PUT('/api/v1/backlog/{item_id}/week', params)
+        : await api.DELETE('/api/v1/backlog/{item_id}/week', params)
+      if (error) throw error
+      return data
+    },
+    onSuccess: (data) => {
+      for (const [key, items] of queryClient.getQueriesData<BacklogItem[]>({ queryKey: queryKeys.backlogAll })) {
+        if (items) queryClient.setQueryData(key, items.map((i) => (i.id === data.id ? data : i)))
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.review })
+    },
     onError: (error) => toast.error(errorMessage(error)),
   })
 }

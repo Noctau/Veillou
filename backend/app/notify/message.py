@@ -15,7 +15,12 @@ ACTION_TITLES = {
     ReminderAction.done: "Сделано",
     ReminderAction.snooze: "+15 мин",
     ReminderAction.tomorrow: "На завтра",
+    ReminderAction.reschedule: "Перенести всё",
+    ReminderAction.pick: "По одному",
+    ReminderAction.accept: "Взять на неделю",
 }
+# Только в Telegram: в пуше раскрывать нечего
+TELEGRAM_ONLY = frozenset({ReminderAction.pick})
 
 WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 WEEKDAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]

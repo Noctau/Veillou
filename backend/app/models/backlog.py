@@ -1,4 +1,8 @@
-"""Долгий ящик: дела без срока, которые постоянно откладываются (ТЗ §4.4)."""
+"""Долгий ящик: дела без срока, которые постоянно откладываются (ТЗ §4.4).
+
+В план дело попадает, только когда его «взяли на неделю» (недельный разбор или
+кнопка на деле): `planned_week` — понедельник этой недели.
+"""
 
 import uuid
 from datetime import date, datetime
@@ -32,6 +36,8 @@ class BacklogItem(UserOwnedMixin, Base):
     conditions: Mapped[list[str]] = mapped_column(JSONB, default=list)
     # Своё окно (часы работы места); NULL — как у типа действия
     time_window: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # «Взято на неделю» (понедельник недели): только такие дела ставит планировщик (M11.2)
+    planned_week: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(12), default=BacklogStatus.active)
     done_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

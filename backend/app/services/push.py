@@ -107,6 +107,8 @@ KIND_LABEL = {
     ReminderKind.before_class: "Перед парой",
     ReminderKind.deadline: "Дедлайн",
     ReminderKind.subtask_start: "Начало",
+    ReminderKind.evening_review: "Вечерний разбор",
+    ReminderKind.weekly_review: "Разбор недели",
     ReminderKind.test: "Проверка",
 }
 

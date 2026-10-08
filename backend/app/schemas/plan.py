@@ -2,11 +2,11 @@
 
 import uuid
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.domain.enums import ActionTypeKey, PlanReason, PlanRevisionStatus, TaskType
+from app.domain.enums import ActionTypeKey, EventKind, PlanReason, PlanRevisionStatus, TaskType
 from app.domain.planner import RiskReason
 from app.schemas.common import InputModel, ReadModel, UTCMoment
 
@@ -23,6 +23,7 @@ class PlanChange(ReadModel):
     op: Literal["move", "add", "remove", "miss"]
     event_id: uuid.UUID | None
     task_id: uuid.UUID | None
+    kind: EventKind = EventKind.subtask
     title: str
     source_type: str | None
     source_id: uuid.UUID | None
@@ -32,15 +33,34 @@ class PlanChange(ReadModel):
 
 class PlanRisk(ReadModel):
     """Под угрозой. no_slots / no_time — не влезает до дедлайна; dependency — не
-    поставлено то, от чего зависит; late — позже внутреннего срока; overdue — просрочено."""
+    поставлено то, от чего зависит; late — позже внутреннего срока; overdue — просрочено;
+    rest — влезло бы, если отдать минимум отдыха.
 
-    task_id: uuid.UUID
-    task_title: str
+    Группа — к чему относится блок: задание, дело из ящика (не влезло в неделю)
+    или экзамен (день подготовки)."""
+
+    group_kind: Literal["task", "backlog", "exam"]
+    group_id: uuid.UUID
+    group_title: str
+    task_id: uuid.UUID | None
     source_type: str
     source_id: uuid.UUID
     title: str
     reason: RiskReason
     deadline: UTCMoment | None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy(cls, data: Any) -> Any:
+        """Ревизии до M11 хранили только task_id / task_title."""
+        if isinstance(data, dict) and "group_id" not in data and data.get("task_id"):
+            data = {
+                **data,
+                "group_kind": "task",
+                "group_id": data["task_id"],
+                "group_title": data.get("task_title", ""),
+            }
+        return data
 
 
 class PlanRevisionRead(ReadModel):

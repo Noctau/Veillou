@@ -58,6 +58,7 @@ class BacklogRead(ReadModel):
     conditions: list[BacklogCondition]
     time_window: list[TimeWindow] | None
     status: BacklogStatus
+    planned_week: date | None = Field(description="Взято на неделю (понедельник) — в плане")
     done_at: UTCMoment | None
     archived_at: UTCMoment | None
     created_at: UTCMoment

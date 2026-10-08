@@ -303,6 +303,11 @@ def _days(grid: Grid, s: PlanSettings, dates: Sequence[date], tz) -> list[Day]:
     return days
 
 
+def _date_of(slot: int, days: Sequence[Day], starts: Sequence[int]) -> date | None:
+    i = bisect.bisect_right(starts, slot) - 1
+    return days[i].date if i >= 0 else None
+
+
 def _split_by_days(free: Iterable[Interval], days: Sequence[Day]) -> list[Interval]:
     result: list[Interval] = []
     for lo, hi in free:
@@ -367,6 +372,7 @@ def prepare(inp: PlanInput) -> Prepared:
     busy = busy_slots(inp, grid, dates)
     base_free = subtract([(0, grid.n)], busy)
     min_part = grid.slots(s.min_part_min)
+    day_starts = [d.lo for d in days]
 
     by_windows: dict[tuple[Window, ...], list[Interval]] = {}
     work = _work_windows(s)
@@ -391,6 +397,8 @@ def prepare(inp: PlanInput) -> Prepared:
             for lo, hi in by_windows[windows]
             if hi > earliest and lo < latest_end
         ]
+        if b.days is not None:
+            free = [f for f in free if _date_of(f[0], days, day_starts) in b.days]
         split = b.splittable and dur >= 2 * min_part
         free = [f for f in free if f[1] - f[0] >= (min_part if split else dur)]
         blocks.append(

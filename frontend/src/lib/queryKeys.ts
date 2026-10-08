@@ -39,4 +39,11 @@ export const queryKeys = {
   job: (id: string) => ['jobs', id] as const,
   latestBreakdown: (taskId: string) => ['tasks', 'breakdown', taskId] as const,
   breakdownTemplates: ['breakdown-templates'] as const,
+  review: ['review'] as const,
+  eveningReview: (day: string) => ['review', 'evening', day] as const,
+  weeklyReview: ['review', 'week'] as const,
+  free: (minutes: number) => ['free', minutes] as const,
+  examsAll: ['exams'] as const,
+  exams: (subjectId: string) => ['exams', 'list', subjectId] as const,
+  exam: (id: string) => ['exams', 'detail', id] as const,
 }

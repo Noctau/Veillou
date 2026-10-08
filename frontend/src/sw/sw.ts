@@ -158,13 +158,14 @@ async function runAction(action: string, token: string, url: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, action }),
     })
-    const body = (await resp.json()) as { message?: string; error?: { message: string } }
+    const body = (await resp.json()) as { message?: string; url?: string | null; error?: { message: string } }
     const text = resp.ok ? body.message : body.error?.message
     await self.registration.showNotification(resp.ok ? 'Готово' : 'Не получилось', {
       body: text ?? '',
       icon: ICON,
       tag: 'action-result',
-      data: { url },
+      // Ответ может вести в другое место (разбор → превью плана на «Сегодня»)
+      data: { url: (resp.ok && body.url) || url },
     })
   } catch {
     // Нет сети — открываем приложение, там можно сделать то же руками

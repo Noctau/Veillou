@@ -10,7 +10,8 @@ export const KIND_LABEL: Record<EventKind, string> = {
   rest: 'Отдых',
   subtask: 'Задания',
   backlog: 'Ящик',
-  exam_prep: 'Экзамены',
+  exam_prep: 'Подготовка',
+  exam: 'Экзамены',
 }
 
 /** Тип одного события — для карточки. */
@@ -21,6 +22,7 @@ export const KIND_SINGLE: Record<EventKind, string> = {
   subtask: 'Подзадача',
   backlog: 'Дело из ящика',
   exam_prep: 'Подготовка к экзамену',
+  exam: 'Экзамен',
 }
 
 /** То, что отмечают «сделано» и что входит в прогресс дня (пары и отдых — нет). */

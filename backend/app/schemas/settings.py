@@ -121,6 +121,9 @@ class UserSettings(_Model):
     schedule: Schedule = Schedule()
     reminders: Reminders = Reminders()
     rest: Rest = Rest()
+    backlog_per_week: int = Field(
+        default=3, ge=0, le=7, description="Сколько дел из ящика брать на неделю"
+    )
     onboarding_done: bool = Field(
         default=False, description="Первичная настройка пройдена или пропущена"
     )

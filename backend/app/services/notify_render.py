@@ -169,6 +169,69 @@ async def _digest(db: AsyncSession, user: User, r: Reminder, now: datetime) -> M
     return await Digest(db, user, now).day(day, morning=True)
 
 
+def _minutes(total: int) -> str:
+    h, m = divmod(total, 60)
+    return f"{h} ч {m} мин" if h and m else (f"{h} ч" if h else f"{m} мин")
+
+
+async def _evening(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
+    """Вечерний разбор. Всё отмечено — не присылаем."""
+    from app.services.review import ReviewService
+
+    day = date.fromisoformat(r.payload["date"])
+    items, done = await ReviewService(db, user, now).evening_items(day)
+    if not items:
+        return None
+    tz = get_tz(user.timezone)
+    head = f"Сделано: {done}. " if done else ""
+    hint = "Перенести невыполненное? Остальное сдвинется, предупрежу, если дедлайн под угрозой."
+    return Message(
+        title=f"Вечерний разбор: не отмечено {len(items)}",
+        sections=(
+            Section(None, tuple(f"{fmt_range(e.start, e.end, tz)} {e.title}" for e in items)),
+            Section(None, (head + hint,)),
+        ),
+        url="/review",
+        actions=(ReminderAction.reschedule, ReminderAction.pick),
+        kind=ReminderKind.evening_review,
+        tag=f"evening-{day.isoformat()}",
+    )
+
+
+async def _weekly(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
+    """Недельный разбор: итоги и дела из ящика на неделю."""
+    from app.services.review import ReviewService
+
+    review = await ReviewService(db, user, now).weekly()
+    st = review.stats
+    if not st.blocks_planned and not review.suggestions and not review.planned:
+        return None
+    sections = []
+    if st.blocks_planned or st.tasks_done or st.backlog_done:
+        summary = lines(
+            f"Сделано блоков: {st.blocks_done} из {st.blocks_planned}"
+            + (f" ({_minutes(st.done_minutes)})" if st.done_minutes else ""),
+            f"Не сделано: {st.blocks_missed}" if st.blocks_missed else None,
+            f"Заданий сдано: {st.tasks_done}" if st.tasks_done else None,
+            f"Дел из ящика закрыто: {st.backlog_done}" if st.backlog_done else None,
+        )
+        sections.append(Section("Итоги недели", summary))
+    if review.planned:
+        sections.append(Section("Уже на неделе", tuple(i.title for i in review.planned)))
+    if review.suggestions:
+        sections.append(
+            Section("Из ящика на неделю", tuple(f"• {i.title}" for i in review.suggestions))
+        )
+    return Message(
+        title="Разбор недели",
+        sections=tuple(sections),
+        url="/review/week",
+        actions=(ReminderAction.accept,) if review.suggestions else (),
+        kind=ReminderKind.weekly_review,
+        tag=f"weekly-{review.week_start.isoformat()}",
+    )
+
+
 def _test(*_: object) -> Message:
     return Message(
         title="Уведомления работают",
@@ -188,6 +251,10 @@ async def render(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Me
         msg = await _subtask_start(db, user, r, now)
     elif kind == ReminderKind.morning_digest:
         msg = await _digest(db, user, r, now)
+    elif kind == ReminderKind.evening_review:
+        msg = await _evening(db, user, r, now)
+    elif kind == ReminderKind.weekly_review:
+        msg = await _weekly(db, user, r, now)
     else:
         msg = _test()
     return None if msg is None else replace(msg, reminder_id=r.id)

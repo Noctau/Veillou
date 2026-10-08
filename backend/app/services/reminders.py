@@ -131,6 +131,31 @@ class _Collector:
         days = [today + timedelta(days=i) for i in range(HORIZON.days)]
         return builder.digest_candidates(days, self.s.schedule.morning_digest, self.tz, channels)
 
+    def reviews(self) -> list[Candidate]:
+        r, at = self.s.reminders, self.s.schedule
+        today = local_date(self.now, self.tz)
+        days = [today + timedelta(days=i) for i in range(HORIZON.days)]
+        result: list[Candidate] = []
+        if ch := _channels(r.evening_review):
+            result += builder.review_candidates(
+                ReminderKind.evening_review,
+                days,
+                at.evening_review,
+                self.tz,
+                ch,
+                builder.EVENING_TTL,
+            )
+        if ch := _channels(r.weekly_review):
+            result += builder.review_candidates(
+                ReminderKind.weekly_review,
+                [d for d in days if d.isoweekday() == at.weekly_review_weekday],
+                at.weekly_review,
+                self.tz,
+                ch,
+                builder.WEEKLY_TTL,
+            )
+        return result
+
     async def subtask_blocks(self, channels: list[str]) -> list[Candidate]:
         rows = (
             await self.db.execute(
@@ -166,6 +191,7 @@ class _Collector:
             result += self.digests(ch)
         if ch := _channels(r.subtask_start):
             result += await self.subtask_blocks(ch)
+        result += self.reviews()
         return result
 
 

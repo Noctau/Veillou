@@ -13,6 +13,7 @@ import { SemesterForm } from '@/features/schedule/SemesterForm'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
 import { useBells } from '@/features/schedule/useSchedule'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
+import { RestSection } from '@/features/settings/sections/RestSection'
 import { useSettings } from '@/features/settings/useSettings'
 import { TelegramSection } from '@/features/telegram/TelegramSection'
 
@@ -55,7 +56,13 @@ function BellsStep() {
 
 function DayModeStep() {
   const { data: settings } = useSettings()
-  return settings ? <DayModeSection settings={settings} /> : <Skeleton className="h-64" />
+  if (!settings) return <Skeleton className="h-64" />
+  return (
+    <div className="flex flex-col gap-4">
+      <DayModeSection settings={settings} />
+      <RestSection settings={settings} />
+    </div>
+  )
 }
 
 const STEPS: Step[] = [
@@ -75,8 +82,8 @@ const STEPS: Step[] = [
     body: () => <SchedulePanel />,
   },
   {
-    title: 'Часы и сон',
-    hint: 'Когда можно ставить учёбу и дела. Не забудьте «Сохранить».',
+    title: 'Часы, сон и отдых',
+    hint: 'Когда можно ставить учёбу и дела и сколько свободных вечеров оставить. Не забудьте «Сохранить».',
     body: () => <DayModeStep />,
   },
   {

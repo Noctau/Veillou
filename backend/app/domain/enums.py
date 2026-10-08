@@ -42,9 +42,10 @@ class EventKind(StrEnum):
     subtask = "subtask"  # подзадача (гибкое, M4+)
     backlog = "backlog"  # дело из ящика (гибкое, M11)
     exam_prep = "exam_prep"  # подготовка к экзамену (гибкое, M12)
+    exam = "exam"  # сам экзамен (жёсткое, из Exam)
 
 
-FIXED_KINDS = frozenset({EventKind.class_, EventKind.personal, EventKind.rest})
+FIXED_KINDS = frozenset({EventKind.class_, EventKind.personal, EventKind.rest, EventKind.exam})
 
 
 class EventStatus(StrEnum):
@@ -145,6 +146,8 @@ class SourceType(StrEnum):
     subtask = "subtask"
     task = "task"  # задание без подзадач — одним блоком
     backlog_item = "backlog_item"
+    exam_session = "exam_session"  # день подготовки к экзамену (M12)
+    exam = "exam"  # жёсткое событие самого экзамена
 
 
 # ---------- долгий ящик (M4.6) ----------
@@ -246,6 +249,8 @@ class ReminderKind(StrEnum):
     before_class = "before_class"
     deadline = "deadline"
     subtask_start = "subtask_start"
+    evening_review = "evening_review"
+    weekly_review = "weekly_review"
     test = "test"  # «Проверить уведомления» из Настроек
 
 
@@ -262,6 +267,9 @@ class ReminderAction(StrEnum):
     done = "done"  # «Сделано»
     snooze = "snooze"  # «+15 мин»
     tomorrow = "tomorrow"  # «На завтра»
+    reschedule = "reschedule"  # вечерний разбор: «Перенести всё»
+    pick = "pick"  # вечерний разбор: «По одному» (только Telegram)
+    accept = "accept"  # недельный разбор: «Взять на неделю»
 
 
 # ---------- перепланирование (M9) ----------
@@ -282,6 +290,8 @@ class PlanReason(StrEnum):
     changes = "changes"  # задания, расписание, настройки
     missed = "missed"  # «не сделано»
     nightly = "nightly"  # ночная джоба: прошедшее неотмеченное → missed
+    weekly = "weekly"  # недельный разбор: дела из ящика на неделю
+    exam = "exam"  # план подготовки к экзамену
 
 
 # ---------- ИИ (M10) ----------
@@ -300,3 +310,24 @@ class AIOrigin(StrEnum):
 
     app = "app"  # фронт поллит GET /jobs/{id}
     telegram = "telegram"  # воркер сам отвечает в чат
+
+
+# ---------- экзамены (M12) ----------
+
+
+class ExamQuestionStatus(StrEnum):
+    not_started = "not_started"
+    learned = "learned"
+    review = "review"  # «повторить»: вопрос возвращается в цикл повторений
+
+
+class ExamSessionKind(StrEnum):
+    learn = "learn"  # выучить новые вопросы
+    review = "review"  # повторить (+1 / +3 / +7 дней)
+    run = "run"  # общий прогон накануне экзамена
+
+
+class ExamSessionStatus(StrEnum):
+    planned = "planned"
+    done = "done"
+    missed = "missed"

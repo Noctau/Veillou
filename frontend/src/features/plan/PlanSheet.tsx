@@ -1,4 +1,13 @@
-import { AlertTriangleIcon, ArrowRightIcon, ChevronDownIcon, ChevronUpIcon, MinusIcon, PlusIcon, XIcon } from 'lucide-react'
+import {
+  AlertTriangleIcon,
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  InboxIcon,
+  MinusIcon,
+  PlusIcon,
+  XIcon,
+} from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -33,26 +42,33 @@ function ChangeRow({ change, tz }: { change: PlanChange; tz: string }) {
   )
 }
 
-/** Угрозы по заданиям: одно задание — одна строка с кнопкой «Варианты». */
+/** Угрозы по заданиям / экзаменам / делам ящика: одна группа — одна строка с «Варианты». */
 function RiskList({ risks, onOptions }: { risks: PlanRisk[]; onOptions: (risk: PlanRisk) => void }) {
-  const byTask = new Map<string, PlanRisk[]>()
-  for (const r of risks) byTask.set(r.task_id, [...(byTask.get(r.task_id) ?? []), r])
+  const byGroup = new Map<string, PlanRisk[]>()
+  for (const r of risks) byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r])
   return (
     <ul className="flex flex-col gap-1">
-      {[...byTask.values()].map((items) => (
-        <li key={items[0].task_id} className="flex items-center gap-2 text-sm">
-          <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-medium">{items[0].task_title}</div>
-            <div className="text-xs text-muted-foreground">
-              {[...new Set(items.map((r) => RISK_LABEL[r.reason]))].join('; ')}
+      {[...byGroup.values()].map((items) => {
+        const soft = items[0].group_kind === 'backlog'
+        return (
+          <li key={items[0].group_id} className="flex items-center gap-2 text-sm">
+            {soft ? (
+              <InboxIcon className="size-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{items[0].group_title}</div>
+              <div className="text-xs text-muted-foreground">
+                {soft ? 'из ящика: не влезает в неделю' : [...new Set(items.map((r) => RISK_LABEL[r.reason]))].join('; ')}
+              </div>
             </div>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => onOptions(items[0])}>
-            Варианты
-          </Button>
-        </li>
-      ))}
+            <Button size="sm" variant="outline" onClick={() => onOptions(items[0])}>
+              Варианты
+            </Button>
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -113,7 +129,11 @@ export function PlanSheet() {
 
           <div className={cn('flex flex-wrap justify-end gap-2', !expanded && proposal.at_risk.length > 0 && 'justify-between')}>
             {!expanded && proposal.at_risk.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={() => setRisk(proposal.at_risk[0])}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setRisk(proposal.at_risk.find((r) => r.group_kind !== 'backlog') ?? proposal.at_risk[0])}
+              >
                 <AlertTriangleIcon /> Варианты
               </Button>
             )}

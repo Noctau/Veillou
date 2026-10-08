@@ -123,6 +123,8 @@ function EventDetails({
   const [editing, setEditing] = useState(false)
 
   const isClass = event.kind === 'class'
+  // Сам экзамен правится на его карточке (вкладка «Экзамен» предмета)
+  const isExam = event.kind === 'exam'
   const fromTemplate = !!event.template_id
   const cancelled = event.status === 'cancelled'
   const done = event.status === 'done'
@@ -262,7 +264,7 @@ function EventDetails({
               <PinOffIcon /> Открепить
             </Button>
           )}
-          {!cancelled && (
+          {!cancelled && !isExam && (
             <Button variant="outline" onClick={() => setEditing(true)}>
               <PencilIcon /> {isClass ? 'Перенести / аудитория' : 'Изменить'}
             </Button>
@@ -285,6 +287,20 @@ function EventDetails({
           {event.source_type === 'subtask' && event.source_id && (
             <OpenTaskButton subtaskId={event.source_id} />
           )}
+          {(event.source_type === 'exam' || event.source_type === 'exam_session') && event.subject_id && (
+            <Button variant="ghost" asChild>
+              <Link to={`/subjects/${event.subject_id}?tab=exam`}>
+                <ExternalLinkIcon /> Экзамен
+              </Link>
+            </Button>
+          )}
+          {event.source_type === 'backlog_item' && (
+            <Button variant="ghost" asChild>
+              <Link to="/inbox">
+                <ExternalLinkIcon /> Ящик
+              </Link>
+            </Button>
+          )}
           {event.source_type === 'task' && event.source_id && (
             <Button variant="ghost" asChild>
               <Link to={`/tasks/${event.source_id}`}>
@@ -293,7 +309,7 @@ function EventDetails({
             </Button>
           )}
           {isClass && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
-          {!fromTemplate && (
+          {!fromTemplate && !isExam && (
             <ConfirmButton title="Удалить событие?" onConfirm={() => remove.mutate(event.id, { onSuccess: onClose })}>
               <Button variant="ghost" className="text-destructive">
                 <Trash2Icon /> Удалить

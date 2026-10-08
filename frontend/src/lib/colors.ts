@@ -31,4 +31,5 @@ export const KIND_COLORS: Record<string, string> = {
   subtask: '#f59e0b',
   backlog: '#64748b',
   exam_prep: '#ef4444',
+  exam: '#ec4899',
 }

@@ -7,7 +7,7 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ from app.domain.enums import (
 )
 from app.models import Event, Reminder, Subtask, Task, User
 from app.notify.builder import next_allowed
-from app.notify.message import fmt_moment
+from app.notify.message import fmt_moment, plural
 from app.schemas.task import SubtaskSchedule, SubtaskUpdate, TaskUpdate
 from app.services.reminders import quiet_range
 from app.services.settings import effective_settings
@@ -46,6 +46,8 @@ class ReminderActionError(AppError):
 class ActionResult:
     message: str
     url: str | None = None
+    # Действие посчитало превью плана — бот предложит «Применить план»
+    proposal_id: uuid.UUID | None = None
 
 
 async def _subtask_event(db: AsyncSession, r: Reminder) -> tuple[Event, Subtask]:
@@ -142,6 +144,35 @@ async def perform(
         day = timedelta(days=1)
         await tasks.schedule(st.id, SubtaskSchedule(start=event.start + day, end=event.end + day))
         return ActionResult(f"Перенесено на {fmt_moment(event.start + day, tz, today)}", url)
+
+    if kind == ReminderKind.evening_review and action == ReminderAction.reschedule:
+        from app.services.review import ReviewService
+
+        day = date.fromisoformat(r.payload["date"])
+        moved, rev = await ReviewService(db, user, now).reschedule(day=day)
+        r.action_used_at = now
+        await db.commit()
+        if not moved:
+            return ActionResult("Переносить нечего — всё отмечено", "/")
+        text = f"Перенесла: {moved} {plural(moved, 'блок', 'блока', 'блоков')}. "
+        text += "Проверьте превью плана" if rev else "План уже учитывает это"
+        return ActionResult(text, "/", rev.id if rev else None)
+
+    if kind == ReminderKind.weekly_review and action == ReminderAction.accept:
+        from app.services.review import ReviewService
+
+        review = ReviewService(db, user, now)
+        week = await review.weekly()
+        ids = [i.id for i in week.planned] + [i.id for i in week.suggestions]
+        if not week.suggestions:
+            raise ReminderActionError("Предлагать нечего — ящик пуст или неделя уже набрана")
+        rev = await review.confirm_week(ids)
+        r.action_used_at = now
+        await db.commit()
+        n = len(week.suggestions)
+        text = f"Взяла на неделю {n} {plural(n, 'дело', 'дела', 'дел')}"
+        text += ". Проверьте превью плана" if rev else ""
+        return ActionResult(text, "/", rev.id if rev else None)
 
     raise ReminderActionError("У этого напоминания нет действий")
 

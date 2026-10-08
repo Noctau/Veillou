@@ -5,7 +5,9 @@
   разбору quickparse, с кнопкой «Изменить» (сменить тип или удалить); если разбор
   неуверенный (длинный текст, задание без срока или предмета) — сначала ИИ (bot/ai.py);
 - фото — задание с фото: ИИ распознаёт текст, срок и предмет;
-- кнопки на напоминаниях: «Сделано», «+15 мин», «На завтра».
+- /free [N] — что сделать за N минут прямо сейчас (bot/review.py);
+- кнопки на напоминаниях: «Сделано», «+15 мин», «На завтра»; на разборах —
+  «Перенести всё», «По одному», «Взять на неделю» (дальше — «Применить план»).
 """
 
 import io
@@ -17,11 +19,11 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import Headers
 
-from app.bot import ai, cards
+from app.bot import ai, cards, review
 from app.core.exceptions import AppError
 from app.core.storage import get_storage
 from app.core.time import get_tz, now_utc
-from app.domain.enums import AIOrigin, AttachmentOwner
+from app.domain.enums import AIOrigin, AttachmentOwner, ReminderAction
 from app.domain.quickparse import needs_ai
 from app.models import User
 from app.schemas.task import TaskCreate
@@ -39,6 +41,7 @@ HELP = (
     "• текст задания целиком или фото доски — разберу с ИИ и предложу разбить на шаги\n\n"
     "/today — план на сегодня\n"
     "/week — план на неделю\n"
+    "/free — что успеть, если есть свободные минуты\n"
     "/add <текст> — быстро, без ИИ\n\n"
     "Напоминания и утренняя сводка тоже приходят сюда."
 )
@@ -75,6 +78,10 @@ async def week(message: Message, db: AsyncSession, user: User) -> None:
     digest = Digest(db, user)
     msg = await digest.week(digest.today)
     await message.answer(msg.telegram_html(), parse_mode="HTML")
+
+
+async def free(message: Message, command: CommandObject, db: AsyncSession, user: User) -> None:
+    await review.free_command(message, db, user, command.args)
 
 
 async def _create(message: Message, db: AsyncSession, user: User, text: str) -> None:
@@ -225,6 +232,9 @@ async def reminder_callback(callback: CallbackQuery, db: AsyncSession, user: Use
         await callback.answer()
         return
     action, reminder_id = parsed
+    if action == ReminderAction.pick:
+        await review.show_pick(callback, db, user, reminder_id)
+        return
     try:
         result = await reminder_actions.perform_by_id(db, user, reminder_id, action)
     except AppError as exc:
@@ -236,7 +246,10 @@ async def reminder_callback(callback: CallbackQuery, db: AsyncSession, user: Use
         await callback.message.edit_reply_markup(
             reply_markup=cards.without_actions(callback.message.reply_markup)
         )
-        await callback.message.reply(f"✓ {result.message}")
+        if result.proposal_id is not None:
+            await review.reply_plan(callback.message, db, user)
+        else:
+            await callback.message.reply(f"✓ {result.message}")
 
 
 def create_router() -> Router:
@@ -248,6 +261,7 @@ def create_router() -> Router:
     router.message.register(today, Command("today"))
     router.message.register(week, Command("week"))
     router.message.register(add, Command("add"))
+    router.message.register(free, Command("free"))
     router.message.register(help_, F.text.startswith("/"))  # неизвестная команда
     router.message.register(photo, F.photo)
     router.message.register(photo, F.document.mime_type.startswith("image/"))
@@ -255,4 +269,6 @@ def create_router() -> Router:
     router.callback_query.register(quick_add_callback, F.data.startswith(cards.QA_PREFIX))
     router.callback_query.register(reminder_callback, F.data.startswith(cards.RA_PREFIX))
     router.callback_query.register(ai.ai_callback, F.data.startswith(ai.AI_PREFIX))
+    router.callback_query.register(review.review_callback, F.data.startswith(review.RV_PREFIX))
+    router.callback_query.register(review.free_callback, F.data.startswith(review.FR_PREFIX))
     return router

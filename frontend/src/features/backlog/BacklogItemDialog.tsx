@@ -1,4 +1,4 @@
-import { ArchiveIcon, CheckIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
+import { ArchiveIcon, CalendarMinusIcon, CalendarPlusIcon, CheckIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 
 import { ConfirmButton } from '@/components/common/ConfirmButton'
@@ -11,7 +11,15 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
 
 import { CONDITION_LABEL, CONDITIONS, ESTIMATES } from './labels'
-import { type BacklogCondition, type BacklogItem, useDeleteBacklog, useUpdateBacklog } from './useBacklog'
+import { usePreviewPlan } from '@/features/plan/usePlan'
+
+import {
+  type BacklogCondition,
+  type BacklogItem,
+  useDeleteBacklog,
+  useTakeForWeek,
+  useUpdateBacklog,
+} from './useBacklog'
 
 type Props = { item: BacklogItem | null; onOpenChange: (open: boolean) => void }
 
@@ -31,6 +39,8 @@ export function BacklogItemDialog({ item, onOpenChange }: Props) {
 function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }) {
   const update = useUpdateBacklog()
   const remove = useDeleteBacklog()
+  const take = useTakeForWeek()
+  const preview = usePreviewPlan()
   const [title, setTitle] = useState(item.title)
   const [note, setNote] = useState(item.note)
   const [categoryId, setCategoryId] = useState(item.category_id)
@@ -134,6 +144,29 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
             </Button>
             <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setStatus('archived')}>
               <ArchiveIcon /> Неактуально
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending || take.isPending}
+              onClick={() =>
+                take.mutate(
+                  { id: item.id, take: !item.planned_week },
+                  // Дело попадёт в план (или уйдёт из него) — сразу показываем превью
+                  { onSuccess: () => preview.mutate({ quiet: true }) },
+                )
+              }
+            >
+              {item.planned_week ? (
+                <>
+                  <CalendarMinusIcon /> Снять с недели
+                </>
+              ) : (
+                <>
+                  <CalendarPlusIcon /> Взять на неделю
+                </>
+              )}
             </Button>
           </>
         ) : (

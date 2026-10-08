@@ -1,6 +1,7 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
-import { MapPinIcon, PlusIcon } from 'lucide-react'
+import { CalendarCheckIcon, ClipboardCheckIcon, MapPinIcon, PlusIcon, TimerIcon } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,11 +16,13 @@ import { PARITY_LABEL, weekParity } from '@/features/schedule/parity'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useNotes } from '@/features/notes/useNotes'
+import { plural } from '@/features/plan/labels'
 import { useAskFeel } from '@/features/plan/useAskFeel'
+import { FreeDialog } from '@/features/review/FreeDialog'
 import { DeadlinesCard } from '@/features/tasks/DeadlinesCard'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
-import { addDaysIso, dayStartUtc, formatDay, wallTime } from '@/lib/time'
+import { addDaysIso, dayStartUtc, formatDay, isoWeekday, wallTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import { useNow } from './useNow'
@@ -156,6 +159,18 @@ function FeedRow({
   )
 }
 
+function ReviewLink({ to, icon: Icon, text }: { to: string; icon: typeof TimerIcon; text: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm font-medium hover:bg-accent"
+    >
+      <Icon className="size-5 shrink-0 text-primary" />
+      {text}
+    </Link>
+  )
+}
+
 // ---------- экран ----------
 
 export function TodayView() {
@@ -167,11 +182,15 @@ export function TodayView() {
   const update = useUpdateEvent()
   const [opened, setOpened] = useState<CalendarEvent | null>(null)
   const [creating, setCreating] = useState(false)
+  const [free, setFree] = useState(false)
 
   const events = data?.events ?? []
   const classes = events.filter((e) => e.kind === 'class')
   const doable = events.filter(isDoable)
   const doneCount = doable.filter((e) => e.status === 'done').length
+  // Гибкие блоки, которые уже начались, но не отмечены, — повод для разбора
+  const unmarked = doable.filter((e) => !e.is_fixed && e.status === 'planned' && parseISO(e.start) <= now)
+  const weekend = isoWeekday(today) >= 6
   const dayOff = data?.days_off[0]
   const inClasses = semester && semester.start_date <= today && today <= semester.classes_end
   const parity = inClasses ? weekParity(today, semester.start_date, semester.first_week_parity) : null
@@ -211,10 +230,22 @@ export function TodayView() {
             </div>
           )}
 
+          {unmarked.length > 0 && (
+            <ReviewLink
+              to="/review"
+              icon={ClipboardCheckIcon}
+              text={`Не отмечено ${unmarked.length} ${plural(unmarked.length, 'блок', 'блока', 'блоков')} — разобрать`}
+            />
+          )}
+          {weekend && <ReviewLink to="/review/week" icon={CalendarCheckIcon} text="Разбор недели: итоги и дела из ящика" />}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">День</CardTitle>
-              <CardAction>
+              <CardAction className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => setFree(true)}>
+                  <TimerIcon /> Есть время
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
                   <PlusIcon /> Событие
                 </Button>
@@ -239,6 +270,7 @@ export function TodayView() {
 
       <EventDetailsDialog event={opened} onOpenChange={(open) => !open && setOpened(null)} />
       <PersonalEventDialog open={creating} onOpenChange={setCreating} draft={{ date: today }} />
+      <FreeDialog open={free} onOpenChange={setFree} />
     </div>
   )
 }

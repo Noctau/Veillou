@@ -1,13 +1,18 @@
-"""Долгий ящик: дела без срока. В планировщик попадут в M11."""
+"""Долгий ящик: дела без срока.
+
+В план попадают дела, «взятые на неделю» (`planned_week`): на недельном
+разборе или кнопкой на деле; ставит их планировщик (services/replan.py).
+"""
 
 import uuid
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import now_utc
-from app.domain.enums import BacklogStatus
+from app.domain.enums import BacklogStatus, EventStatus
 from app.domain.quickparse import guess_action_type
 from app.models import ActionType, BacklogItem, Category, User
 from app.schemas.backlog import BacklogCreate, BacklogUpdate
@@ -36,6 +41,7 @@ _REQUIRED = {"title", "note", "conditions", "status"}
 class BacklogService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
+        self.user = user
         self.user_id = user.id
         self.items = BacklogRepo(db, user.id)
         self.categories = _CategoryRepo(db, user.id)
@@ -105,6 +111,38 @@ class BacklogService:
         await self.db.commit()
         return item
 
+    async def take_for_week(self, id: uuid.UUID, take: bool) -> BacklogItem:
+        """«Взять на неделю» (в Сб/Вс — на следующую) / «Снять с недели»."""
+        from app.services.review import take_for_week
+
+        item = await self.items.get_or_404(id)
+        await take_for_week(self.db, self.user, item, take)
+        await self.db.commit()
+        return item
+
     async def delete(self, id: uuid.UUID) -> None:
         self.items.soft_delete(await self.items.get_or_404(id))
         await self.db.commit()
+
+
+async def on_backlog_event_status(
+    db: AsyncSession, user_id: uuid.UUID, item_id: uuid.UUID, status: str
+) -> None:
+    """Блок дела отметили «сделано» → дело сделано; сняли отметку → снова активно."""
+    if status == EventStatus.done:
+        values: dict[str, Any] = {"status": BacklogStatus.done, "done_at": now_utc()}
+        current = BacklogStatus.active
+    elif status == EventStatus.planned:
+        values, current = {"status": BacklogStatus.active, "done_at": None}, BacklogStatus.done
+    else:
+        return
+    await db.execute(
+        update(BacklogItem)
+        .where(
+            BacklogItem.id == item_id,
+            BacklogItem.user_id == user_id,
+            BacklogItem.deleted_at.is_(None),
+            BacklogItem.status == current,
+        )
+        .values(**values)
+    )

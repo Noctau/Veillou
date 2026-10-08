@@ -5,6 +5,7 @@ from app.models.attachment import Attachment
 from app.models.backlog import BacklogItem
 from app.models.catalog import ActionType, Category
 from app.models.event import Event, RecurringEvent
+from app.models.exam import Exam, ExamQuestion, ExamSession
 from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
 from app.models.plan import Calibration, PlanRevision, StudyDayLimit
@@ -28,6 +29,9 @@ __all__ = [
     "ClassRule",
     "DayOff",
     "Event",
+    "Exam",
+    "ExamQuestion",
+    "ExamSession",
     "Job",
     "Milestone",
     "Note",

@@ -1,5 +1,6 @@
-import { CalendarClockIcon, ScissorsIcon, TimerIcon } from 'lucide-react'
+import { CalendarClockIcon, InboxIcon, ScissorsIcon, SofaIcon, TimerIcon } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useBacklog, useTakeForWeek } from '@/features/backlog/useBacklog'
 import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSettings } from '@/features/settings/useSettings'
 import { formatMinutes } from '@/features/tasks/labels'
@@ -23,23 +25,38 @@ type Props = {
 }
 
 /**
- * Варианты, когда задание под угрозой (ТЗ §6, шаг 4): урезать оценки, больше учёбы
- * в конкретный день, сдвинуть внутренний срок. Решает пользователь; после выбора —
- * новое превью. «Убрать дела из ящика» появится, когда ящик попадёт в план (M11.2).
+ * Варианты, когда что-то под угрозой (ТЗ §6, шаг 4): урезать оценки, больше учёбы
+ * в конкретный день, убрать дела из ящика с недели, сдвинуть внутренний срок.
+ * Решает пользователь; после выбора — новое превью. Дело из ящика, которое не
+ * влезло, можно снять с недели.
  */
 export function AtRiskDialog({ risk, onOpenChange }: Props) {
-  const { data: task } = useTask(risk?.task_id)
+  const isTask = risk?.group_kind === 'task'
+  const { data: task } = useTask(isTask ? (risk?.task_id ?? undefined) : undefined)
+  const close = () => onOpenChange(false)
   return (
     <Dialog open={!!risk} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{risk?.task_title}</DialogTitle>
-          <DialogDescription>Под угрозой: {risk && RISK_LABEL[risk.reason]}. Что можно сделать:</DialogDescription>
+          <DialogTitle>{risk?.group_title}</DialogTitle>
+          <DialogDescription>
+            {risk?.group_kind === 'backlog'
+              ? 'Дело из ящика не влезает в свободное время этой недели.'
+              : `Под угрозой: ${risk ? RISK_LABEL[risk.reason] : ''}. Что можно сделать:`}
+          </DialogDescription>
         </DialogHeader>
-        {!task || !risk ? (
+        {risk?.group_kind === 'backlog' ? (
+          <BacklogOptions risk={risk} onDone={close} />
+        ) : risk?.group_kind === 'exam' ? (
+          <div className="flex flex-col gap-4">
+            {risk.reason === 'rest' && <RestNote />}
+            <DayLimitSection deadline={risk.deadline} onDone={close} />
+            <DropBacklogSection onDone={close} />
+          </div>
+        ) : !task || !risk ? (
           <Skeleton className="h-48" />
         ) : (
-          <Options key={task.id} task={task} risk={risk} onDone={() => onOpenChange(false)} />
+          <TaskOptions key={task.id} task={task} risk={risk} onDone={close} />
         )}
       </DialogContent>
     </Dialog>
@@ -48,13 +65,39 @@ export function AtRiskDialog({ risk, onOpenChange }: Props) {
 
 const round5 = (min: number) => Math.max(5, Math.round(min / 5) * 5)
 
-function Options({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onDone: () => void }) {
-  const tz = useTimeZone()
-  const { data: settings } = useSettings()
+function useReplan(onDone: () => void) {
   const preview = usePreviewPlan()
+  return {
+    pending: preview.isPending,
+    replan: () => {
+      preview.mutate({})
+      onDone()
+    },
+  }
+}
+
+/** Причина — минимум отдыха: подсказка, где его поменять. */
+function RestNote() {
+  return (
+    <section className="flex gap-2 rounded-lg bg-muted p-3 text-sm">
+      <SofaIcon className="mt-0.5 size-4 shrink-0" />
+      <p>
+        Свободное время осталось только в защищённые вечера и полдня выходных. План их не трогает — минимум отдыха можно
+        поменять в{' '}
+        <Link to="/settings" className="text-primary underline-offset-4 hover:underline">
+          Настройках
+        </Link>
+        .
+      </p>
+    </section>
+  )
+}
+
+function TaskOptions({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onDone: () => void }) {
+  const { data: settings } = useSettings()
   const updateTask = useUpdateTask()
   const updateSubtask = useUpdateSubtask(task.id)
-  const putLimit = usePutDayLimit()
+  const { replan, pending } = useReplan(onDone)
 
   const todo = task.subtasks.filter((s) => s.status === 'todo')
   const whole = todo.length === 0 && task.subtasks.length === 0
@@ -63,19 +106,8 @@ function Options({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onD
     : Object.fromEntries(todo.map((s) => [s.id, s.estimate_min]))
   const [estimates, setEstimates] = useState<Record<string, number>>(initial)
 
-  const today = todayIn(tz)
-  const lastDay = risk.deadline ? wallDate(risk.deadline, tz) : addDaysIso(today, 13)
-  const [day, setDay] = useState(today)
-  const limitHours = (settings?.study_limit_min_per_day ?? 360) / 60
-  const [hours, setHours] = useState(limitHours + 2)
-
   const buffer = task.deadline_buffer_days ?? settings?.deadline_buffer_days ?? 0
-  const busy = preview.isPending || updateTask.isPending || updateSubtask.isPending || putLimit.isPending
-
-  const replan = () => {
-    preview.mutate({})
-    onDone()
-  }
+  const busy = pending || updateTask.isPending || updateSubtask.isPending
 
   const saveEstimates = async () => {
     if (whole) {
@@ -94,6 +126,7 @@ function Options({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onD
 
   return (
     <div className="flex flex-col gap-4">
+      {risk.reason === 'rest' && <RestNote />}
       <section className="flex flex-col gap-2">
         <h3 className="flex items-center gap-2 text-sm font-medium">
           <ScissorsIcon className="size-4" /> Урезать оценки
@@ -141,40 +174,8 @@ function Options({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onD
       </section>
 
       <Separator />
-
-      <section className="flex flex-col gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-medium">
-          <TimerIcon className="size-4" /> Больше учёбы в один день
-        </h3>
-        <p className="text-xs text-muted-foreground">Обычно — до {limitHours} ч в день. Разово можно больше.</p>
-        <div className="flex items-end gap-2">
-          <div className="flex flex-1 flex-col gap-1">
-            <Label htmlFor="risk-day">День</Label>
-            <Input id="risk-day" type="date" min={today} max={lastDay} value={day} onChange={(e) => setDay(e.target.value)} />
-          </div>
-          <div className="flex w-24 flex-col gap-1">
-            <Label htmlFor="risk-hours">Часов</Label>
-            <Input
-              id="risk-hours"
-              type="number"
-              inputMode="decimal"
-              min={0.5}
-              max={16}
-              step={0.5}
-              value={hours}
-              onChange={(e) => setHours(Number(e.target.value))}
-            />
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || !day || !(hours > 0 && hours <= 16)}
-            onClick={() => putLimit.mutate({ day, minutes: Math.round(hours * 60) }, { onSuccess: replan })}
-          >
-            Пересчитать
-          </Button>
-        </div>
-      </section>
+      <DayLimitSection deadline={risk.deadline} onDone={onDone} />
+      <DropBacklogSection onDone={onDone} />
 
       {buffer > 0 && task.deadline && (
         <>
@@ -198,6 +199,116 @@ function Options({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk; onD
           </section>
         </>
       )}
+    </div>
+  )
+}
+
+/** «Больше учёбы в один день»: разовый лимит на дату. */
+function DayLimitSection({ deadline, onDone }: { deadline: string | null; onDone: () => void }) {
+  const tz = useTimeZone()
+  const { data: settings } = useSettings()
+  const putLimit = usePutDayLimit()
+  const { replan, pending } = useReplan(onDone)
+  const today = todayIn(tz)
+  const lastDay = deadline ? wallDate(deadline, tz) : addDaysIso(today, 13)
+  const [day, setDay] = useState(today)
+  const limitHours = (settings?.study_limit_min_per_day ?? 360) / 60
+  const [hours, setHours] = useState(limitHours + 2)
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-2 text-sm font-medium">
+        <TimerIcon className="size-4" /> Больше учёбы в один день
+      </h3>
+      <p className="text-xs text-muted-foreground">Обычно — до {limitHours} ч в день. Разово можно больше.</p>
+      <div className="flex items-end gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <Label htmlFor="risk-day">День</Label>
+          <Input id="risk-day" type="date" min={today} max={lastDay} value={day} onChange={(e) => setDay(e.target.value)} />
+        </div>
+        <div className="flex w-24 flex-col gap-1">
+          <Label htmlFor="risk-hours">Часов</Label>
+          <Input
+            id="risk-hours"
+            type="number"
+            inputMode="decimal"
+            min={0.5}
+            max={16}
+            step={0.5}
+            value={hours}
+            onChange={(e) => setHours(Number(e.target.value))}
+          />
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || putLimit.isPending || !day || !(hours > 0 && hours <= 16)}
+          onClick={() => putLimit.mutate({ day, minutes: Math.round(hours * 60) }, { onSuccess: replan })}
+        >
+          Пересчитать
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+/** «Убрать дела из ящика»: снять взятые на неделю — их время отдать учёбе. */
+function DropBacklogSection({ onDone }: { onDone: () => void }) {
+  const { data: items } = useBacklog('active')
+  const take = useTakeForWeek()
+  const { replan, pending } = useReplan(onDone)
+  const planned = (items ?? []).filter((i) => i.planned_week)
+  if (!planned.length) return null
+  return (
+    <>
+      <Separator />
+      <section className="flex flex-col gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-medium">
+          <InboxIcon className="size-4" /> Убрать дела из ящика
+        </h3>
+        <p className="text-xs text-muted-foreground">Они вернутся в следующий разбор недели.</p>
+        <ul className="flex flex-col gap-1">
+          {planned.map((i) => (
+            <li key={i.id} className="flex items-center gap-2 text-sm">
+              <span className="min-w-0 flex-1 truncate">{i.title}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending || take.isPending}
+                onClick={() => take.mutate({ id: i.id, take: false }, { onSuccess: replan })}
+              >
+                Снять
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  )
+}
+
+function BacklogOptions({ risk, onDone }: { risk: PlanRisk; onDone: () => void }) {
+  const take = useTakeForWeek()
+  const { replan, pending } = useReplan(onDone)
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {risk.reason === 'rest' && <RestNote />}
+      <p className="text-muted-foreground">
+        Сначала план ставит учёбу, дела из ящика — в оставшиеся окна, подходящие под их условия. Можно снять дело с недели:
+        оно вернётся в следующий разбор.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onDone}>
+          Оставить
+        </Button>
+        <Button
+          variant="outline"
+          disabled={pending || take.isPending}
+          onClick={() => take.mutate({ id: risk.group_id, take: false }, { onSuccess: replan })}
+        >
+          Снять с недели
+        </Button>
+      </div>
     </div>
   )
 }

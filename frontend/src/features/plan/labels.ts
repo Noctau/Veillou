@@ -17,6 +17,7 @@ export const RISK_LABEL: Record<RiskReason, string> = {
   dependency: 'не поставлен предыдущий шаг',
   late: 'позже, чем хотелось (впритык к дедлайну)',
   overdue: 'дедлайн уже прошёл',
+  rest: 'влезет, только если отдать минимум отдыха',
 }
 
 export const REASON_LABEL: Record<PlanReason, string> = {
@@ -24,6 +25,8 @@ export const REASON_LABEL: Record<PlanReason, string> = {
   changes: 'План устарел после правок',
   missed: 'Переносим невыполненное',
   nightly: 'Пересчитали план за ночь',
+  weekly: 'Дела из ящика на неделю',
+  exam: 'План подготовки к экзамену',
 }
 
 /** «3 блока перенесены · 1 задание под угрозой» */
@@ -33,8 +36,11 @@ export function summarize(rev: PlanRevision): string {
   if (rev.added) parts.push(`${rev.added} ${plural(rev.added, 'новый блок', 'новых блока', 'новых блоков')}`)
   if (rev.removed) parts.push(`${rev.removed} ${plural(rev.removed, 'блок убран', 'блока убраны', 'блоков убраны')}`)
   if (rev.missed) parts.push(`${rev.missed} ${plural(rev.missed, 'блок', 'блока', 'блоков')} в «не сделано»`)
-  const tasks = new Set(rev.at_risk.map((r) => r.task_id)).size
+  const risky = rev.at_risk.filter((r) => r.group_kind !== 'backlog')
+  const tasks = new Set(risky.map((r) => r.group_id)).size
   if (tasks) parts.push(`${tasks} ${plural(tasks, 'задание', 'задания', 'заданий')} под угрозой`)
+  const boxes = new Set(rev.at_risk.filter((r) => r.group_kind === 'backlog').map((r) => r.group_id)).size
+  if (boxes) parts.push(`${boxes} ${plural(boxes, 'дело', 'дела', 'дел')} из ящика не влезает`)
   return parts.join(' · ')
 }
 

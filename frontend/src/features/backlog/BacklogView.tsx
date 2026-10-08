@@ -1,4 +1,4 @@
-import { CalendarIcon, ClockIcon, SendIcon } from 'lucide-react'
+import { CalendarCheckIcon, CalendarIcon, ClockIcon, SendIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -86,6 +86,12 @@ function Row({
             <span className="flex items-center gap-1">
               <ClockIcon className="size-3" />
               {estimate}
+            </span>
+          )}
+          {item.planned_week && item.status === 'active' && (
+            <span className="flex items-center gap-1 text-primary">
+              <CalendarCheckIcon className="size-3" />
+              на неделе
             </span>
           )}
           {item.desired_by && (

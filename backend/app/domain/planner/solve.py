@@ -4,10 +4,12 @@
 2. Жадное решение (быстро, всегда есть) — подсказка для CP-SAT.
 3. CP-SAT с остатком бюджета времени. Берём его решение, если оно есть,
    проходит проверку и ставит не меньше блоков (с учётом приоритета), чем жадное.
-4. at_risk, diff с прошлым планом, статистика.
+4. at_risk, diff с прошлым планом, статистика. Если что-то не влезло, жадное
+   решение без минимума отдыха показывает, не отдых ли тому причина (`rest`).
 """
 
 from collections.abc import Iterable
+from dataclasses import replace
 from datetime import timedelta
 from time import perf_counter
 
@@ -21,7 +23,7 @@ from app.domain.planner.contracts import (
     PlanStats,
     RiskReason,
 )
-from app.domain.planner.cpsat import Solution, effective_priority, solve_cp
+from app.domain.planner.cpsat import Solution, miss_weight, solve_cp
 from app.domain.planner.greedy import solve_greedy
 from app.domain.planner.grid import Prepared, prepare
 
@@ -30,7 +32,7 @@ RESERVE_S = 0.15
 
 
 def _weight(prep: Prepared, solution: Solution) -> int:
-    return sum(effective_priority(prep.by_id[b]) for b in solution)
+    return sum(miss_weight(prep.by_id[b]) for b in solution)
 
 
 def _placements(prep: Prepared, solution: Solution) -> list[Placement]:
@@ -72,6 +74,25 @@ def _at_risk(prep: Prepared, solution: Solution) -> list[AtRisk]:
     return result
 
 
+def _blamed_on_rest(inp: PlanInput, risks: list[AtRisk]) -> list[AtRisk]:
+    """no_time / late → rest, если без минимума отдыха блок встал бы (вовремя)."""
+    s = inp.settings
+    suspects = {r.block_id for r in risks if r.reason in (RiskReason.no_time, RiskReason.late)}
+    if not suspects or not (s.free_evenings_per_week or s.weekend_half_days):
+        return risks
+    relaxed = prepare(
+        replace(inp, settings=replace(s, free_evenings_per_week=0, weekend_half_days=0))
+    )
+    solution = solve_greedy(relaxed)
+    fixed: set = set()
+    for block_id in suspects:
+        parts = solution.get(block_id)
+        pb = relaxed.by_id[block_id]
+        if parts and (pb.due is None or parts[-1][1] <= pb.due):
+            fixed.add(block_id)
+    return [replace(r, reason=RiskReason.rest) if r.block_id in fixed else r for r in risks]
+
+
 def diff(previous: Iterable[Placement], current: Iterable[Placement]) -> PlanDiff:
     before = {(p.block_id, p.part): p for p in previous}
     after = {(p.block_id, p.part): p for p in current}
@@ -106,7 +127,7 @@ def solve(inp: PlanInput) -> PlanResult:
     ids = {b.id for b in inp.blocks}
     return PlanResult(
         placements=tuple(placements),
-        at_risk=tuple(_at_risk(prep, solution)),
+        at_risk=tuple(_blamed_on_rest(inp, _at_risk(prep, solution))),
         diff=diff((p for p in inp.previous if p.block_id in ids), placements),
         stats=PlanStats(
             engine=engine,

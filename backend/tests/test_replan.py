@@ -359,7 +359,8 @@ async def test_at_risk_in_preview(auth_client, user):
     assert rev is not None
     assert {r["reason"] for r in rev.at_risk} <= {"no_time", "no_slots"}
     assert rev.at_risk and rev.at_risk[0]["task_id"] == task["id"]
-    assert rev.at_risk[0]["task_title"] == "Реферат"
+    assert rev.at_risk[0]["group_title"] == "Реферат"
+    assert rev.at_risk[0]["group_kind"] == "task"
 
 
 async def test_stale_and_orphan_blocks(auth_client, user):

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import now_utc
 from app.models import PushSubscription, User
-from app.notify.message import ACTION_TITLES, Message
+from app.notify.message import ACTION_TITLES, TELEGRAM_ONLY, Message
 
 log = logging.getLogger(__name__)
 
@@ -110,7 +110,9 @@ def push_payload(msg: Message) -> str:
         "body": msg.plain_body(),
         "url": msg.url,
         "tag": msg.tag,
-        "actions": [{"action": a, "title": ACTION_TITLES[a]} for a in msg.actions]
+        "actions": [
+            {"action": a, "title": ACTION_TITLES[a]} for a in msg.actions if a not in TELEGRAM_ONLY
+        ]
         if msg.action_token
         else [],
         "token": msg.action_token,

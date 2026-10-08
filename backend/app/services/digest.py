@@ -1,7 +1,9 @@
-"""Утренняя сводка (M6.4) и планы для бота: /today, /week.
+"""Утренняя сводка и планы для бота: /today, /week.
 
-Сводка v1: пары с аудиториями, события дня, просроченные задания, дедлайны
-недели и одно самое старое дело из ящика. План подзадач появится в v2 (M11.6).
+Сводка v2 (M11.6): пары с аудиториями, план на день (шаги заданий и подготовка
+к экзаменам — из плана), дело из ящика (поставленное на сегодня, иначе самое
+старое), прочие события, просроченное, дедлайны и экзамены недели. Если план
+ждёт подтверждения — напоминание открыть приложение.
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -16,12 +18,14 @@ from app.domain.enums import (
     ClassType,
     EventKind,
     EventStatus,
+    PlanRevisionStatus,
     ReminderKind,
+    SourceType,
     SubtaskStatus,
     TaskStatus,
 )
 from app.domain.tasks import progress
-from app.models import BacklogItem, Event, Subtask, Task, User
+from app.models import BacklogItem, Event, PlanRevision, Subtask, Task, User
 from app.notify.message import (
     Message,
     Section,
@@ -51,10 +55,14 @@ def class_line(e: Event, tz: ZoneInfo) -> str:
     return f"{line} — отменена" if e.status == EventStatus.cancelled else line
 
 
-def event_line(e: Event, tz: ZoneInfo) -> str:
+def event_line(e: Event, tz: ZoneInfo, context: str | None = None) -> str:
     mark = "✓ " if e.status == EventStatus.done else ""
     loc = f" · {e.location}" if e.location else ""
-    return f"{mark}{fmt_range(e.start, e.end, tz)} {e.title}{loc}"
+    ctx = f" — {context}" if context and context != e.title else ""
+    return f"{mark}{fmt_range(e.start, e.end, tz)} {e.title}{ctx}{loc}"
+
+
+PLAN_KINDS = frozenset({EventKind.subtask, EventKind.exam_prep})
 
 
 async def task_progress(db: AsyncSession, tasks: list[Task]) -> dict[object, float]:
@@ -148,22 +156,82 @@ class Digest:
             .limit(1)
         )
 
-    def _day_sections(self, events: list[Event]) -> list[Section]:
+    async def _task_titles(self, events: list[Event]) -> dict[object, str]:
+        """Блок шага → название задания (для строки «шаг — задание»)."""
+        ids = [e.source_id for e in events if e.source_type == SourceType.subtask]
+        if not ids:
+            return {}
+        rows = await self.db.execute(
+            select(Subtask.id, Task.title)
+            .join(Task, Task.id == Subtask.task_id)
+            .where(Subtask.id.in_(ids), Subtask.user_id == self.user.id)
+        )
+        return dict(rows.all())
+
+    async def _day_sections(self, events: list[Event]) -> tuple[list[Section], bool]:
+        """Разделы дня и есть ли в нём дело из ящика."""
+        live = [e for e in events if e.status != EventStatus.cancelled]
         classes = [e for e in events if e.kind == EventKind.class_]
+        plan = [e for e in live if e.kind in PLAN_KINDS and e.status != EventStatus.missed]
+        box = [e for e in live if e.kind == EventKind.backlog and e.status != EventStatus.missed]
         others = [
-            e for e in events if e.kind != EventKind.class_ and e.status != EventStatus.cancelled
+            e
+            for e in live
+            if e.kind not in PLAN_KINDS | {EventKind.class_, EventKind.backlog}
+            and e.status != EventStatus.missed
         ]
         sections = []
         if classes:
             sections.append(Section("Пары", tuple(class_line(e, self.tz) for e in classes)))
+        if plan:
+            tasks = await self._task_titles(plan)
+            sections.append(
+                Section(
+                    "План на день",
+                    tuple(event_line(e, self.tz, tasks.get(e.source_id)) for e in plan),
+                )
+            )
+        if box:
+            sections.append(Section("Из долгого ящика", tuple(event_line(e, self.tz) for e in box)))
         if others:
             sections.append(Section("В календаре", tuple(event_line(e, self.tz) for e in others)))
-        return sections
+        return sections, bool(box)
+
+    async def _exam_section(self, start: datetime, end: datetime) -> list[Section]:
+        from app.services.exams import days_until, upcoming_exams
+
+        exams = await upcoming_exams(self.db, self.user, start, end)
+        if not exams:
+            return []
+        lines = []
+        for exam, title in exams:
+            n = days_until(exam, self.today, self.tz)
+            when = fmt_day(local_date(exam.starts_at, self.tz), self.today)
+            left = f" · через {n} {plural(n, 'день', 'дня', 'дней')}" if n > 1 else ""
+            room = f" · ауд. {exam.location}" if exam.location else ""
+            lines.append(f"{when} {exam.starts_at.astimezone(self.tz):%H:%M} — {title}{room}{left}")
+        return [Section("Экзамены", tuple(lines))]
+
+    async def _pending_plan(self) -> list[Section]:
+        rev = await self.db.scalar(
+            select(PlanRevision).where(
+                PlanRevision.user_id == self.user.id,
+                PlanRevision.deleted_at.is_(None),
+                PlanRevision.status == PlanRevisionStatus.proposed,
+            )
+        )
+        if rev is None:
+            return []
+        risky = {r.get("group_title") or r.get("task_title") for r in rev.at_risk}
+        text = "План ждёт подтверждения — откройте приложение"
+        if risky:
+            text += f" (под угрозой: {', '.join(sorted(t for t in risky if t))})"
+        return [Section(None, (text,))]
 
     async def day(self, day: date, *, morning: bool = False) -> Message:
         """Сводка на день: утренняя (morning) или ответ на /today."""
         start, end = day_bounds_utc(day, self.tz)
-        sections = self._day_sections(await self._events(start, end))
+        sections, has_box = await self._day_sections(await self._events(start, end))
         if not sections:
             sections.append(Section(None, ("Пар и дел в календаре нет.",)))
         # Несданное к сроку не пропадает из сводки, пока его не закроют
@@ -173,10 +241,13 @@ class Digest:
         sections += await self._deadline_section(
             max(start, self.now), start + timedelta(days=7), "Дедлайны недели"
         )
-        if item := await self._oldest_backlog():
+        sections += await self._exam_section(max(start, self.now), start + timedelta(days=8))
+        if not has_box and (item := await self._oldest_backlog()):
             waiting = (self.today - local_date(item.created_at, self.tz)).days
             age = f" — ждёт {waiting} {plural(waiting, 'день', 'дня', 'дней')}" if waiting else ""
             sections.append(Section("Из долгого ящика", (f"{item.title}{age}",)))
+        if morning:
+            sections = await self._pending_plan() + sections
         title = fmt_day_full(day)
         if morning:
             title = f"Доброе утро! {title}"

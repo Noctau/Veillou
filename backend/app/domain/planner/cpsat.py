@@ -8,7 +8,8 @@
 Жёстко: окна, дедлайн, зависимости, перерыв после длинных блоков, лимит учёбы
 в день, ≤ N подзадач одного задания в день, минимум отдыха.
 Мягко (минимизируем): приоритет × время завершения, огромный штраф за
-непостановку, опоздание к внутреннему сроку, сдвиг относительно прошлого плана
+непостановку (у дел из ящика — на порядки меньше: только в оставшееся время),
+опоздание к внутреннему сроку, сдвиг относительно прошлого плана
 (сегодня/завтра — дорого), утро для «связи с людьми», разрезание, порядок шагов
 задания (`sequence`).
 """
@@ -26,6 +27,7 @@ from app.domain.planner.grid import Interval, Prepared, PreparedBlock
 # Веса целевой функции (на слот сетки, где это время)
 W_END = 4  # × приоритет: раньше закончить
 W_MISS = 10_000_000  # × приоритет: блок не поставлен
+W_MISS_FILLER = 20_000  # × приоритет: дело из ящика не поставлено
 W_LATE = 400  # × приоритет: позже внутреннего срока
 W_STABLE_NEAR = 40  # сдвиг блока, который стоял на сегодня/завтра
 W_STABLE_FAR = 1  # сдвиг остальных
@@ -62,6 +64,11 @@ class _Block:
 
 def effective_priority(pb: PreparedBlock) -> int:
     return max(1, pb.block.priority) * (OVERDUE_BOOST if pb.overdue else 1)
+
+
+def miss_weight(pb: PreparedBlock) -> int:
+    """Штраф за непостановку: дела из ящика — только в оставшееся время."""
+    return effective_priority(pb) * (W_MISS_FILLER if pb.block.filler else W_MISS)
 
 
 class _Builder:
@@ -299,7 +306,7 @@ class _Builder:
                 m.add(last == p2.end).only_enforce_if(p2.pres)
             m.add(last == 0).only_enforce_if(b.pres.Not())
             self.objective.append(prio * W_END * last)
-            self.objective.append(prio * W_MISS * (1 - b.pres))
+            self.objective.append(miss_weight(pb) * (1 - b.pres))
             if pb.due is not None:
                 late = m.new_int_var(0, n, f"late{pb.index}")
                 m.add(late >= last - pb.due)

@@ -5,6 +5,8 @@
 ставится джоба `plan.preview` (с дедупликацией и паузой — серия правок даёт
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
+Дела из ящика (взятые на неделю) и дни подготовки к экзаменам — тоже.
+
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
 (флаг сессии `SKIP_REPLAN`).
@@ -17,7 +19,17 @@ from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session, UOWTransaction
 
 from app.domain.enums import EventStatus, PlanReason, SubtaskStatus, TaskStatus
-from app.models import ActionType, Event, StudyDayLimit, Subtask, Task, User
+from app.models import (
+    ActionType,
+    BacklogItem,
+    Event,
+    Exam,
+    ExamSession,
+    StudyDayLimit,
+    Subtask,
+    Task,
+    User,
+)
 from app.services.jobs import enqueue_plan_preview_sync
 from app.services.replan import SKIP_REPLAN
 
@@ -34,6 +46,17 @@ TASK_FIELDS = {
 SUBTASK_FIELDS = {"estimate_min", "depends_on", "time_window", "action_type_id", "deleted_at"}
 EVENT_FIELDS = {"start", "end", "is_pinned", "deleted_at"}
 USER_FIELDS = {"settings", "timezone"}
+BACKLOG_FIELDS = {
+    "planned_week",
+    "status",
+    "estimate_min",
+    "conditions",
+    "time_window",
+    "action_type_id",
+    "deleted_at",
+}
+EXAM_FIELDS = {"starts_at", "duration_min", "plan_enabled", "deleted_at"}
+SESSION_FIELDS = {"question_ids", "minutes", "date", "deleted_at"}
 # Статусы события, переход в которые (или из которых) меняет занятость
 EVENT_STATUSES = {EventStatus.missed, EventStatus.cancelled}
 
@@ -74,6 +97,14 @@ def _relevant(obj: Any, is_new: bool) -> bool:
         return not is_new and bool(_changed(obj, USER_FIELDS))
     if isinstance(obj, ActionType):
         return is_new or bool(_changed(obj, {"windows", "deleted_at"}))
+    if isinstance(obj, BacklogItem):
+        if is_new:
+            return obj.planned_week is not None
+        return bool(_changed(obj, BACKLOG_FIELDS))
+    if isinstance(obj, Exam):
+        return not is_new and bool(_changed(obj, EXAM_FIELDS))
+    if isinstance(obj, ExamSession):
+        return is_new or bool(_changed(obj, SESSION_FIELDS))
     return isinstance(obj, StudyDayLimit)
 
 

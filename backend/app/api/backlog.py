@@ -40,6 +40,19 @@ async def update_backlog_item(
     return BacklogRead.model_validate(await svc.update(item_id, patch))
 
 
+@router.put("/{item_id}/week")
+async def take_backlog_item_for_week(item_id: uuid.UUID, svc: Service) -> BacklogRead:
+    """«Взять на неделю» (в Сб/Вс — на следующую): дело попадёт в план. Не больше
+    N дел в неделю (Настройки)."""
+    return BacklogRead.model_validate(await svc.take_for_week(item_id, take=True))
+
+
+@router.delete("/{item_id}/week")
+async def drop_backlog_item_from_week(item_id: uuid.UUID, svc: Service) -> BacklogRead:
+    """Снять с недели: блок уберёт следующее превью плана."""
+    return BacklogRead.model_validate(await svc.take_for_week(item_id, take=False))
+
+
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_backlog_item(item_id: uuid.UUID, svc: Service) -> None:
     await svc.delete(item_id)

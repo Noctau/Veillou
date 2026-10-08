@@ -11,6 +11,8 @@ from app.api import (
     backlog,
     catalog,
     events,
+    exams,
+    free,
     health,
     me,
     notes,
@@ -18,6 +20,7 @@ from app.api import (
     plan,
     projects,
     quickadd,
+    review,
     schedule,
     search,
     sources,
@@ -71,6 +74,10 @@ def create_app() -> FastAPI:
     api.include_router(notify.actions_router)
     api.include_router(plan.router)
     api.include_router(plan.calibration_router)
+    api.include_router(exams.router)
+    api.include_router(exams.questions_router)
+    api.include_router(review.router)
+    api.include_router(free.router)
     api.include_router(attachments.router)
     api.include_router(attachments.files_router)
     api.include_router(ai.router)

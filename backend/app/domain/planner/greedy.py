@@ -1,7 +1,8 @@
 """Жадный планировщик: fallback, если CP-SAT не успел, и стартовая подсказка для него.
 
-Порядок — EDF: просроченные, затем ближе внутренний срок, затем узкие окна
-(«связь с людьми» раньше учёбы), затем приоритет, затем порядок шагов задания.
+Порядок — EDF (дела из ящика — после всего остального): просроченные, затем
+ближе внутренний срок, затем узкие окна («связь с людьми» раньше учёбы), затем
+приоритет, затем порядок шагов задания.
 Блок ставится в самое раннее допустимое место: сначала целиком до внутреннего
 срока, потом разрезанным, потом то же самое до настоящего дедлайна. Отдых
 резервируется заранее — самые поздние вечера и половины выходных недели (EDF
@@ -146,7 +147,7 @@ def _order_key(pb: PreparedBlock) -> tuple:
     due = pb.due if pb.due is not None else pb.latest_end
     narrow = sum(hi - lo for lo, hi in pb.free)
     seq = pb.block.sequence if pb.block.sequence is not None else 0
-    return (not pb.overdue, due, narrow, -effective_priority(pb), seq, pb.index)
+    return (pb.block.filler, not pb.overdue, due, narrow, -effective_priority(pb), seq, pb.index)
 
 
 def solve_greedy(prep: Prepared) -> Solution:

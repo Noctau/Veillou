@@ -29,12 +29,13 @@ export function usePlanState() {
   })
 }
 
-/** После применения/отката меняются блоки: календарь, задания, «Сегодня». */
+/** После применения/отката меняются блоки: календарь, задания, «Сегодня», дни подготовки. */
 function useInvalidatePlanned() {
   const queryClient = useQueryClient()
   return () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
-    queryClient.invalidateQueries({ queryKey: queryKeys.tasks })
+    for (const queryKey of [queryKeys.calendarAll, queryKeys.tasks, queryKeys.examsAll, queryKeys.review]) {
+      queryClient.invalidateQueries({ queryKey })
+    }
   }
 }
 

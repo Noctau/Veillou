@@ -16,7 +16,9 @@ from app.schemas.event import (
     RecurringEventCreate,
     RecurringEventUpdate,
 )
+from app.services.backlog import on_backlog_event_status
 from app.services.base import UserScopedRepository, apply_fields, validate_patch
+from app.services.exams import ExamService
 from app.services.schedule_sync import SeriesSync
 from app.services.tasks import on_subtask_event_status
 
@@ -59,6 +61,7 @@ def _is_manual_edit(changes: dict[str, Any]) -> bool:
 class EventService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
+        self.user = user
         self.user_id = user.id
         self.tz = get_tz(user.timezone)
         self.events = EventRepo(db, user.id)
@@ -114,8 +117,8 @@ class EventService:
         if not event.is_fixed and changes.keys() & {"start", "end"}:
             # Гибкий блок, перенесённый руками, планировщик больше не двигает
             event.is_pinned = True
-        if event.source_type == SourceType.subtask and event.source_id and "status" in changes:
-            await on_subtask_event_status(self.db, self.user_id, event.source_id, event.status)
+        if "status" in changes:
+            await on_event_status(self.db, self.user, event)
         await self.db.commit()
         return event
 
@@ -167,3 +170,15 @@ class EventService:
         self.recurring.soft_delete(rec)
         await self.sync.remove_series(rec)
         await self.db.commit()
+
+
+async def on_event_status(db: AsyncSession, user: User, event: Event) -> None:
+    """Отметка на гибком блоке → та же отметка у его источника. Не коммитит."""
+    if event.source_id is None:
+        return
+    if event.source_type == SourceType.subtask:
+        await on_subtask_event_status(db, user.id, event.source_id, event.status)
+    elif event.source_type == SourceType.backlog_item:
+        await on_backlog_event_status(db, user.id, event.source_id, event.status)
+    elif event.source_type == SourceType.exam_session:
+        await ExamService(db, user).on_session_status(event.source_id, event.status)

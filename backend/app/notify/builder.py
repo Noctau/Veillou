@@ -9,6 +9,8 @@
 - дедлайны — за 3 дня, за 1 день и в день сдачи, во время утренней сводки
   (склеиваются с ней в одно сообщение);
 - утренняя сводка — каждый день в заданное время;
+- вечерний разбор — каждый день, недельный — в выбранный день недели (пустой
+  разбор отправитель пропускает: нечего разбирать — нечего и присылать);
 - начало подзадачи — в момент начала блока (по умолчанию выключено);
 - тихие часы: ничего не приходит — переносится на их конец;
 - окно типа действия: «написать научруку» в 22:00 переносится на начало
@@ -33,6 +35,9 @@ MERGE_WINDOW = timedelta(minutes=1)
 SEARCH_DAYS = 8
 # Сводка, опоздавшая больше чем на 4 часа (воркер лежал), уже не нужна
 DIGEST_TTL = timedelta(hours=4)
+# Разборы: вечерний к утру не нужен, недельный — до конца дня
+EVENING_TTL = timedelta(hours=3)
+WEEKLY_TTL = timedelta(hours=12)
 
 
 @dataclass(frozen=True)
@@ -180,6 +185,28 @@ def digest_candidates(
             fire_at=wall_to_utc(d, at, tz),
             channels=tuple(channels),
             expires_at=wall_to_utc(d, at, tz) + DIGEST_TTL,
+            payload={"date": d.isoformat()},
+        )
+        for d in days
+    ]
+
+
+def review_candidates(
+    kind: ReminderKind,
+    days: Iterable[date],
+    at: time,
+    tz: ZoneInfo,
+    channels: Sequence[str],
+    ttl: timedelta,
+) -> list[Candidate]:
+    """Вечерний / недельный разбор: в заданное время выбранных дней."""
+    return [
+        Candidate(
+            kind=kind,
+            key=f"{kind}:{d.isoformat()}",
+            fire_at=wall_to_utc(d, at, tz),
+            channels=tuple(channels),
+            expires_at=wall_to_utc(d, at, tz) + ttl,
             payload={"date": d.isoformat()},
         )
         for d in days

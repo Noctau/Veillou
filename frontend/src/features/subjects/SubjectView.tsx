@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ExternalLinkIcon, GraduationCapIcon, PencilIcon, UserIcon } from 'lucide-react'
+import { ArrowLeftIcon, ExternalLinkIcon, PencilIcon, UserIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ExamPanel } from '@/features/exams/ExamPanel'
 import { NoteList } from '@/features/notes/NoteList'
 import { useSemesters } from '@/features/schedule/useSchedule'
 import { SourceList } from '@/features/sources/SourceList'
@@ -78,23 +79,21 @@ function Header({ subject, onEdit }: { subject: Subject; onEdit: () => void }) {
   )
 }
 
-/** Вкладка «Экзамен»: пока форма контроля и даты сессии; билеты и план подготовки — M12. */
+/** Вкладка «Экзамен»: форма контроля, даты сессии, экзамен с билетами и планом подготовки. */
 function ExamTab({ subject }: { subject: Subject }) {
   const { data: semesters } = useSemesters()
   const semester = semesters?.find((s) => s.id === subject.semester_id)
+  const session =
+    semester?.session_start && semester.session_end
+      ? `Сессия: ${formatDay(semester.session_start, { weekday: undefined, month: 'long' })} — ${formatDay(semester.session_end, { weekday: undefined, month: 'long' })}`
+      : undefined
   return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
-      <GraduationCapIcon className="size-8" />
-      <p className="text-foreground">
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">
         {subject.control_form === 'none' ? 'Без итогового контроля' : CONTROL_FORM_LABEL[subject.control_form]}
+        {session && ` · ${session}`}
       </p>
-      {semester?.session_start && semester.session_end && (
-        <p>
-          Сессия: {formatDay(semester.session_start, { weekday: undefined, month: 'long' })} —{' '}
-          {formatDay(semester.session_end, { weekday: undefined, month: 'long' })}
-        </p>
-      )}
-      <p>Дата экзамена, билеты и план подготовки появятся в одном из следующих обновлений.</p>
+      <ExamPanel subjectId={subject.id} />
     </div>
   )
 }

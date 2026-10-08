@@ -107,6 +107,11 @@ class Block:
     buffer_days: int | None = None
     # Порядок внутри задания (group_id): мягко — шаг с меньшим номером лучше раньше
     sequence: int | None = None
+    # Дело из ящика: ставится только в то, что осталось после основных блоков
+    # (штраф за непостановку на порядки меньше — ради него основное не сдвинется)
+    filler: bool = False
+    # Только в эти дни (дата дня планировщика); None — в любые
+    days: frozenset[date] | None = None
 
 
 @dataclass(frozen=True)
@@ -143,6 +148,7 @@ class RiskReason(StrEnum):
     dependency = "dependency"  # не размещено то, от чего блок зависит
     late = "late"  # размещено, но позже внутреннего срока (дедлайн − буфер)
     overdue = "overdue"  # дедлайн уже прошёл — ставим как можно раньше
+    rest = "rest"  # влезло бы, если отдать минимум отдыха (no_time / late из-за отдыха)
 
 
 @dataclass(frozen=True)
