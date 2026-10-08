@@ -47,6 +47,8 @@ class Job(EntityMixin, Base):
     dedupe_key: Mapped[str | None] = mapped_column(String(200))
     last_error: Mapped[str | None] = mapped_column(Text)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Итог для того, кто ждёт джобу (фронт поллит GET /jobs/{id}): черновик разбивки и т. п.
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class Reminder(UserOwnedMixin, Base):

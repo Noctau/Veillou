@@ -1,8 +1,10 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import type { components } from '@/api/schema'
 import { api } from '@/lib/api'
+import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
 
 export type QuickParse = components['schemas']['QuickParseRead']
@@ -46,4 +48,16 @@ export function useParseNow() {
       staleTime: 60_000,
       queryFn: () => fetchParse(text.trim()),
     })
+}
+
+/** ИИ-разбор неуверенного ввода: id джобы, карточка — через useJob. */
+export function useAiParse() {
+  return useMutation({
+    mutationFn: async (text: string) => {
+      const { data, error } = await api.POST('/api/v1/quick-add/ai-parse', { body: { text } })
+      if (error) throw error
+      return data.job_id
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
 }

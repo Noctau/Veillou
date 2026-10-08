@@ -232,6 +232,13 @@ class JobStatus(StrEnum):
 class JobKind(StrEnum):
     reminders_sync = "reminders.sync"  # пересобрать будущие напоминания пользователя
     plan_preview = "plan.preview"  # пересчитать превью плана после правок
+    ai_breakdown = "ai.breakdown"  # разбить задание на шаги (черновик)
+    ai_parse = "ai.parse"  # разобрать свободный текст (бот, ＋)
+    ai_photo = "ai.photo"  # распознать фото задания
+
+
+# ИИ-джобы идут своей очередью: по одной, по порядку постановки, и ждут, если ИИ недоступен
+AI_JOB_KINDS = frozenset({JobKind.ai_breakdown, JobKind.ai_parse, JobKind.ai_photo})
 
 
 class ReminderKind(StrEnum):
@@ -275,3 +282,21 @@ class PlanReason(StrEnum):
     changes = "changes"  # задания, расписание, настройки
     missed = "missed"  # «не сделано»
     nightly = "nightly"  # ночная джоба: прошедшее неотмеченное → missed
+
+
+# ---------- ИИ (M10) ----------
+
+
+class AIPurpose(StrEnum):
+    """Зачем звали ИИ — колонка `ai_log.purpose`."""
+
+    breakdown = "breakdown"
+    parse = "parse"
+    photo = "photo"
+
+
+class AIOrigin(StrEnum):
+    """Откуда запрос к ИИ — куда отдавать результат."""
+
+    app = "app"  # фронт поллит GET /jobs/{id}
+    telegram = "telegram"  # воркер сам отвечает в чат

@@ -1,5 +1,6 @@
 """Импорт всех моделей, чтобы они попали в Base.metadata (Alembic, тесты)."""
 
+from app.models.ai import AILog, BreakdownTemplate
 from app.models.attachment import Attachment
 from app.models.backlog import BacklogItem
 from app.models.catalog import ActionType, Category
@@ -16,10 +17,12 @@ from app.models.telegram import TelegramLinkCode
 from app.models.user import User
 
 __all__ = [
+    "AILog",
     "ActionType",
     "Attachment",
     "BacklogItem",
     "BellSchedule",
+    "BreakdownTemplate",
     "Calibration",
     "Category",
     "ClassRule",

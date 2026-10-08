@@ -21,7 +21,8 @@ make dev          # Postgres 16 (docker, :5433) + миграции + API :8000 +
 | `make gen-api` | OpenAPI бэкенда → `frontend/src/api/schema.d.ts` |
 | `make create-user email=...` | создать пользователя (пароль спросит; регистрации в приложении нет) |
 | `make bot` | Telegram-бот (long polling), нужен `TELEGRAM_BOT_TOKEN` в `.env` |
-| `make worker` | фоновый процесс: напоминания (push + Telegram), пересборка, ночная докатка |
+| `make worker` | фоновый процесс: напоминания (push + Telegram), ИИ-джобы, пересборка, ночная докатка |
+| `make ai-evals` | эталонные задания для оценки промптов ИИ (`backend/app/ai/evals/`) |
 | `make vapid-keys` | ключи Web Push → вписать в `.env` |
 
 Telegram: создать бота у @BotFather, вписать `TELEGRAM_BOT_TOKEN` и `TELEGRAM_BOT_USERNAME`
@@ -30,6 +31,10 @@ Telegram: создать бота у @BotFather, вписать `TELEGRAM_BOT_TO
 Напоминания: `make vapid-keys` → `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` в `.env`, запустить
 `make worker`, затем «Настройки → Уведомления → Включить» (push работает на https или localhost)
 и «Проверить уведомления». Без воркера напоминания не уходят.
+
+ИИ (разбивка заданий, разбор текста, фото): локально — Ollama (`ollama serve`,
+`ollama pull qwen3:8b qwen2.5vl:7b`), модели и провайдер — `LLM_*` в `.env`. Вызовы идут
+джобами через `make worker`; без воркера «Разбить на шаги» будет ждать вечно.
 
 ## Прод
 

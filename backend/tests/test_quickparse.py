@@ -57,6 +57,12 @@ def test_homework_in_two_weeks():
     assert r.kind_hint == KindHint.task
 
 
+def test_number_words():
+    assert p("доклад через две недели").date == date(2026, 10, 20)
+    assert p("сдать через три дня").date == date(2026, 10, 9)
+    assert p("напомнить через одну неделю").date == date(2026, 10, 13)
+
+
 def test_reading_chapter_numeric_date():
     r = p("прочитать главу 3 учебника по климатологии к 12.10")
     assert r.title == "Прочитать главу 3 учебника"

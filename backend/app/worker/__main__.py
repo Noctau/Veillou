@@ -5,7 +5,12 @@
 - отправка готовых напоминаний из `reminders` (push + Telegram);
 - раз в час — пересборка напоминаний всех пользователей (окно едет вперёд);
 - джобы превью плана (после правок заданий, расписания, «не сделано»);
-- в 3:00 по DEFAULT_TIMEZONE — докатка повторов и регулярных заданий, чистка очередей,
+- ИИ-джобы — отдельным циклом, по одной и по порядку постановки (долгий ответ
+  модели не задерживает напоминания). Если ИИ недоступен, запросы ждут в очереди:
+  цикл реже проверяет, не появился ли он, и, когда появится, выполняет всё по очереди.
+  Из бота ответ приходит сразу в Telegram;
+- в 3:00 по DEFAULT_TIMEZONE — докатка повторов и регулярных заданий, чистка очередей
+  и ai_log,
   прошедшие неотмеченные блоки → missed и превью плана к утру.
 
 При старте сразу выполняется ночная джоба и пересборка: окна не отстают,
@@ -23,10 +28,11 @@ from sqlalchemy import delete
 from app.core.config import settings
 from app.core.db import engine, session_factory
 from app.core.time import get_tz, now_utc
-from app.domain.enums import JobKind, ReminderStatus
+from app.domain.enums import AI_JOB_KINDS, JobKind, ReminderStatus
 from app.models import Reminder
 from app.notify.notifier import Notifier, Sender, TelegramSender, WebPushSender
 from app.services import jobs
+from app.services.ai import prune_log
 from app.services.dispatch import dispatch_due, next_due_at
 from app.services.recurring_tasks import roll_all_recurring_tasks
 from app.services.reminders import handle_sync_job, sync_all_users
@@ -38,10 +44,15 @@ NIGHTLY_AT = time(3, 0)
 RESYNC_EVERY = timedelta(hours=1)
 KEEP_REMINDERS = timedelta(days=30)
 
-HANDLERS: dict[str, jobs.Handler] = {
-    JobKind.reminders_sync: handle_sync_job,
-    JobKind.plan_preview: handle_preview_job,
-}
+
+def build_handlers(bot: Bot | None) -> dict[str, jobs.Handler]:
+    from app.bot.ai import make_handlers
+
+    return {
+        JobKind.reminders_sync: handle_sync_job,
+        JobKind.plan_preview: handle_preview_job,
+        **make_handlers(bot),
+    }
 
 
 def seconds_until(at: time, now: datetime) -> float:
@@ -59,6 +70,7 @@ async def nightly() -> None:
         created = await roll_all_users(db)
         subtasks = await roll_all_recurring_tasks(db)
         await jobs.prune(db)
+        await prune_log(db)
         await db.execute(
             delete(Reminder).where(
                 Reminder.status != ReminderStatus.pending,
@@ -112,9 +124,36 @@ def build_notifier() -> tuple[Notifier, list[Bot]]:
     return Notifier(senders), closers
 
 
-async def tick(notifier: Notifier) -> None:
-    await jobs.run_ready(session_factory, HANDLERS)
+async def tick(notifier: Notifier, handlers: dict[str, jobs.Handler]) -> None:
+    await jobs.run_ready(session_factory, handlers, exclude=AI_JOB_KINDS)
     await dispatch_due(session_factory, notifier)
+
+
+AI_POLL_SEC = 2.0
+# ИИ недоступен: как часто проверять, не появился ли (растёт до 5 минут)
+AI_BACKOFF_SEC = (30, 60, 120, 300)
+
+
+def ai_pause(outcome: jobs.JobOutcome | None, misses: int) -> tuple[float, int]:
+    """Пауза перед следующей ИИ-джобой и новое число неудачных проверок подряд."""
+    if outcome is None:
+        return AI_POLL_SEC, misses
+    if outcome == jobs.JobOutcome.deferred:
+        return AI_BACKOFF_SEC[min(misses, len(AI_BACKOFF_SEC) - 1)], misses + 1
+    return 0.0, 0
+
+
+async def ai_loop(handlers: dict[str, jobs.Handler]) -> None:
+    misses = 0
+    while True:
+        try:
+            outcome = await jobs.run_one(session_factory, handlers, kinds=AI_JOB_KINDS, fifo=True)
+        except Exception:
+            log.exception("Очередь ИИ: ошибка")
+            outcome = None
+        pause, misses = ai_pause(outcome, misses)
+        if pause:
+            await asyncio.sleep(pause)
 
 
 async def sleep_time() -> float:
@@ -128,14 +167,17 @@ async def sleep_time() -> float:
 
 async def main() -> None:
     notifier, closers = build_notifier()
+    handlers = build_handlers(closers[0] if closers else None)
+    ai_task: asyncio.Task[None] | None = None
     try:
         await safely("Ночная джоба", nightly)
         await safely("Пересборка напоминаний", resync_all)
         loop = asyncio.get_running_loop()
         next_nightly = loop.time() + seconds_until(NIGHTLY_AT, now_utc())
         next_resync = loop.time() + RESYNC_EVERY.total_seconds()
+        ai_task = asyncio.create_task(ai_loop(handlers))
         while True:
-            await safely("Цикл очередей", lambda: tick(notifier))
+            await safely("Цикл очередей", lambda: tick(notifier, handlers))
             if loop.time() >= next_nightly:
                 await safely("Ночная джоба", nightly)
                 next_nightly = loop.time() + seconds_until(NIGHTLY_AT, now_utc())
@@ -149,6 +191,8 @@ async def main() -> None:
                 pause = settings.WORKER_POLL_SEC
             await asyncio.sleep(pause)
     finally:
+        if ai_task is not None:
+            ai_task.cancel()
         for bot in closers:
             await bot.session.close()
         await engine.dispose()

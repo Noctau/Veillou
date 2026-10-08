@@ -1,6 +1,18 @@
-import { ArrowLeftIcon, CheckIcon, MoreVerticalIcon, RepeatIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
+import {
+  ArrowLeftIcon,
+  BookmarkIcon,
+  BookmarkPlusIcon,
+  CheckIcon,
+  ClockIcon,
+  MoreVerticalIcon,
+  RepeatIcon,
+  RotateCcwIcon,
+  ScanTextIcon,
+  SparklesIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { type ReactNode, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,7 +38,11 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import type { Job } from '@/features/ai/useJob'
 import { AttachmentList } from '@/features/attachments/AttachmentList'
+import { useAttachments } from '@/features/attachments/useAttachments'
+import { TemplatesDialog } from '@/features/breakdown/TemplatesDialog'
+import { useLatestBreakdown } from '@/features/breakdown/useBreakdown'
 import { describeRrule } from '@/features/calendar/rrule'
 import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
 import { useProject, useProjects } from '@/features/projects/useProjects'
@@ -239,13 +255,39 @@ function Description({ task, onSave }: { task: TaskDetail; onSave: (description:
   )
 }
 
+/** Разбивка, которую ещё не применили: ждёт ИИ, считается или готова к проверке. */
+function DraftBanner({ taskId, job }: { taskId: string; job: Job }) {
+  const ready = job.status === 'done'
+  const text = ready ? 'Черновик шагов готов' : job.waiting ? 'Шаги ждут ИИ — он сейчас недоступен' : 'ИИ разбивает на шаги…'
+  return (
+    <Link
+      to={`/tasks/${taskId}/breakdown?job=${job.id}`}
+      className={cn(
+        'mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted',
+        ready && 'border-primary/50',
+      )}
+    >
+      {ready ? (
+        <SparklesIcon className="size-4 text-primary" />
+      ) : (
+        <ClockIcon className="size-4 text-muted-foreground" />
+      )}
+      <span className="flex-1">{text}</span>
+      {ready && <span className="text-primary">Проверить</span>}
+    </Link>
+  )
+}
+
 export function TaskView({ taskId }: { taskId: string }) {
   const navigate = useNavigate()
   const tz = useTimeZone()
   const { data: task, isPending, isError, error } = useTask(taskId)
   const update = useUpdateTask()
   const remove = useDeleteTask()
+  const { data: attachments } = useAttachments('task', taskId)
+  const { data: draftJob } = useLatestBreakdown(taskId)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [saveTemplate, setSaveTemplate] = useState(false)
 
   if (isPending) {
     return (
@@ -262,6 +304,16 @@ export function TaskView({ taskId }: { taskId: string }) {
   const done = task.status === 'done'
   const due = task.deadline ? describeDeadline(task.deadline, tz) : null
   const estimate = task.subtasks.reduce((sum, s) => sum + (s.status === 'done' ? 0 : s.estimate_min), 0)
+  const hasPhoto = !!attachments?.some((a) => a.mime.startsWith('image/'))
+  const canBreak = !task.recurrence && !done
+  const stepIndex = new Map(task.subtasks.map((s, i) => [s.id, i]))
+  const templateSteps = task.subtasks.map((s) => ({
+    title: s.title,
+    estimate_min: s.estimate_min,
+    action_type_id: s.action_type_id,
+    depends_on: s.depends_on.map((d) => stepIndex.get(d)).filter((d): d is number => d !== undefined),
+    note: s.note,
+  }))
 
   return (
     <div className="flex flex-col gap-4">
@@ -292,6 +344,16 @@ export function TaskView({ taskId }: { taskId: string }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canBreak && (
+              <DropdownMenuItem onSelect={() => navigate(`/tasks/${task.id}/breakdown?templates=1`)}>
+                <BookmarkIcon /> Шаги из шаблона
+              </DropdownMenuItem>
+            )}
+            {task.subtasks.length > 0 && !task.recurrence && (
+              <DropdownMenuItem onSelect={() => setSaveTemplate(true)}>
+                <BookmarkPlusIcon /> Сохранить шаги как шаблон
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
               <Trash2Icon /> Удалить задание
             </DropdownMenuItem>
@@ -310,11 +372,37 @@ export function TaskView({ taskId }: { taskId: string }) {
         </Button>
       </div>
 
-      <Section title="Шаги">
+      <Section
+        title="Шаги"
+        action={
+          // Черновик уже есть (или ждёт ИИ) — второй запрос в очередь не ставим
+          canBreak &&
+          !draftJob && (
+            <Button size="sm" variant="outline" asChild>
+              <Link to={`/tasks/${task.id}/breakdown`}>
+                <SparklesIcon /> {task.subtasks.length ? 'Разбить заново' : 'Разбить с ИИ'}
+              </Link>
+            </Button>
+          )
+        }
+      >
+        {draftJob && canBreak && <DraftBanner taskId={task.id} job={draftJob} />}
         <SubtaskList task={task} />
       </Section>
 
-      <Section title="Описание">
+      <Section
+        title="Описание"
+        action={
+          canBreak &&
+          hasPhoto && (
+            <Button size="sm" variant="ghost" asChild>
+              <Link to={`/tasks/${task.id}/breakdown?photo=1`}>
+                <ScanTextIcon /> Распознать фото
+              </Link>
+            </Button>
+          )
+        }
+      >
         <Description key={task.description} task={task} onSave={(description) => patch({ description })} />
       </Section>
 
@@ -323,6 +411,15 @@ export function TaskView({ taskId }: { taskId: string }) {
       </Section>
 
       <Meta task={task} patch={patch} />
+
+      <TemplatesDialog
+        open={saveTemplate}
+        onOpenChange={setSaveTemplate}
+        steps={templateSteps}
+        taskType={task.task_type}
+        defaultName={task.title}
+        onApply={(t) => navigate(`/tasks/${task.id}/breakdown?template=${t.id}`)}
+      />
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

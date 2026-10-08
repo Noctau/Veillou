@@ -5,6 +5,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.routing import APIRoute
 
 from app.api import (
+    ai,
     attachments,
     auth,
     backlog,
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     api.include_router(plan.calibration_router)
     api.include_router(attachments.router)
     api.include_router(attachments.files_router)
+    api.include_router(ai.router)
     app.include_router(api)
     return app
 

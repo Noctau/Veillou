@@ -36,4 +36,7 @@ export const queryKeys = {
   plan: ['plan'] as const,
   dayLimits: ['plan', 'day-limits'] as const,
   calibration: ['calibration'] as const,
+  job: (id: string) => ['jobs', id] as const,
+  latestBreakdown: (taskId: string) => ['tasks', 'breakdown', taskId] as const,
+  breakdownTemplates: ['breakdown-templates'] as const,
 }

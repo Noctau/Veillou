@@ -100,8 +100,9 @@ async def test_free_text_to_backlog(tg, session, linked):
     assert ("Изменить", f"qa:edit:b:{item.id.hex}") in buttons(last_markup(tg))
 
 
-async def test_free_text_task_with_deadline(tg, session, linked):
-    [reply] = await tg.send("сдать реферат до 15 окт")
+async def test_add_task_with_deadline(tg, session, linked):
+    """/add — всегда быстрый разбор, без ИИ (свободный текст без предмета ушёл бы в ИИ)."""
+    [reply] = await tg.send("/add сдать реферат до 15 окт")
     assert "Задание" in reply and "до " in reply
     [task] = await active_tasks(session)
     assert task.deadline is not None

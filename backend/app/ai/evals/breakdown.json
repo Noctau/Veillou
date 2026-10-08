@@ -1,0 +1,104 @@
+[
+  {
+    "id": "essay-monsoon",
+    "title": "Реферат «Муссоны Южной Азии»",
+    "task_type": "essay",
+    "subject": "Климатология",
+    "description": "Объём 10–12 страниц, не меньше 5 источников (из них 2 статьи не старше 2015 г.), оформление по ГОСТ 7.32. Сдать в СДО в формате PDF.",
+    "deadline_days": 10,
+    "free_minutes": 1500,
+    "expect": {"steps": [4, 10], "total": [360, 900], "keywords": ["источник", "оформ"]}
+  },
+  {
+    "id": "homework-problems",
+    "title": "ДЗ: задачи 3.1–3.8",
+    "task_type": "homework",
+    "subject": "Физика атмосферы",
+    "description": "Задачник Матвеева, глава 3 (термодинамика атмосферы), задачи 3.1–3.8. Оформить решения в тетради, сфотографировать и прислать.",
+    "deadline_days": 4,
+    "free_minutes": 600,
+    "expect": {"steps": [2, 6], "total": [120, 420], "keywords": ["задач"]}
+  },
+  {
+    "id": "report-elnino",
+    "title": "Доклад про Эль-Ниньо на семинар",
+    "task_type": "report",
+    "subject": "Общая циркуляция атмосферы",
+    "description": "Доклад на 10 минут с презентацией (8–10 слайдов). Механизм явления, индекс ONI, влияние на осадки в Южной Америке.",
+    "deadline_days": 6,
+    "free_minutes": 900,
+    "expect": {"steps": [3, 8], "total": [240, 600], "keywords": ["слайд", "презентац"]}
+  },
+  {
+    "id": "lab-synoptic",
+    "title": "Практикум: анализ синоптической карты",
+    "task_type": "lab",
+    "subject": "Синоптическая метеорология",
+    "description": "Провести изобары через 5 гПа на карте за 12 UTC 03.10, выделить фронты и барические образования, написать краткое описание погоды в Москве.",
+    "deadline_days": 3,
+    "free_minutes": 400,
+    "expect": {"steps": [2, 6], "total": [120, 360], "keywords": ["изобар", "фронт"]}
+  },
+  {
+    "id": "reading-chapter",
+    "title": "Прочитать главы 4–5 Хромова",
+    "task_type": "reading",
+    "subject": "Климатология",
+    "description": "Хромов, Петросянц «Метеорология и климатология», гл. 4–5, составить конспект.",
+    "deadline_days": 5,
+    "free_minutes": 700,
+    "expect": {"steps": [2, 6], "total": [120, 420], "keywords": ["конспект"]}
+  },
+  {
+    "id": "coursework-chapter",
+    "title": "Глава 1 ВКР: обзор литературы",
+    "task_type": "coursework",
+    "subject": null,
+    "project": "ВКР: экстремальные осадки в ЕТР",
+    "description": "Обзор литературы по экстремальным осадкам на Европейской территории России за 1980–2020 гг. 15–20 страниц. Согласовать структуру главы с научным руководителем.",
+    "deadline_days": 21,
+    "free_minutes": 2400,
+    "expect": {"steps": [6, 15], "total": [900, 2400], "keywords": ["научн", "структур"], "people_step": true}
+  },
+  {
+    "id": "exam-prep",
+    "title": "Подготовка к зачёту по статистике",
+    "task_type": "exam_prep",
+    "subject": "Статистические методы в метеорологии",
+    "description": "30 вопросов: корреляция, регрессия, критерии согласия, временные ряды. Зачёт устный.",
+    "deadline_days": 7,
+    "free_minutes": 1200,
+    "expect": {"steps": [4, 12], "total": [480, 1200], "keywords": ["вопрос"]}
+  },
+  {
+    "id": "tight-deadline",
+    "title": "Эссе по философии",
+    "task_type": "essay",
+    "subject": "Философия",
+    "description": "Эссе 5 страниц на тему «Свобода и ответственность».",
+    "deadline_days": 1,
+    "free_minutes": 90,
+    "expect": {"steps": [2, 6], "total": [180, 480], "warning": true}
+  },
+  {
+    "id": "work-task",
+    "title": "Обработать данные станций за 2023 год",
+    "task_type": "other",
+    "subject": null,
+    "project": "ВКР: экстремальные осадки в ЕТР",
+    "description": "Скачать суточные осадки по 40 станциям ЕТР с сайта ВНИИГМИ-МЦД, проверить пропуски, посчитать 95-й процентиль, прислать таблицу руководителю.",
+    "deadline_days": 14,
+    "free_minutes": 2000,
+    "expect": {"steps": [3, 10], "total": [240, 1200], "keywords": ["пропуск", "процентил"], "people_step": true}
+  },
+  {
+    "id": "vague",
+    "title": "Сделать что-то по гидрологии",
+    "task_type": "other",
+    "subject": "Гидрология",
+    "description": "",
+    "deadline_days": 5,
+    "free_minutes": 600,
+    "expect": {"steps": [1, 6]}
+  }
+]

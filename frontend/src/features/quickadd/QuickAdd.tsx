@@ -9,6 +9,7 @@ import {
   ListTodoIcon,
   NotebookPenIcon,
   SendIcon,
+  SparklesIcon,
   XIcon,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -35,11 +36,12 @@ import { errorMessage } from '@/lib/errors'
 import { compressImage } from '@/lib/image'
 import { SHARE_PARAM } from '@/lib/pwa-shared'
 import { queryKeys } from '@/lib/queryKeys'
-import { formatDay, wallToUtc } from '@/lib/time'
+import { formatDay, wallDate, wallToUtc } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
+import { type AiCardResult, AiParseCard } from './AiParseCard'
 import { SharedFiles } from './SharedFiles'
-import { type QuickParse, useParseNow, useQuickParse } from './useQuickParse'
+import { type QuickParse, useAiParse, useParseNow, useQuickParse } from './useQuickParse'
 import { useShare } from './useShare'
 
 type Kind = 'task' | 'backlog' | 'event' | 'note'
@@ -54,6 +56,11 @@ const KINDS: { value: Kind; label: string; icon: typeof InboxIcon }[] = [
 const DEFAULT_EVENT_MIN = 60
 /** С файлами (из «Поделиться») можно создать только задание или конспект. */
 const FILE_KINDS: Kind[] = ['task', 'note']
+/** Название задания из фото без подписи — распознавание заменит его (как на сервере). */
+const PHOTO_TITLE = 'Задание с фото'
+
+/** Неуверенный ввод ушёл в ИИ: быстрый разбор держим на случай «создать как есть». */
+type AiPending = { jobId: string; raw: string; p: QuickParse; day: string | null; subjectId: string | null }
 
 type Saved = { id: string; kind: Kind; title: string; link?: string }
 
@@ -95,8 +102,12 @@ export function QuickAdd() {
   const [saved, setSaved] = useState<Saved[]>([])
   const [workTask, setWorkTask] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [skipAi, setSkipAi] = useState(false)
+  const [ai, setAi] = useState<AiPending | null>(null)
+  const aiParse = useAiParse()
   const share = useShare(params.get(SHARE_PARAM), setText)
   const hasFiles = share.files.length > 0
+  const onlyImages = hasFiles && share.files.every((f) => f.type.startsWith('image/'))
   const queryClient = useQueryClient()
 
   const { data: parsed } = useQuickParse(text)
@@ -123,6 +134,7 @@ export function QuickAdd() {
     setKindOverride(null)
     setDropSubject(false)
     setDropDate(false)
+    setSkipAi(false)
   }
 
   const remember = (item: Saved) => setSaved((old) => [item, ...old].slice(0, 5))
@@ -130,7 +142,8 @@ export function QuickAdd() {
   /** Задание или конспект с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
   const saveWithFiles = async () => {
     const raw = text.trim()
-    if (kind === 'task' && !raw) {
+    const allImages = share.files.every((f) => f.type.startsWith('image/'))
+    if (kind === 'task' && !raw && !allImages) {
       toast.error('Напишите, что за задание')
       return
     }
@@ -142,7 +155,7 @@ export function QuickAdd() {
       const subjectId = dropSubject ? null : (p?.subject_id ?? null)
       if (kind === 'task') {
         const t = await createTask.mutateAsync({
-          title: p?.title || raw,
+          title: p?.title || raw || PHOTO_TITLE,
           task_type: p?.task_type ?? 'other',
           description: '',
           subject_id: subjectId,
@@ -151,9 +164,9 @@ export function QuickAdd() {
           priority: 'normal',
           subtasks: [],
         })
-        owner = { type: 'task', id: t.id, link: `/tasks/${t.id}` }
+        // Фото задания — сразу распознать и разбить на шаги
+        owner = { type: 'task', id: t.id, link: allImages ? `/tasks/${t.id}/breakdown?photo=1` : `/tasks/${t.id}` }
       } else {
-        const allImages = share.files.every((f) => f.type.startsWith('image/'))
         const n = await createNote.mutateAsync({
           title: p?.title || raw || null,
           kind: allImages ? 'photo' : 'file',
@@ -234,7 +247,22 @@ export function QuickAdd() {
       return
     }
 
+    if (p.needs_ai && !skipAi) {
+      reset()
+      aiParse.mutate(raw, {
+        onSuccess: (jobId) => setAi({ jobId, raw, p, day, subjectId }),
+        onError: restore,
+      })
+      return
+    }
+
     reset()
+    createPlainTask(raw, p, day, subjectId)
+  }
+
+  /** Задание по быстрому разбору (без ИИ). */
+  const createPlainTask = (raw: string, p: QuickParse, day: string | null, subjectId: string | null) => {
+    const title = p.title || raw
     createTask.mutate(
       {
         title,
@@ -248,14 +276,52 @@ export function QuickAdd() {
       },
       {
         onSuccess: (t) => {
-          remember({ id: t.id, kind, title, link: `/tasks/${t.id}` })
+          remember({ id: t.id, kind: 'task', title, link: `/tasks/${t.id}` })
           toast.success('Задание добавлено', {
             action: { label: 'Открыть', onClick: () => navigate(`/tasks/${t.id}`) },
           })
         },
-        onError: restore,
+        onError: () => setText(raw),
       },
     )
+  }
+
+  /** Карточка ИИ подтверждена. */
+  const createFromAi = async (card: AiCardResult, breakDown: boolean) => {
+    if (card.kind === 'backlog') {
+      setAi(null)
+      createBacklog.mutate({
+        title: card.title,
+        note: card.description.slice(0, 2000),
+        desired_by: card.deadline ? wallDate(card.deadline, tz) : null,
+        action_type_id: card.action_type_id,
+      })
+      remember({ id: crypto.randomUUID(), kind: 'backlog', title: card.title, link: '/inbox' })
+      return
+    }
+    try {
+      const t = await createTask.mutateAsync({
+        title: card.title,
+        task_type: card.task_type,
+        description: card.description,
+        subject_id: card.subject_id,
+        action_type_id: card.action_type_id,
+        deadline: card.deadline,
+        priority: 'normal',
+        subtasks: [],
+      })
+      setAi(null)
+      if (breakDown) {
+        navigate(`/tasks/${t.id}/breakdown`)
+        return
+      }
+      remember({ id: t.id, kind: 'task', title: card.title, link: `/tasks/${t.id}` })
+      toast.success('Задание добавлено', {
+        action: { label: 'Открыть', onClick: () => navigate(`/tasks/${t.id}`) },
+      })
+    } catch {
+      // Ошибку уже показал хук мутации; карточка остаётся
+    }
   }
 
   const dateChip = () => {
@@ -310,9 +376,9 @@ export function QuickAdd() {
               size="icon"
               className="size-11 shrink-0"
               aria-label="Добавить"
-              disabled={uploading || needsTime || (!text.trim() && !(hasFiles && kind === 'note'))}
+              disabled={uploading || aiParse.isPending || needsTime || (!text.trim() && !(hasFiles && (kind === 'note' || onlyImages)))}
             >
-              {uploading ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
+              {uploading || aiParse.isPending ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
             </Button>
           </form>
 
@@ -367,10 +433,36 @@ export function QuickAdd() {
                 )}
               </div>
               {needsTime && <p className="text-xs text-destructive">Для события напишите время: «завтра в 14».</p>}
+              {kind === 'task' && !hasFiles && live.needs_ai && (
+                <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <SparklesIcon className="size-3.5 text-primary" />
+                  {skipAi ? 'Сохраню как есть, без ИИ.' : 'ИИ уточнит предмет, тип и срок — вы проверите.'}
+                  <button type="button" className="underline underline-offset-4" onClick={() => setSkipAi((v) => !v)}>
+                    {skipAi ? 'с ИИ' : 'без ИИ'}
+                  </button>
+                </p>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {ai && (
+        <AiParseCard
+          key={ai.jobId}
+          jobId={ai.jobId}
+          busy={createTask.isPending}
+          onCreate={(card, breakDown) => void createFromAi(card, breakDown)}
+          onPlain={() => {
+            createPlainTask(ai.raw, ai.p, ai.day, ai.subjectId)
+            setAi(null)
+          }}
+          onClose={() => {
+            setText(ai.raw)
+            setAi(null)
+          }}
+        />
+      )}
 
       <Button variant="outline" size="sm" className="self-start" onClick={() => setWorkTask(true)}>
         <BriefcaseIcon /> Задание с работы

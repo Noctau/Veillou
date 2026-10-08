@@ -6,17 +6,15 @@ from fastapi import APIRouter, Depends, status
 
 from app.api.deps import CurrentUser, SessionDep
 from app.domain.enums import PlanReason
-from app.models import PlanRevision
 from app.schemas.plan import (
     CalibrationRead,
-    PlanRevisionRead,
     PlanState,
     PlanUndoResult,
     StudyDayLimitPut,
     StudyDayLimitRead,
 )
 from app.services import calibration
-from app.services.replan import ReplanService
+from app.services.replan import ReplanService, plan_state, revision_read
 from app.services.study_limits import StudyLimitService
 
 
@@ -30,33 +28,10 @@ router = APIRouter(prefix="/plan", tags=["plan"])
 calibration_router = APIRouter(prefix="/calibration", tags=["plan"])
 
 
-def revision_read(rev: PlanRevision | None) -> PlanRevisionRead | None:
-    if rev is None:
-        return None
-    read = PlanRevisionRead.model_validate(rev)
-    for change in read.changes:
-        if change.op == "move":
-            read.moved += 1
-        elif change.op == "add":
-            read.added += 1
-        elif change.op == "remove":
-            read.removed += 1
-        else:
-            read.missed += 1
-    return read
-
-
-async def _state(svc: ReplanService) -> PlanState:
-    return PlanState(
-        proposal=revision_read(await svc.proposal()),
-        undoable=revision_read(await svc.undoable()),
-    )
-
-
 @router.get("")
 async def read_plan_state(svc: Service) -> PlanState:
     """Ожидающее превью (после триггеров его считает воркер) и что можно откатить."""
-    return await _state(svc)
+    return await plan_state(svc)
 
 
 @router.post("/preview")
@@ -64,7 +39,7 @@ async def preview_plan(svc: Service, reason: PlanReason = PlanReason.manual) -> 
     """Перепланировать сейчас. Ничего не меняет — только превью; пустое, если
     менять нечего. Показывает и превью, которое раньше отклонили."""
     await svc.preview([reason], force=True)
-    return await _state(svc)
+    return await plan_state(svc)
 
 
 @router.post("/revisions/{revision_id}/apply")
@@ -72,14 +47,14 @@ async def apply_plan(revision_id: uuid.UUID, svc: Service) -> PlanState:
     """Применить превью. 409 plan_stale — план успел измениться: новое превью уже
     посчитано (GET /plan)."""
     await svc.apply(revision_id)
-    return await _state(svc)
+    return await plan_state(svc)
 
 
 @router.post("/revisions/{revision_id}/dismiss")
 async def dismiss_plan(revision_id: uuid.UUID, svc: Service) -> PlanState:
     """«Отменить» в шторке: превью отклонено, план не меняется."""
     await svc.dismiss(revision_id)
-    return await _state(svc)
+    return await plan_state(svc)
 
 
 @router.post("/undo")

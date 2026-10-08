@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.domain.enums import ActionTypeKey, TaskType
 from app.domain.quickparse import KindHint
@@ -10,7 +10,7 @@ from app.schemas.common import InputModel, UTCMoment, WallTime
 
 
 class QuickParseRequest(InputModel):
-    text: Annotated[str, StringConstraints(max_length=500)]
+    text: Annotated[str, StringConstraints(max_length=6000)]
 
 
 class QuickParseRead(BaseModel):
@@ -27,3 +27,4 @@ class QuickParseRead(BaseModel):
     task_type: TaskType | None
     action_type: ActionTypeKey | None
     kind_hint: KindHint
+    needs_ai: bool = Field(description="Разбор неуверенный — стоит спросить ИИ")

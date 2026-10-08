@@ -32,6 +32,8 @@ async def test_parse_with_user_subjects(auth_client, frozen):
         "task_type": "essay",
         "action_type": "study",
         "kind_hint": "task",
+        # Есть и срок, и предмет — ИИ не нужен
+        "needs_ai": False,
     }
 
 

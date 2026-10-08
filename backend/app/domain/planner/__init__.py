@@ -4,6 +4,7 @@ CP-SAT на сетке 15 минут с жадным fallback. Подробно�
 grid (доступность), cpsat (модель), greedy (fallback), check (инварианты).
 """
 
+from app.domain.planner.capacity import free_minutes
 from app.domain.planner.contracts import (
     AtRisk,
     Block,
@@ -40,5 +41,6 @@ __all__ = [
     "TimeRange",
     "Window",
     "available_slots",
+    "free_minutes",
     "solve",
 ]

@@ -59,6 +59,33 @@ class Settings(BaseSettings):
     # Как часто воркер проверяет очереди (точность напоминаний — не хуже минуты)
     WORKER_POLL_SEC: float = 10.0
 
+    # ИИ (M10). ollama — нативный /api/chat; openai — любой OpenAI-совместимый API
+    # (base url вида https://…/v1). Модели: текст и картинки (фото задания).
+    LLM_PROVIDER: Literal["ollama", "openai"] = "ollama"
+    LLM_BASE_URL: str = "http://localhost:11434"
+    LLM_API_KEY: SecretStr | None = None
+    LLM_MODEL: str = "qwen3:8b"
+    LLM_VISION_MODEL: str = "qwen2.5vl:7b"
+    LLM_TIMEOUT_SEC: float = 180.0
+    # Подключение — коротко: выключенный домашний компьютер не должен держать запрос
+    LLM_CONNECT_TIMEOUT_SEC: float = 5.0
+    LLM_TEMPERATURE: float = 0.2
+    # Потолок длины ответа: локальные модели с JSON-грамматикой иногда «зацикливаются»
+    LLM_MAX_TOKENS: int = 2048
+    # Запасной провайдер: если основной недоступен или ответил не по схеме.
+    # Пусто — без запасного. После сбоя основного LLM_PRIMARY_COOLDOWN_SEC сразу в запасной.
+    LLM_FALLBACK_PROVIDER: Literal["ollama", "openai"] | None = None
+    LLM_FALLBACK_BASE_URL: str = ""
+    LLM_FALLBACK_API_KEY: SecretStr | None = None
+    LLM_FALLBACK_MODEL: str = ""
+    LLM_FALLBACK_VISION_MODEL: str = ""  # пусто — та же модель
+    LLM_PRIMARY_COOLDOWN_SEC: float = 300.0
+    # Ни один провайдер не отвечает — запросы ждут в очереди и выполняются по одному,
+    # когда ИИ появится. Дольше этого ожидание бессмысленно — запрос отменяется.
+    LLM_QUEUE_MAX_HOURS: float = 72.0
+    # Хранить ai_log столько дней
+    AI_LOG_KEEP_DAYS: int = 90
+
     @field_validator("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_USERNAME", mode="before")
     @classmethod
     def _empty_is_none(cls, value: Any) -> Any:
@@ -67,7 +94,15 @@ class Settings(BaseSettings):
             value = value.strip().removeprefix("@")
         return value or None
 
-    @field_validator("APP_URL", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", mode="before")
+    @field_validator(
+        "APP_URL",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "LLM_API_KEY",
+        "LLM_FALLBACK_PROVIDER",
+        "LLM_FALLBACK_API_KEY",
+        mode="before",
+    )
     @classmethod
     def _blank_is_none(cls, value: Any) -> Any:
         if isinstance(value, str):

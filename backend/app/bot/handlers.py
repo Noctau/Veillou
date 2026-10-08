@@ -2,30 +2,44 @@
 
 - /today, /week — план на сегодня и неделю;
 - /add <текст> и любой текст без команды — задание / дело в ящик / событие по
-  разбору quickparse, с кнопкой «Изменить» (сменить тип или удалить);
+  разбору quickparse, с кнопкой «Изменить» (сменить тип или удалить); если разбор
+  неуверенный (длинный текст, задание без срока или предмета) — сначала ИИ (bot/ai.py);
+- фото — задание с фото: ИИ распознаёт текст, срок и предмет;
 - кнопки на напоминаниях: «Сделано», «+15 мин», «На завтра».
 """
 
-from aiogram import F, Router
+import io
+
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.datastructures import Headers
 
-from app.bot import cards
+from app.bot import ai, cards
 from app.core.exceptions import AppError
+from app.core.storage import get_storage
 from app.core.time import get_tz, now_utc
+from app.domain.enums import AIOrigin, AttachmentOwner
+from app.domain.quickparse import needs_ai
 from app.models import User
+from app.schemas.task import TaskCreate
 from app.services import quickadd, reminder_actions, telegram
+from app.services.ai_parse import PHOTO_TITLE, AIParseService
+from app.services.attachments import AttachmentService
 from app.services.digest import Digest
+from app.services.tasks import TaskService
 
 HELP = (
     "Пишите мне что угодно — я разберу и сохраню:\n"
     "• «реферат климатология до 15 окт» — задание с дедлайном\n"
     "• «записаться к стоматологу» — дело в долгий ящик\n"
-    "• «кино в пт в 19» — событие в календаре\n\n"
+    "• «кино в пт в 19» — событие в календаре\n"
+    "• текст задания целиком или фото доски — разберу с ИИ и предложу разбить на шаги\n\n"
     "/today — план на сегодня\n"
     "/week — план на неделю\n"
-    "/add <текст> — то же, что просто написать\n\n"
+    "/add <текст> — быстро, без ИИ\n\n"
     "Напоминания и утренняя сводка тоже приходят сюда."
 )
 
@@ -88,7 +102,46 @@ async def free_text(message: Message, db: AsyncSession, user: User) -> None:
     if not text or not text.strip():
         await message.answer(HELP)
         return
+    if needs_ai(text, await quickadd.parse_text(db, user, text[:500])):
+        await ai.start_text(message, db, user, text)
+        return
     await _create(message, db, user, text)
+
+
+async def download(bot: Bot, file_id: str) -> bytes:
+    buf = io.BytesIO()
+    await bot.download(file_id, destination=buf)
+    return buf.getvalue()
+
+
+async def photo(message: Message, db: AsyncSession, user: User, bot: Bot) -> None:
+    """Фото (или картинка файлом) — задание с этим фото; ИИ распознаёт текст и срок."""
+    if message.photo:
+        file_id, mime, name = message.photo[-1].file_id, "image/jpeg", "photo.jpg"
+    else:
+        assert message.document is not None
+        doc = message.document
+        file_id, mime, name = doc.file_id, doc.mime_type or "image/jpeg", doc.file_name
+    caption = (message.caption or "").strip()
+    parsed = await quickadd.parse_text(db, user, caption[:500]) if caption else None
+    data = await download(bot, file_id)
+    task = await TaskService(db, user).create(
+        TaskCreate(
+            title=(parsed.title if parsed and parsed.title else caption)[:300] or PHOTO_TITLE,
+            deadline=parsed.deadline if parsed and parsed.date else None,
+        )
+    )
+    upload = UploadFile(
+        io.BytesIO(data), filename=name or "photo.jpg", headers=Headers({"content-type": mime})
+    )
+    await AttachmentService(db, user, get_storage()).upload(AttachmentOwner.task, task.id, upload)
+    placeholder = await message.reply("📷 Распознаю фото…")
+    await AIParseService(db, user).start_photo(
+        task.id,
+        origin=AIOrigin.telegram,
+        chat_id=message.chat.id,
+        message_id=placeholder.message_id,
+    )
 
 
 # ---------- кнопки карточки «Создано» ----------
@@ -196,7 +249,10 @@ def create_router() -> Router:
     router.message.register(week, Command("week"))
     router.message.register(add, Command("add"))
     router.message.register(help_, F.text.startswith("/"))  # неизвестная команда
+    router.message.register(photo, F.photo)
+    router.message.register(photo, F.document.mime_type.startswith("image/"))
     router.message.register(free_text)
     router.callback_query.register(quick_add_callback, F.data.startswith(cards.QA_PREFIX))
     router.callback_query.register(reminder_callback, F.data.startswith(cards.RA_PREFIX))
+    router.callback_query.register(ai.ai_callback, F.data.startswith(ai.AI_PREFIX))
     return router

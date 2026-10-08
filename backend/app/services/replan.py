@@ -70,6 +70,7 @@ from app.models import (
     Task,
     User,
 )
+from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
 from app.services.calibration import DEFAULT_ACTION, coefficients
 from app.services.settings import effective_settings
@@ -829,3 +830,29 @@ async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
         finally:
             db.info.pop(SKIP_REPLAN, None)
     return len(users)
+
+
+# ---------- ответ API ----------
+
+
+def revision_read(rev: PlanRevision | None) -> PlanRevisionRead | None:
+    if rev is None:
+        return None
+    read = PlanRevisionRead.model_validate(rev)
+    for change in read.changes:
+        if change.op == "move":
+            read.moved += 1
+        elif change.op == "add":
+            read.added += 1
+        elif change.op == "remove":
+            read.removed += 1
+        else:
+            read.missed += 1
+    return read
+
+
+async def plan_state(svc: ReplanService) -> PlanState:
+    return PlanState(
+        proposal=revision_read(await svc.proposal()),
+        undoable=revision_read(await svc.undoable()),
+    )

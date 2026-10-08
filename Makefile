@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install vapid-keys \
+.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install vapid-keys ai-evals \
 	deploy prod-ps prod-logs prod-create-user prod-backup prod-restore backup-pull
 
 COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env
@@ -55,6 +55,10 @@ bot:
 
 worker:
 	$(BACK) python -m app.worker
+
+# Эталонные задания для промптов ИИ: make ai-evals [a="breakdown --only essay-monsoon"]
+ai-evals:
+	$(BACK) python -m app.ai.evals $(a)
 
 # Ключи Web Push -> скопировать в .env
 vapid-keys:
