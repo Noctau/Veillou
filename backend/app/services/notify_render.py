@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import day_bounds_utc, get_tz, local_date
 from app.domain.enums import (
+    ClassType,
     EventKind,
     EventStatus,
     ReminderAction,
@@ -66,7 +67,7 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
     else:
         when = f"В {e.start.astimezone(tz):%H:%M}"
 
-    kind = CLASS_TYPE_SHORT.get(e.class_type) if e.class_type else None  # type: ignore[call-overload]
+    kind = CLASS_TYPE_SHORT.get(ClassType(e.class_type)) if e.class_type else None
     where = f"ауд. {e.location}" if e.location else None
     head = " · ".join(p for p in (fmt_range(e.start, e.end, tz), kind, where) if p)
     info = lines(head, f"Преподаватель: {e.teacher}" if e.teacher else None)
@@ -117,9 +118,8 @@ def _deadline_title(days_before: int) -> str:
 
 async def _deadline(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
     t = await _task(db, r)
-    if t is None:
+    if t is None or t.deadline is None:  # срок сняли — напоминание устарело
         return None
-    assert t.deadline is not None
     tz = get_tz(user.timezone)
     today = local_date(now, tz)
     days_before = (local_date(t.deadline, tz) - today).days

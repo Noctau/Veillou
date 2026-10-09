@@ -174,7 +174,7 @@ async def latest_milestones(project_id: uuid.UUID, svc: ProjectAI) -> JobRead | 
 @router.post("/projects/{project_id}/milestones/suggest/{job_id}/dismiss", status_code=NO_CONTENT)
 async def dismiss_milestones(project_id: uuid.UUID, job_id: uuid.UUID, svc: ProjectAI) -> None:
     """«Отмена» на экране проверки — черновик больше не предлагается."""
-    await svc.dismiss(job_id)
+    await svc.dismiss(project_id, job_id)
 
 
 @router.post("/projects/{project_id}/milestones/bulk")

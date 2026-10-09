@@ -11,7 +11,7 @@
 import uuid
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
@@ -45,7 +45,7 @@ class ReviewService:
             d + timedelta(days=1), time(0), self.tz
         )
 
-    def _flexible(self, start: datetime, end: datetime):
+    def _flexible(self, start: datetime, end: datetime) -> Select[Event]:
         return select(Event).where(
             Event.user_id == self.user_id,
             Event.deleted_at.is_(None),
@@ -154,7 +154,7 @@ class ReviewService:
             per_week=per_week,
             stats=await self.week_stats(stats_week),
             planned=[BacklogRead.model_validate(i) for i in planned],
-            suggestions=[BacklogRead.model_validate(by_id[c.id]) for c in picked],  # type: ignore[index]
+            suggestions=[BacklogRead.model_validate(by_id[c.id]) for c in picked],
         )
 
     async def confirm_week(self, item_ids: list[uuid.UUID]) -> PlanRevision | None:

@@ -14,7 +14,7 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import Connection, delete, or_, select, text
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import Insert, insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.time import now_utc
@@ -32,6 +32,7 @@ REMINDERS_DEBOUNCE = timedelta(seconds=3)
 PLAN_DEBOUNCE = timedelta(seconds=5)
 
 Handler = Callable[[AsyncSession, Job], Awaitable[None]]
+CRASHED_MESSAGE = "Не получилось — попробуйте ещё раз"
 
 
 class JobOutcome(StrEnum):
@@ -77,7 +78,7 @@ def _insert(
     run_at: datetime,
     dedupe_key: str | None,
     max_attempts: int = 3,
-) -> Any:
+) -> Insert:
     return (
         insert(Job)
         .values(
@@ -192,7 +193,19 @@ async def _claim(
     if exclude:
         stmt = stmt.where(Job.kind.not_in(list(exclude)))
     order = [Job.created_at, Job.id] if fifo else [Job.run_at]
-    job = await db.scalar(stmt.order_by(*order).limit(1).with_for_update(skip_locked=True))
+    stmt = stmt.order_by(*order).limit(1).with_for_update(skip_locked=True)
+    job = await db.scalar(stmt)
+    # «running» с истёкшей арендой и без попыток: воркер падал на ней каждый раз
+    # (например, OOM) — больше не берём, иначе она крутилась бы вечно
+    while job is not None and job.status == JobStatus.running and job.attempts >= job.max_attempts:
+        log.error("Джоба %s (%s) роняла воркер %d раз — failed", job.id, job.kind, job.attempts)
+        job.status = JobStatus.failed
+        job.locked_until = None
+        job.finished_at = now
+        job.last_error = "Воркер падал во время выполнения"
+        job.result = {**(job.result or {}), "error": CRASHED_MESSAGE}
+        await db.commit()
+        job = await db.scalar(stmt)
     if job is None:
         return None
     job.status = JobStatus.running

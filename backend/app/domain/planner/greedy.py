@@ -11,6 +11,8 @@
 """
 
 from collections import defaultdict
+from collections.abc import Set as AbstractSet
+from typing import Any
 
 from app.domain.planner.contracts import BlockId
 from app.domain.planner.cpsat import Solution, effective_priority
@@ -44,7 +46,9 @@ class _State:
         self._reserve_rest(prep.evenings, prep.evenings_required)
         self._reserve_rest(prep.halves, prep.halves_required)
 
-    def _reserve_rest(self, windows: list[RestWindow], required: dict) -> None:
+    def _reserve_rest(
+        self, windows: list[RestWindow], required: dict[tuple[int, int], int]
+    ) -> None:
         by_week: dict[tuple[int, int], list[RestWindow]] = defaultdict(list)
         for w in windows:
             by_week[w.week].append(w)
@@ -52,7 +56,9 @@ class _State:
             for w in sorted(ws, key=lambda w: -w.lo)[: required.get(week, 0)]:
                 self.rest[w.lo : w.hi] = b"\x01" * (w.hi - w.lo)
 
-    def blocker(self, pb: PreparedBlock, s: int, length: int, days_used: set[int]) -> int | None:
+    def blocker(
+        self, pb: PreparedBlock, s: int, length: int, days_used: AbstractSet[int]
+    ) -> int | None:
         """None — часть [s, s+length) можно ставить; иначе — следующий старт для проверки."""
         prep = self.prep
         pad = prep.pad_for(length)
@@ -80,7 +86,7 @@ class _State:
         length: int,
         lower: int,
         end_limit: int,
-        days_used: set[int] = frozenset(),  # type: ignore[assignment]
+        days_used: AbstractSet[int] = frozenset(),
     ) -> int | None:
         for lo, hi in pb.free:
             hi = min(hi, end_limit)
@@ -167,7 +173,7 @@ def _short(tagged: dict[tuple[BlockId, int], int], quota: PreparedQuota) -> int:
     return quota.need - sum(tagged.get((quota.tag, d), 0) for d in quota.days)
 
 
-def _order_key(pb: PreparedBlock) -> tuple:
+def _order_key(pb: PreparedBlock) -> tuple[Any, ...]:
     due = pb.due if pb.due is not None else pb.latest_end
     narrow = sum(hi - lo for lo, hi in pb.free)
     seq = pb.block.sequence if pb.block.sequence is not None else 0

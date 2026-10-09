@@ -382,7 +382,8 @@ async def test_sync_job_runs_through_queue(auth_client, session, user):
     job = await session.scalar(
         select(Job).where(Job.user_id == user.id, Job.kind == JobKind.reminders_sync)
     )
-    assert job is not None and job.status == JobStatus.done
+    assert job is not None
+    assert job.status == JobStatus.done
 
 
 async def test_failing_job_is_retried(session, user):
@@ -394,7 +395,8 @@ async def test_failing_job_is_retried(session, user):
 
     assert await jobs.run_one(session_factory, {"boom": boom})
     job = await session.scalar(select(Job).where(Job.kind == "boom"))
-    assert job.status == JobStatus.pending and job.attempts == 1
+    assert job.status == JobStatus.pending
+    assert job.attempts == 1
     assert job.run_at > now_utc()
     assert "nope" in job.last_error
 
@@ -483,7 +485,8 @@ async def test_push_action_snooze_creates_reminder(session, user):
     snoozed = await session.scalar(
         select(Reminder).where(Reminder.dedupe_key.startswith(f"{r.dedupe_key}:snooze:"))
     )
-    assert snoozed is not None and not snoozed.is_auto
+    assert snoozed is not None
+    assert not snoozed.is_auto
     assert snoozed.fire_at >= now_utc() + timedelta(minutes=14)
 
 
@@ -609,7 +612,8 @@ async def test_morning_digest_with_deadline_goes_to_both_channels(auth_client, s
     msg = tg.sent[0]
     assert msg.title.startswith("Доброе утро!")
     html = msg.telegram_html()
-    assert "Не забыть" in html and "Дедлайн через 3 дня: Реферат" in html
+    assert "Не забыть" in html
+    assert "Дедлайн через 3 дня: Реферат" in html
     assert "Климатология (лекция)" not in html  # тип пары не задан
     assert "10:45–12:20 Климатология · ауд. 1234" in html
 
@@ -617,3 +621,27 @@ async def test_morning_digest_with_deadline_goes_to_both_channels(auth_client, s
     await dispatch_due(session_factory, notifier(push=push, telegram=tg), now=tomorrow_at(10, 30))
     assert push.sent[-1].title == "Через 15 мин: Климатология"
     assert tg.sent[-1].title == "Через 15 мин: Климатология"
+
+
+async def test_unsupported_action_is_rejected(client, session, user):
+    """I-07: «Взять на неделю» на дедлайне не превращается молча в «на завтра»."""
+    from app.schemas.task import TaskCreate
+    from app.services.tasks import TaskService
+
+    token = "u" * 40
+    task = await TaskService(session, user).create(
+        TaskCreate(title="Реферат", deadline=now_utc() + timedelta(days=2))
+    )
+    await add_reminder(
+        session,
+        user,
+        kind=ReminderKind.deadline,
+        entity_type="task",
+        entity_id=task.id,
+        action_token_hash=hash_token(token),
+    )
+    resp = await client.post(
+        f"{API}/notifications/action", json={"token": token, "action": "accept"}
+    )
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "reminder_action_failed"

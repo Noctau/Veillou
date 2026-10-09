@@ -9,7 +9,14 @@ from pydantic import Field, StringConstraints, field_validator, model_validator
 from app.domain.enums import EventStatus, Feel, Priority, SubtaskStatus, TaskStatus, TaskType
 from app.domain.recurrence import parse_rrule
 from app.schemas.catalog import TimeWindow, Windows
-from app.schemas.common import InputModel, Moment, ReadModel, UTCMoment
+from app.schemas.common import (
+    MAX_BLOCK_DURATION,
+    InputModel,
+    Moment,
+    ReadModel,
+    SaneDate,
+    UTCMoment,
+)
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 Description = Annotated[str, StringConstraints(max_length=20_000)]
@@ -71,6 +78,8 @@ class SubtaskSchedule(InputModel):
     def _check(self) -> Self:
         if self.end is not None and self.end <= self.start:
             raise ValueError("Конец должен быть позже начала")
+        if self.end is not None and self.end - self.start > MAX_BLOCK_DURATION:
+            raise ValueError("Блок — не дольше суток")
         return self
 
 
@@ -118,13 +127,13 @@ class TaskCreate(InputModel):
     deadline: Moment | None = None
     priority: Priority = Priority.normal
     estimate_min: TaskEstimate | None = None
-    issued_at: date | None = None
+    issued_at: SaneDate | None = None
     project_id: uuid.UUID | None = None
     milestone_id: uuid.UUID | None = Field(default=None, description="Проект берётся из этапа")
     recurrence: RRule | None = Field(
         default=None, description="Регулярное задание: вхождения станут подзадачами с датой"
     )
-    recurrence_start: date | None = Field(default=None, description="null — с сегодня")
+    recurrence_start: SaneDate | None = Field(default=None, description="null — с сегодня")
     subtasks: list[SubtaskCreate] = Field(default_factory=list, max_length=50)
 
     _rrule = field_validator("recurrence")(_check_rrule)
@@ -143,11 +152,11 @@ class TaskUpdate(InputModel):
     status: TaskStatus | None = None
     estimate_min: TaskEstimate | None = None
     deadline_buffer_days: BufferDays | None = None
-    issued_at: date | None = None
+    issued_at: SaneDate | None = None
     project_id: uuid.UUID | None = None
     milestone_id: uuid.UUID | None = None
     recurrence: RRule | None = None
-    recurrence_start: date | None = None
+    recurrence_start: SaneDate | None = None
 
     _rrule = field_validator("recurrence")(_check_rrule)
 
@@ -157,7 +166,7 @@ class WorkTaskCreate(InputModel):
 
     title: Title
     description: Description = ""
-    issued_at: date | None = Field(default=None, description="null — сегодня")
+    issued_at: SaneDate | None = Field(default=None, description="null — сегодня")
     deadline: Moment | None = Field(default=None, description="null — выдача + 14 дней, 23:59")
     project_id: uuid.UUID | None = Field(
         default=None, description="null — проект «по умолчанию для заданий с работы»"

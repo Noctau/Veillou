@@ -190,6 +190,7 @@ def with_subjects[T: BaseModel](schema: type[T], names: list[str]) -> type[T]:
     fields = {name: (info.annotation, info) for name, info in schema.model_fields.items()}
     fields["subject"] = (subject, Field(description="Предмет из списка или пустая строка"))
     # Порядок полей сохраняем — модель заполняет их по порядку
+    # Модель строится в рантайме: mypy не выводит её тип из **fields
     return create_model(schema.__name__, __base__=_base_of(schema), **fields)  # type: ignore[call-overload,no-any-return]
 
 

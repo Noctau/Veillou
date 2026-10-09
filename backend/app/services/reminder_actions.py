@@ -35,6 +35,14 @@ from app.services.tasks import TaskService
 SNOOZE = timedelta(minutes=15)
 # Сколько живёт токен кнопок пуша после срока напоминания
 TOKEN_TTL = timedelta(days=7)
+# Какие кнопки у какого напоминания (как в notify_render): прочее — 409, а не «на завтра»
+_ITEM = frozenset({ReminderAction.done, ReminderAction.snooze, ReminderAction.tomorrow})
+ALLOWED: dict[ReminderKind, frozenset[ReminderAction]] = {
+    ReminderKind.deadline: _ITEM,
+    ReminderKind.subtask_start: _ITEM,
+    ReminderKind.evening_review: frozenset({ReminderAction.reschedule}),
+    ReminderKind.weekly_review: frozenset({ReminderAction.accept}),
+}
 
 
 class ReminderActionError(AppError):
@@ -102,12 +110,16 @@ def _snooze(db: AsyncSession, user: User, r: Reminder, at: datetime) -> datetime
 async def perform(
     db: AsyncSession, user: User, r: Reminder, action: ReminderAction, now: datetime | None = None
 ) -> ActionResult:
+    """Строку `r` вызывающий берёт `FOR UPDATE`: второе нажатие ждёт первое и видит
+    `action_used_at` — кнопка срабатывает ровно один раз."""
     now = now or now_utc()
     tz = get_tz(user.timezone)
     today = now.astimezone(tz).date()
     if r.action_used_at is not None:
         raise ReminderActionError("Уже сделано")
     kind = ReminderKind(r.kind)
+    if action not in ALLOWED.get(kind, frozenset()):
+        raise ReminderActionError("У этого напоминания нет такого действия")
     tasks = TaskService(db, user)
 
     if kind == ReminderKind.deadline:
@@ -141,9 +153,11 @@ async def perform(
             return ActionResult(f"Напомню {fmt_moment(fire_at, tz, today)}", url)
         if event.status != EventStatus.planned:
             raise ReminderActionError("Блок уже отмечен")
-        day = timedelta(days=1)
-        await tasks.schedule(st.id, SubtaskSchedule(start=event.start + day, end=event.end + day))
-        return ActionResult(f"Перенесено на {fmt_moment(event.start + day, tz, today)}", url)
+        shift = timedelta(days=1)
+        await tasks.schedule(
+            st.id, SubtaskSchedule(start=event.start + shift, end=event.end + shift)
+        )
+        return ActionResult(f"Перенесено на {fmt_moment(event.start + shift, tz, today)}", url)
 
     if kind == ReminderKind.evening_review and action == ReminderAction.reschedule:
         from app.services.review import ReviewService
@@ -180,10 +194,13 @@ async def perform(
 async def perform_by_token(db: AsyncSession, token: str, action: ReminderAction) -> ActionResult:
     """Кнопка пуша: токен одноразовый и живёт `TOKEN_TTL`."""
     r = await db.scalar(
-        select(Reminder).where(
+        select(Reminder)
+        .where(
             Reminder.action_token_hash == hash_token(token),
             Reminder.deleted_at.is_(None),
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     # Срок — от времени отправки, а не создания: напоминания создаются за 8 дней вперёд
     if r is None or r.fire_at < now_utc() - TOKEN_TTL:
@@ -199,11 +216,14 @@ async def perform_by_id(
 ) -> ActionResult:
     """Кнопка в Telegram: пользователь уже известен боту."""
     r = await db.scalar(
-        select(Reminder).where(
+        select(Reminder)
+        .where(
             Reminder.id == reminder_id,
             Reminder.user_id == user.id,
             Reminder.deleted_at.is_(None),
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if r is None:
         raise NotFoundError("Напоминание не найдено")

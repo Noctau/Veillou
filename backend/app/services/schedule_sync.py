@@ -13,6 +13,7 @@ occurrence_date) начиная с сегодняшнего дня (локаль
 Subject, а для личных повторов — RecurringEvent (и ночной докаткой окна).
 """
 
+import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -24,7 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import get_tz, local_date, now_utc
-from app.domain.enums import EventKind, EventStatus, TemplateType
+from app.domain.enums import EventKind, EventStatus, Parity, RuleParity, TemplateType
 from app.domain.recurrence import (
     Bells,
     BellSlot,
@@ -45,6 +46,8 @@ from app.models import (
     User,
 )
 from app.services.jobs import request_reminders_sync
+
+log = logging.getLogger(__name__)
 
 # Личные повторы материализуются на столько дней вперёд (ночная джоба докатывает)
 RECURRING_HORIZON_DAYS = 90
@@ -220,7 +223,8 @@ class SeriesSync:
         Время и поля берутся из шаблона на дату вхождения, статус сбрасывается.
         Если по шаблону в этот день вхождения нет (или шаблон удалён) — событие удаляется.
         """
-        assert event.template_id is not None and event.occurrence_date is not None
+        if event.template_id is None or event.occurrence_date is None:
+            raise ValueError(f"Событие {event.id} не из шаблона")
         day = event.occurrence_date
         window = DateRange(day, day)
         desired: list[Desired] | None = None
@@ -291,7 +295,9 @@ class SeriesSync:
         ):
             return None
 
-        spec = SemesterSpec(semester.start_date, semester.classes_end, semester.first_week_parity)
+        spec = SemesterSpec(
+            semester.start_date, semester.classes_end, Parity(semester.first_week_parity)
+        )
         occurrences = expand_class_rule(
             _rule_spec(rule),
             spec,
@@ -418,7 +424,7 @@ def _rule_spec(rule: ClassRule) -> ClassRuleSpec:
     return ClassRuleSpec(
         key=rule.id,
         weekday=rule.weekday,
-        parity=rule.parity,
+        parity=RuleParity(rule.parity),
         pair_number=rule.pair_number,
         start_time=rule.start_time,
         end_time=rule.end_time,
@@ -429,9 +435,13 @@ def _rule_spec(rule: ClassRule) -> ClassRuleSpec:
 
 async def roll_all_users(db: AsyncSession, *, now: datetime | None = None) -> int:
     """Ночная джоба: докатывает окно личных повторов у всех пользователей."""
-    users = list(await db.scalars(select(User).where(User.deleted_at.is_(None))))
+    users = list(await db.execute(select(User.id, User.timezone).where(User.deleted_at.is_(None))))
     created = 0
-    for user in users:
-        created += await SeriesSync(db, user.id, get_tz(user.timezone), now=now).roll_recurring()
-    await db.commit()
+    for user_id, timezone in users:
+        try:
+            created += await SeriesSync(db, user_id, get_tz(timezone), now=now).roll_recurring()
+            await db.commit()
+        except Exception:
+            log.exception("Докатка повторов пользователя %s упала", user_id)
+            await db.rollback()
     return created

@@ -76,7 +76,8 @@ class NeedsTimeError(AppError):
 
 
 def _event_bounds(p: ParseResult, tz: ZoneInfo) -> tuple[datetime, datetime]:
-    assert p.date is not None and p.time is not None
+    if p.date is None or p.time is None:
+        raise NeedsTimeError()
     start = wall_to_utc(p.date, p.time, tz)
     if p.end_time is not None:
         end = wall_to_utc(p.date, p.end_time, tz)
@@ -129,7 +130,7 @@ async def create_from_text(
             )
         )
         return Created(
-            kind, event.id, title, start=start, end=end, subject=subject and subject.name
+            kind, event.id, title, start=start, end=end, subject=subject.name if subject else None
         )
 
     if kind == KindHint.backlog:
@@ -148,7 +149,9 @@ async def create_from_text(
             deadline=deadline,
         )
     )
-    return Created(kind, task.id, title, deadline=deadline, subject=subject and subject.name)
+    return Created(
+        kind, task.id, title, deadline=deadline, subject=subject.name if subject else None
+    )
 
 
 async def delete_created(db: AsyncSession, user: User, kind: KindHint, id: uuid.UUID) -> None:

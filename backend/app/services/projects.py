@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import time, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
@@ -86,7 +86,7 @@ class ProjectService:
             )
             .group_by(Task.project_id)
         )
-        return {pid: (total, done) for pid, total, done in rows.all()}
+        return {pid: (total, done) for pid, total, done in rows.all() if pid is not None}
 
     async def _week_minutes(self, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
         """Проект → (сделано, сделано + запланировано) минут на этой неделе.
@@ -137,12 +137,15 @@ class ProjectService:
         done: dict[uuid.UUID, int] = defaultdict(int)
         planned: dict[uuid.UUID, int] = defaultdict(int)
         for kind, sid, status, e_start, e_end in rows.all():
+            if sid is None:
+                continue
             if kind == SourceType.project:
-                pid = sid
+                pid: uuid.UUID | None = sid
             elif kind == SourceType.task:
                 pid = task_project.get(sid)
             else:
-                pid = task_project.get(sub_task.get(sid))
+                task_id = sub_task.get(sid)
+                pid = task_project.get(task_id) if task_id else None
             if pid is None:
                 continue
             minutes = round((e_end - e_start).total_seconds() / 60)
@@ -215,7 +218,7 @@ class ProjectService:
             .where(
                 Project.user_id == self.user_id,
                 Project.is_work_default.is_(True),
-                Project.id != keep if keep else True,
+                Project.id != keep if keep else true(),
             )
             .values(is_work_default=False)
         )

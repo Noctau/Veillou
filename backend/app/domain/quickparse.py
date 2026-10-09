@@ -248,7 +248,7 @@ def _word_match(name: str, token: str) -> bool:
         return True
     # Падежи: «климатология» ~ «климатологии»
     stem = name[:-2] if len(name) >= 6 else name[:-1] if len(name) >= 5 else None
-    return bool(stem) and token.startswith(stem) and len(token) - len(stem) <= 4  # type: ignore[arg-type]
+    return stem is not None and token.startswith(stem) and len(token) - len(stem) <= 4
 
 
 def _match_subject(
@@ -381,9 +381,9 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
 
     # «сегодня», «завтра», «послезавтра»
     if day is None:
-        words = {"сегодня": 0, "завтра": 1, "послезавтра": 2}
+        offsets = {"сегодня": 0, "завтра": 1, "послезавтра": 2}
         if m := sc.find(_b(PREP + r"(сегодня|послезавтра|завтра)")):
-            day = today + timedelta(days=words[m[2]])
+            day = today + timedelta(days=offsets[m[2]])
             mark_deadline(m["prep"])
             sc.take(m)
 
@@ -427,26 +427,26 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
         for m in re.finditer(_b(pattern), sc.text):
             if not sc.free(m.start(), m.end()):
                 continue
-            minutes, part, next_word = m[3], m["part"], m["next"] or ""
-            if not (minutes or part or m["hours"]):
-                # Голое «в 5» — время, только если это не счёт («в 5 магазинов»,
-                # «на 2 человека»)
-                if m["prep"] == "на" or re.search(r"(ов|ев|ей|ам|ям|ах|ях|ми)$", next_word):
-                    continue
-            parsed_time = _hour(int(m[2]), int(minutes or 0), part)
+            mins, part, next_word = m[3], m["part"], m["next"] or ""
+            # Голое «в 5» — время, только если это не счёт («в 5 магазинов», «на 2 человека»)
+            bare = not (mins or part or m["hours"])
+            if bare and (m["prep"] == "на" or re.search(r"(ов|ев|ей|ам|ям|ах|ях|ми)$", next_word)):
+                continue
+            parsed_time = _hour(int(m[2]), int(mins or 0), part)
             if parsed_time:
                 at = parsed_time
                 mark_deadline(m["prep"])
                 # Следующее слово — не часть времени, его оставляем в названии
                 sc.taken.append((m.start(), m.start("next") if m["next"] else m.end()))
                 break
-    if at is None:
-        # «14:30», «семинар 14.30» (дата вида 14.10 уже разобрана выше)
-        if m := sc.find(_b(r"(\d{1,2})[:.](\d{2})")):
-            parsed_time = _hour(int(m[1]), int(m[2]), None)
-            if parsed_time:
-                at = parsed_time
-                sc.take(m)
+    # «14:30», «семинар 14.30» (дата вида 14.10 уже разобрана выше)
+    if (
+        at is None
+        and (m := sc.find(_b(r"(\d{1,2})[:.](\d{2})")))
+        and (parsed_time := _hour(int(m[1]), int(m[2]), None))
+    ):
+        at = parsed_time
+        sc.take(m)
 
     if at is None:
         parts = {"утром": time(9, 0), "днем": time(13, 0), "вечером": time(19, 0)}
@@ -464,9 +464,9 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
 
     # Тип задания и предмет — по тексту без дат (в названии остаются)
     task_type: TaskType | None = None
-    for kind, pattern in TASK_TYPES:
+    for candidate, pattern in TASK_TYPES:
         if sc.find(_b(f"(?:{pattern})")):
-            task_type = kind
+            task_type = candidate
             break
     has_study_verb = sc.find(_b(f"(?:{STUDY_VERBS})")) is not None
 
@@ -495,6 +495,7 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
     if action_type is None and (task_type or subject_id is not None or has_study_verb):
         action_type = ActionTypeKey.study
 
+    kind: KindHint
     if at is not None and not is_deadline and task_type is None:
         kind = KindHint.event
     elif task_type or subject_id is not None or is_deadline:

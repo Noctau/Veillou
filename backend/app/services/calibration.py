@@ -61,7 +61,10 @@ async def recalibrate(db: AsyncSession, user_id: uuid.UUID) -> None:
     rows = await _rows(db, user_id)
     history: dict[Key, list[Feel]] = defaultdict(list)
     for task_type, sub_type, task_type_id, feel, done_at in feels.all():
-        key = (task_type, keys.get(sub_type or task_type_id, DEFAULT_ACTION))
+        if feel is None or done_at is None:  # отфильтровано в запросе
+            continue
+        type_id = sub_type or task_type_id
+        key = (task_type, keys.get(type_id, DEFAULT_ACTION) if type_id else DEFAULT_ACTION)
         row = rows.get(key)
         if row is not None and row.reset_at is not None and done_at <= row.reset_at:
             continue

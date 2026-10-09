@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.prompts import ExistingMilestone, MilestonesContext, milestones_messages
 from app.ai.schemas import AIMilestones
 from app.core.config import settings
+from app.core.exceptions import ConflictError, NotFoundError
 from app.core.time import get_tz, local_date, now_utc
 from app.domain.enums import AIPurpose, JobKind, JobStatus, MilestoneStatus, TaskStatus
 from app.domain.projects import RawMilestone, normalize_milestones
@@ -24,7 +25,7 @@ from app.models import Job, Milestone, Project, Task, User
 from app.schemas.ai import MilestonesApply, MilestonesDraft, MilestonesRequest, MilestoneSuggestion
 from app.schemas.project import ProjectDetail
 from app.services import jobs
-from app.services.ai import call_llm
+from app.services.ai import call_llm, enqueue_ai
 from app.services.projects import ProjectService
 
 # Сколько заданий проекта показать ИИ
@@ -61,11 +62,10 @@ class ProjectAIService:
             "comment": data.comment,
             "previous": [m.model_dump(mode="json") for m in data.previous],
         }
-        job_id = await jobs.enqueue(
-            self.db, JobKind.ai_milestones, user_id=self.user_id, payload=payload, max_attempts=1
+        job_id = await enqueue_ai(
+            self.db, JobKind.ai_milestones, user_id=self.user_id, payload=payload
         )
         await self.db.commit()
-        assert job_id is not None
         return job_id
 
     async def context(self, project: Project, request: MilestonesRequest) -> MilestonesContext:
@@ -158,25 +158,40 @@ class ProjectAIService:
             return None
         return job
 
-    async def dismiss(self, job_id: uuid.UUID) -> None:
+    async def dismiss(self, project_id: uuid.UUID, job_id: uuid.UUID) -> None:
         """«Отмена» на экране проверки: черновик больше не предлагается."""
+        await self.projects.projects.get_or_404(project_id)
+        job = await self._draft_job(job_id)
+        if job is None or (job.payload or {}).get("project_id") != str(project_id):
+            raise NotFoundError("Черновик этапов не найден")
         await self._mark_applied(job_id, {"dismissed": True})
         await self.db.commit()
 
-    async def _mark_applied(self, job_id: uuid.UUID, extra: dict[str, Any] | None = None) -> None:
-        job = await self.db.scalar(
-            select(Job).where(
-                Job.id == job_id, Job.user_id == self.user_id, Job.kind == JobKind.ai_milestones
-            )
+    async def _draft_job(self, job_id: uuid.UUID, *, for_update: bool = False) -> Job | None:
+        stmt = select(Job).where(
+            Job.id == job_id, Job.user_id == self.user_id, Job.kind == JobKind.ai_milestones
         )
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        return await self.db.scalar(stmt)
+
+    async def _mark_applied(self, job_id: uuid.UUID, extra: dict[str, Any] | None = None) -> None:
+        job = await self._draft_job(job_id)
         if job is not None and job.result is not None:
             job.result = {**job.result, "applied": True, **(extra or {})}
 
     # ---------- «Сохранить» ----------
 
     async def apply(self, project_id: uuid.UUID, data: MilestonesApply) -> ProjectDetail:
-        """Добавляет этапы к существующим. Коммитит."""
-        await self.projects.projects.get_or_404(project_id)
+        """Добавляет этапы к существующим. Коммитит.
+
+        Черновик (`job_id`) сохраняется один раз: строка джобы блокируется, повтор
+        (двойной клик) получает 409, а не второй комплект этапов."""
+        await self.projects.projects.get_or_404(project_id, for_update=True)
+        if data.job_id is not None:
+            job = await self._draft_job(data.job_id, for_update=True)
+            if job is not None and (job.result or {}).get("applied"):
+                raise ConflictError("Эти этапы уже сохранены", code="already_applied")
         last = await self.db.scalar(
             select(func.max(Milestone.position)).where(
                 Milestone.project_id == project_id, Milestone.deleted_at.is_(None)

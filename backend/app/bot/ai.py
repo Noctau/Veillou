@@ -64,6 +64,8 @@ TASK_TYPE_TITLE = {
     TaskType.exam_prep: "Подготовка к экзамену",
     TaskType.other: "Другое",
 }
+# Сколько названий «под угрозой» перечислять (остальное — «и ещё N»): лимит Telegram
+PLAN_RISK_TITLES = 10
 KIND_TITLE = {KindHint.task: "Задание", KindHint.backlog: "В ящик", KindHint.event: "Событие"}
 
 
@@ -218,8 +220,13 @@ def plan_text(state: PlanState) -> str:
         parts.append(f"убрано: {rev.removed}")
     text = "Превью плана: " + (", ".join(parts) if parts else "без переносов")
     if rev.at_risk:
-        titles = dict.fromkeys(r.group_title for r in rev.at_risk if r.group_kind != "backlog")
-        text += "\n⚠️ Под угрозой: " + html.escape(", ".join(titles))
+        titles = list(
+            dict.fromkeys(r.group_title for r in rev.at_risk if r.group_kind != "backlog")
+        )
+        shown = ", ".join(_snippet(t, 80) for t in titles[:PLAN_RISK_TITLES])
+        if len(titles) > PLAN_RISK_TITLES:
+            shown += f" и ещё {len(titles) - PLAN_RISK_TITLES}"
+        text += "\n⚠️ Под угрозой: " + shown
     return text
 
 
@@ -264,29 +271,27 @@ async def _user(db: AsyncSession, job: Job) -> User:
 def _handler(run: Run, reply: Reply, bot: Bot | None) -> jobs.Handler:
     async def handle(db: AsyncSession, job: Job) -> None:
         user = await _user(db, job)
-        to_chat = bot is not None and job.payload.get("origin") == AIOrigin.telegram
+        # Ответ в чат — только запросам из Telegram и только если бот настроен
+        chat = bot if job.payload.get("origin") == AIOrigin.telegram else None
         # До rollback в обработчике очереди: потом атрибуты джобы истекут
         already_waiting = bool((job.result or {}).get("waiting"))
         created_at = job.created_at
         try:
             result = await run(db, user, job)
         except jobs.JobDeferredError as exc:
-            if to_chat:
-                assert bot is not None
+            if chat is not None:
                 if exc.max_wait is not None and created_at < now_utc() - exc.max_wait:
-                    await _deliver(bot, job, f"🤖 {html.escape(exc.expired_message)}")
+                    await _deliver(chat, job, f"🤖 {html.escape(exc.expired_message)}")
                 elif not already_waiting:
                     # Один раз: «в очереди»; результат потом заменит это сообщение
-                    await _deliver(bot, job, f"🤖 {html.escape(exc.message)}")
+                    await _deliver(chat, job, f"🤖 {html.escape(exc.message)}")
             raise
         except jobs.JobFailedError as exc:
-            if to_chat:
-                assert bot is not None
-                await _deliver(bot, job, f"🤖 {html.escape(exc.message)}")
+            if chat is not None:
+                await _deliver(chat, job, f"🤖 {html.escape(exc.message)}")
             raise
-        if to_chat:
-            assert bot is not None
-            await reply(bot, db, user, job, result)
+        if chat is not None:
+            await reply(chat, db, user, job, result)
 
     return handle
 
@@ -331,8 +336,13 @@ def make_handlers(bot: Bot | None) -> dict[str, jobs.Handler]:
 # ---------- кнопки ----------
 
 
-async def _job(db: AsyncSession, user: User, id: uuid.UUID) -> Job | None:
-    return await db.scalar(select(Job).where(Job.id == id, Job.user_id == user.id))
+async def _job(db: AsyncSession, user: User, id: uuid.UUID, *, lock: bool = False) -> Job | None:
+    """`lock` — для кнопок, которые что-то создают: второе нажатие ждёт первое и видит
+    его отметку (`created` / `applied`)."""
+    stmt = select(Job).where(Job.id == id, Job.user_id == user.id)
+    if lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return await db.scalar(stmt)
 
 
 async def _edit(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup | None) -> None:
@@ -344,7 +354,9 @@ async def _start_breakdown(
     callback: CallbackQuery, db: AsyncSession, user: User, task_id: uuid.UUID, head: str
 ) -> None:
     """Ставит разбивку; шаги пришлёт воркер новым сообщением."""
-    assert callback.message is not None
+    if callback.message is None:  # сообщение слишком старое — Telegram его не прислал
+        await callback.answer("Сообщение устарело — откройте задание в приложении")
+        return
     await BreakdownService(db, user).start(
         task_id, BreakdownRequest(), origin=AIOrigin.telegram, chat_id=callback.message.chat.id
     )
@@ -354,7 +366,7 @@ async def _start_breakdown(
 async def _on_parse_job(
     callback: CallbackQuery, db: AsyncSession, user: User, data: AIData
 ) -> None:
-    job = await _job(db, user, data.id)
+    job = await _job(db, user, data.id, lock=data.op not in ("ed", "bk"))
     if job is None or job.status != JobStatus.done or not job.result:
         await callback.answer("Карточка устарела — напишите заново", show_alert=True)
         return
@@ -374,6 +386,9 @@ async def _on_parse_job(
         return
 
     kind = {"tt": KindHint.task, "tb": KindHint.backlog}.get(data.op)
+    # Отметка — в той же транзакции, что и создание (сервис коммитит): строка джобы
+    # заблокирована до этого коммита, повторное нажатие увидит «Уже создано»
+    job.result = {**job.result, "created": True}
     if data.op == "raw":
         created = await create_from_text(db, user, draft.text)
     else:
@@ -425,7 +440,7 @@ async def ai_callback(callback: CallbackQuery, db: AsyncSession, user: User) -> 
 async def _apply_breakdown(
     callback: CallbackQuery, db: AsyncSession, user: User, job_id: uuid.UUID
 ) -> None:
-    job = await _job(db, user, job_id)
+    job = await _job(db, user, job_id, lock=True)
     if job is None or job.status != JobStatus.done or not job.result:
         await callback.answer("Шаги устарели — разбейте заново", show_alert=True)
         return
@@ -456,12 +471,23 @@ async def _apply_breakdown(
 # ---------- вход: текст и фото ----------
 
 
+async def replace_text(message: Message, placeholder: Message, text: str) -> None:
+    """Заменить текст своего сообщения-заглушки (явно через бота входящего сообщения)."""
+    if message.bot is not None:
+        await message.bot.edit_message_text(
+            text, chat_id=placeholder.chat.id, message_id=placeholder.message_id
+        )
+
+
 async def start_text(message: Message, db: AsyncSession, user: User, text: str) -> None:
     """Сообщение, которое quickparse не уверенно разобрал, — в ИИ."""
     placeholder = await message.reply(THINKING)
-    await AIParseService(db, user).start_parse(
-        text,
-        origin=AIOrigin.telegram,
-        chat_id=message.chat.id,
-        message_id=placeholder.message_id,
-    )
+    try:
+        await AIParseService(db, user).start_parse(
+            text,
+            origin=AIOrigin.telegram,
+            chat_id=message.chat.id,
+            message_id=placeholder.message_id,
+        )
+    except AppError as exc:  # квота ИИ и т. п.: «Разбираю…» заменяем причиной
+        await replace_text(message, placeholder, f"🤖 {html.escape(exc.message)}")

@@ -56,7 +56,15 @@ class WorkHours(_Model):
 
 class ReminderRule(_Model):
     enabled: bool = True
-    channels: list[Channel] = Field(default_factory=lambda: [Channel.push, Channel.telegram])
+    channels: list[Channel] = Field(
+        default_factory=lambda: [Channel.push, Channel.telegram], max_length=len(Channel)
+    )
+
+    @field_validator("channels", mode="before")
+    @classmethod
+    def _unique_channels(cls, value: Any) -> Any:
+        # Повторы схлопываются до проверки длины: ["push", "push"] — это просто push
+        return list(dict.fromkeys(value)) if isinstance(value, list) and len(value) <= 10 else value
 
 
 class BeforeClassRule(ReminderRule):
@@ -148,7 +156,7 @@ def _partial(model: type[BaseModel], cache: dict[type, type[BaseModel]]) -> type
             # сохраняем ограничения (ge/le) и сериализатор времени
             annotation = Annotated[annotation, *info.metadata]
         fields[name] = (annotation | None, Field(default=None, description=info.description))
-    partial = create_model(  # type: ignore[call-overload]
+    partial = create_model(
         f"{model.__name__}Patch",
         __config__=ConfigDict(extra="forbid"),
         **fields,

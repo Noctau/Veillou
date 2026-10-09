@@ -12,7 +12,15 @@ from typing import Annotated, Self
 from pydantic import Field, HttpUrl, StringConstraints, field_serializer, model_validator
 
 from app.domain.enums import ClassType, ControlForm, Parity, RuleParity
-from app.schemas.common import HexColor, InputModel, ReadModel, WallTime, Weekday
+from app.schemas.common import (
+    MAX_PERIOD,
+    HexColor,
+    InputModel,
+    ReadModel,
+    SaneDate,
+    WallTime,
+    Weekday,
+)
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
@@ -23,10 +31,10 @@ ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2
 
 class SemesterCreate(InputModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-    start_date: date
-    classes_end: date = Field(description="Последний день занятий")
-    session_start: date | None = None
-    session_end: date | None = None
+    start_date: SaneDate
+    classes_end: SaneDate = Field(description="Последний день занятий")
+    session_start: SaneDate | None = None
+    session_end: SaneDate | None = None
     first_week_parity: Parity = Parity.odd
 
     @model_validator(mode="after")
@@ -41,15 +49,17 @@ class SemesterCreate(InputModel):
             # Пары генерируются до classes_end включительно — в сессии их быть не должно
             if self.session_start <= self.classes_end:
                 raise ValueError("Сессия должна начинаться после последнего дня занятий")
+        if (self.session_end or self.classes_end) - self.start_date > MAX_PERIOD:
+            raise ValueError("Семестр вместе с сессией — не длиннее года")
         return self
 
 
 class SemesterUpdate(InputModel):
     name: str | None = None
-    start_date: date | None = None
-    classes_end: date | None = None
-    session_start: date | None = None
-    session_end: date | None = None
+    start_date: SaneDate | None = None
+    classes_end: SaneDate | None = None
+    session_start: SaneDate | None = None
+    session_end: SaneDate | None = None
     first_week_parity: Parity | None = None
 
 
@@ -116,20 +126,22 @@ class BellScheduleRead(ReadModel):
 
 
 class DayOffCreate(InputModel):
-    date_from: date
-    date_to: date
+    date_from: SaneDate
+    date_to: SaneDate
     title: ShortText = ""
 
     @model_validator(mode="after")
     def _check(self) -> Self:
         if self.date_to < self.date_from:
             raise ValueError("Конец раньше начала")
+        if self.date_to - self.date_from > MAX_PERIOD:
+            raise ValueError("Выходные — не дольше года подряд")
         return self
 
 
 class DayOffUpdate(InputModel):
-    date_from: date | None = None
-    date_to: date | None = None
+    date_from: SaneDate | None = None
+    date_to: SaneDate | None = None
     title: str | None = None
 
 
@@ -213,8 +225,8 @@ class ClassRuleCreate(InputModel):
     class_type: ClassType = ClassType.lecture
     location: ShortText | None = None
     teacher: ShortText | None = None
-    valid_from: date | None = None
-    valid_to: date | None = None
+    valid_from: SaneDate | None = None
+    valid_to: SaneDate | None = None
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -239,8 +251,8 @@ class ClassRuleUpdate(InputModel):
     class_type: ClassType | None = None
     location: str | None = None
     teacher: str | None = None
-    valid_from: date | None = None
-    valid_to: date | None = None
+    valid_from: SaneDate | None = None
+    valid_to: SaneDate | None = None
 
 
 class ClassRuleRead(ReadModel):

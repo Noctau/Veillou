@@ -7,9 +7,11 @@
 ящика, а подходящее есть, оно занимает последнее место.
 """
 
+import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from app.domain.backlog import DAY, WEEK, merge, week_intervals
@@ -20,14 +22,14 @@ LIMIT = 3
 
 @dataclass(frozen=True)
 class FreeCandidate:
-    kind: str  # "subtask" | "task" | "backlog"
-    id: object
+    kind: Literal["subtask", "task", "backlog"]
+    id: uuid.UUID
     title: str
     minutes: int
     windows: tuple[Window, ...] = ()  # пусто — в любое время
     days: frozenset[date] | None = None  # только в эти дни
     # Меньше — лучше (сервис: время в плане / дедлайн / приоритет ящика)
-    rank: tuple = ()
+    rank: tuple[Any, ...] = ()
 
 
 def window_open(windows: Sequence[Window], local: datetime, minutes: int) -> bool:

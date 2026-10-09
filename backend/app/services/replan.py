@@ -26,12 +26,13 @@
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
-from typing import Any
+from typing import Any, overload
 
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -90,11 +91,14 @@ from app.models import (
     Task,
     User,
 )
+from app.models.base import UserOwnedMixin
 from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
 from app.services import exams
 from app.services.calibration import DEFAULT_ACTION, coefficients
 from app.services.settings import effective_settings
+
+log = logging.getLogger(__name__)
 
 # Флаг сессии: правки делает сам планировщик — не запускать пересчёт по триггеру
 SKIP_REPLAN = "skip_replan"
@@ -228,12 +232,12 @@ class _Builder:
         self.day_start = wall_to_utc(self.today, time(0), self.tz)
         self.horizon_end = now + timedelta(days=MAX_HORIZON_DAYS)
 
-    async def _scalars[M](
+    async def _scalars[M: UserOwnedMixin](
         self, model: type[M], *where: Any, order_by: Sequence[Any] = ()
     ) -> list[M]:
         stmt = (
             select(model)
-            .where(model.user_id == self.user_id, model.deleted_at.is_(None), *where)  # type: ignore[attr-defined]
+            .where(model.user_id == self.user_id, model.deleted_at.is_(None), *where)
             .order_by(*order_by)
         )
         return list(await self.db.scalars(stmt))
@@ -277,9 +281,9 @@ class _Builder:
             order_by=[Subtask.position, Subtask.occurrence_date, Subtask.created_at, Subtask.id],
         )
         subs_by_task: dict[uuid.UUID, list[Subtask]] = defaultdict(list)
-        for st in subtasks:
-            subs_by_task[st.task_id].append(st)
-        subtask_by_id = {st.id: st for st in subtasks}
+        for sub in subtasks:
+            subs_by_task[sub.task_id].append(sub)
+        subtask_by_id = {sub.id: sub for sub in subtasks}
         this_week = box.week_start(self.today)
         items = await self._scalars(
             BacklogItem,
@@ -345,16 +349,19 @@ class _Builder:
         def owner_of(e: Event) -> tuple[str | None, bool, str | None]:
             """(группа для «≤ N в день», считается ли учёбой, метка нормы) — для
             занятого времени."""
+            if e.source_id is None:
+                return None, False, None
+            st: Subtask | None
             if e.source_type == SourceType.subtask:
-                st = subtask_by_id.get(e.source_id)  # type: ignore[arg-type]
+                st = subtask_by_id.get(e.source_id)
                 task = task_by_id.get(st.task_id) if st else None
             elif e.source_type == SourceType.task:
-                task, st = task_by_id.get(e.source_id), None  # type: ignore[arg-type]
+                task, st = task_by_id.get(e.source_id), None
             elif e.source_type == SourceType.exam_session:
-                sess = session_by_id.get(e.source_id)  # type: ignore[arg-type]
+                sess = session_by_id.get(e.source_id)
                 return (f"exam:{sess.exam_id}" if sess else None), True, None
             elif e.source_type == SourceType.backlog_item:
-                item = item_by_id.get(e.source_id)  # type: ignore[arg-type]
+                item = item_by_id.get(e.source_id)
                 return None, item is not None and type_key(item.action_type_id) == "study", None
             elif e.source_type == SourceType.project and e.source_id is not None:
                 tag = project_tag(e.source_id)
@@ -376,7 +383,11 @@ class _Builder:
         stale: list[Event] = []
         for e in flexible:
             ours = e.source_type in PLANNED_SOURCES and e.source_id is not None
-            key = block_id(SourceType(e.source_type), e.source_id) if ours else None  # type: ignore[arg-type]
+            key = (
+                block_id(SourceType(e.source_type), e.source_id)
+                if e.source_type in PLANNED_SOURCES and e.source_id is not None
+                else None
+            )
             if e.status == EventStatus.planned and e.end <= self.day_start:
                 if ours:
                     stale.append(e)
@@ -401,8 +412,8 @@ class _Builder:
                 if key:
                     fixed_by_source[key].append(fixed_id(e.id))
                     consumed[key] += minutes
-            else:
-                movable[key].append(e)  # type: ignore[index]
+            elif key is not None:  # не закреплённое — всегда «наше» (ours)
+                movable[key].append(e)
 
         # «Не сделано» сегодня (вечерний разбор) — переносим не раньше завтра
         missed_today = set(
@@ -429,6 +440,8 @@ class _Builder:
             )
         )
         for source_id, start, end in done_rows.all():
+            if source_id is None:
+                continue
             consumed[block_id(SourceType.task, source_id)] += round(
                 (end - start).total_seconds() / 60
             )
@@ -451,9 +464,9 @@ class _Builder:
             subs = subs_by_task.get(task.id, [])
             todo: list[tuple[SourceType, uuid.UUID, Subtask | None, int]] = []
             if subs:
-                for st in subs:
-                    if st.status == SubtaskStatus.todo:
-                        todo.append((SourceType.subtask, st.id, st, st.estimate_min))
+                for sub in subs:
+                    if sub.status == SubtaskStatus.todo:
+                        todo.append((SourceType.subtask, sub.id, sub, sub.estimate_min))
             elif task.estimate_min:
                 todo.append((SourceType.task, task.id, None, task.estimate_min))
 
@@ -532,14 +545,15 @@ class _Builder:
                 if item.time_window
                 else (type_windows(act) if item.action_type_id else ()) or work
             )
-            week = item.planned_week
-            assert week is not None
+            planned_week = item.planned_week
+            if planned_week is None:  # в выборке только взятые на неделю
+                continue
             add(
                 Block(
                     id=key,
                     duration_min=remaining,
-                    deadline=wall_to_utc(week + timedelta(days=7), time(0), self.tz),
-                    earliest=wall_to_utc(week, time(0), self.tz),
+                    deadline=wall_to_utc(planned_week + timedelta(days=7), time(0), self.tz),
+                    earliest=wall_to_utc(planned_week, time(0), self.tz),
                     buffer_days=0,
                     priority=box.priority(
                         local_date(item.created_at, self.tz), item.desired_by, self.today
@@ -621,8 +635,8 @@ class _Builder:
             last = project.deadline + timedelta(days=1) if project.deadline else None
             for i in range(proj.QUOTA_WEEKS):
                 week = this_week + timedelta(weeks=i)
-                end = min(week + timedelta(days=7), last or date.max)
-                if end <= max(week, self.today):
+                until_day = min(week + timedelta(days=7), last or date.max)
+                if until_day <= max(week, self.today):
                     break
                 target = (
                     proj.week_target(norm, done_before.get(project.id, 0), 7 - self.today.weekday())
@@ -634,8 +648,8 @@ class _Builder:
                     by_week[week] = events
                     continue
                 qid = quota_id(project.id, week)
-                quotas.append(Quota(qid, tag, week, end, target))
-                week_end = wall_to_utc(end, time(0), self.tz)
+                quotas.append(Quota(qid, tag, week, until_day, target))
+                week_end = wall_to_utc(until_day, time(0), self.tz)
                 color = colors.get(project.category_id) if project.category_id else None
                 sources[qid] = Source(
                     SourceType.project,
@@ -772,13 +786,16 @@ class _Builder:
         )
         result: dict[uuid.UUID, int] = defaultdict(int)
         for kind, sid, start, end in rows:
+            if sid is None:
+                continue
             if kind == SourceType.project:
-                pid = sid
+                pid: uuid.UUID | None = sid
             elif kind == SourceType.subtask:
-                pid = task_project.get(sub_task.get(sid))
+                task_id = sub_task.get(sid)
+                pid = task_project.get(task_id) if task_id else None
             else:
                 pid = task_project.get(sid)
-            if pid in projects:
+            if pid is not None and pid in projects:
                 result[pid] += round((end - start).total_seconds() / 60)
         return result
 
@@ -943,14 +960,15 @@ class ReplanService:
             .limit(1)
         )
 
-    async def _get(self, id: uuid.UUID) -> PlanRevision:
-        rev = await self.db.scalar(
-            select(PlanRevision).where(
-                PlanRevision.id == id,
-                PlanRevision.user_id == self.user_id,
-                PlanRevision.deleted_at.is_(None),
-            )
+    async def _get(self, id: uuid.UUID, *, for_update: bool = False) -> PlanRevision:
+        stmt = select(PlanRevision).where(
+            PlanRevision.id == id,
+            PlanRevision.user_id == self.user_id,
+            PlanRevision.deleted_at.is_(None),
         )
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        rev = await self.db.scalar(stmt)
         if rev is None:
             raise NotFoundError("Превью не найдено")
         return rev
@@ -1025,7 +1043,9 @@ class ReplanService:
     # ---------- применение ----------
 
     async def apply(self, id: uuid.UUID) -> PlanRevision:
-        rev = await self._get(id)
+        # Блокировка: второе «Применить» (бот + приложение, двойной клик) ждёт первое
+        # и получает «уже неактуально», а не выполняет операции ещё раз
+        rev = await self._get(id, for_update=True)
         if rev.status != PlanRevisionStatus.proposed:
             raise PlanStaleError("Это превью уже неактуально")
         now = self.now()
@@ -1073,7 +1093,7 @@ class ReplanService:
         for op in ops:
             if op["op"] == "add":
                 after = op["after"]
-                event = Event(
+                created = Event(
                     user_id=self.user_id,
                     kind=op.get("kind", EventKind.subtask),
                     title=op["title"],
@@ -1087,9 +1107,11 @@ class ReplanService:
                     subject_id=uuid.UUID(op["subject_id"]) if op.get("subject_id") else None,
                     color=op.get("color"),
                 )
-                self.db.add(event)
+                self.db.add(created)
                 await self.db.flush()
-                undo.append({"event_id": str(event.id), "created": True, "after": _state(event)})
+                undo.append(
+                    {"event_id": str(created.id), "created": True, "after": _state(created)}
+                )
                 continue
 
             event = await self._event(op["event_id"])
@@ -1210,22 +1232,35 @@ async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
     днём, не должен записать утренний блок в «не сделано»).
     """
     now = now or now_utc()
-    users = list(await db.scalars(select(User).where(User.deleted_at.is_(None))))
-    for user in users:
-        tz = get_tz(user.timezone)
+    ids = list(await db.scalars(select(User.id).where(User.deleted_at.is_(None))))
+    for user_id in ids:
         db.info[SKIP_REPLAN] = True
         try:
+            user = await db.get(User, user_id)
+            if user is None:
+                continue
+            tz = get_tz(user.timezone)
             await mark_missed(db, user.id, wall_to_utc(local_date(now, tz), time(0), tz))
             await exams.sync_all(db, user, now)
             await ReplanService(db, user, now).preview([PlanReason.nightly])
+        except Exception:
+            # Один пользователь не должен оставить остальных без плана к утру
+            log.exception("Ночное перепланирование пользователя %s упало", user_id)
+            await db.rollback()
         finally:
             db.info.pop(SKIP_REPLAN, None)
-    return len(users)
+    return len(ids)
 
 
 # ---------- ответ API ----------
 
 
+@overload
+def revision_read(rev: PlanRevision) -> PlanRevisionRead: ...
+@overload
+def revision_read(rev: None) -> None: ...
+@overload
+def revision_read(rev: PlanRevision | None) -> PlanRevisionRead | None: ...
 def revision_read(rev: PlanRevision | None) -> PlanRevisionRead | None:
     if rev is None:
         return None

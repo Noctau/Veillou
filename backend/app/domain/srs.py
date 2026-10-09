@@ -131,13 +131,15 @@ def build(
 
     plans: list[DayPlan] = []
     for d in sorted(set(learn) | set(reviews)):
-        if ids := learn.get(d):
-            plans.append(DayPlan(d, ExamSessionKind.learn, tuple(ids), len(ids) * params.learn_min))
-        if ids := reviews.get(d):
+        if new := learn.get(d):
+            plans.append(DayPlan(d, ExamSessionKind.learn, tuple(new), len(new) * params.learn_min))
+        if repeat := reviews.get(d):
             plans.append(
-                DayPlan(d, ExamSessionKind.review, tuple(ids), len(ids) * params.review_min)
+                DayPlan(d, ExamSessionKind.review, tuple(repeat), len(repeat) * params.review_min)
             )
     if with_run and run_day >= today and (run_day, ExamSessionKind.run) not in closed:
-        ids = tuple(q.id for q in ordered)
-        plans.append(DayPlan(run_day, ExamSessionKind.run, ids, len(ids) * params.run_min))
+        everything = tuple(q.id for q in ordered)
+        plans.append(
+            DayPlan(run_day, ExamSessionKind.run, everything, len(everything) * params.run_min)
+        )
     return plans

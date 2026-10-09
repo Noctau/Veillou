@@ -9,9 +9,11 @@
 import uuid
 from collections import defaultdict
 from datetime import datetime, time, timedelta
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import ColumnElement
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
@@ -30,12 +32,29 @@ from app.domain.enums import (
 from app.domain.free import FreeCandidate, pick
 from app.domain.planner import Window
 from app.models import ActionType, BacklogItem, Event, Subtask, Task, User
+from app.models.base import UserOwnedMixin
 from app.schemas.review import FreeSuggestion
 from app.schemas.task import SubtaskSchedule
 from app.services.calibration import DEFAULT_ACTION, coefficients
 from app.services.replan import windows_from_json
 from app.services.settings import effective_settings
 from app.services.tasks import TaskService
+
+SOURCE_MODEL: dict[str, type[Task] | type[Subtask] | type[BacklogItem]] = {
+    "subtask": Subtask,
+    "task": Task,
+    "backlog": BacklogItem,
+}
+SOURCE_TYPE = {
+    "subtask": SourceType.subtask,
+    "task": SourceType.task,
+    "backlog": SourceType.backlog_item,
+}
+
+
+Kind = Literal["subtask", "task", "backlog"]
+# Подпись (задание шага / «Из ящика»), id задания и его дедлайн
+Meta = tuple[str | None, uuid.UUID | None, datetime | None]
 
 
 class FreeService:
@@ -47,15 +66,15 @@ class FreeService:
         self.now = now or now_utc()
         self.today = local_date(self.now, self.tz)
 
-    async def _all[M](self, model: type[M], *where) -> list[M]:
+    async def _all[M: UserOwnedMixin](self, model: type[M], *where: ColumnElement[bool]) -> list[M]:
         stmt = select(model).where(
-            model.user_id == self.user_id,  # type: ignore[attr-defined]
-            model.deleted_at.is_(None),  # type: ignore[attr-defined]
+            model.user_id == self.user_id,
+            model.deleted_at.is_(None),
             *where,
         )
         return list(await self.db.scalars(stmt))
 
-    async def candidates(self) -> tuple[list[FreeCandidate], dict]:
+    async def candidates(self) -> tuple[list[FreeCandidate], dict[tuple[Kind, uuid.UUID], Meta]]:
         action_types = {a.id: a for a in await self._all(ActionType)}
         by_key = {a.key: a for a in action_types.values() if a.key}
         coefs = await coefficients(self.db, self.user_id)
@@ -72,17 +91,19 @@ class FreeService:
             Event.start >= self.now,
             Event.source_type.in_([SourceType.subtask, SourceType.task]),
         ):
+            if e.source_id is None:
+                continue
             if e.source_id not in next_block or e.start < next_block[e.source_id]:
-                next_block[e.source_id] = e.start  # type: ignore[index]
+                next_block[e.source_id] = e.start
 
         def type_of(type_id: uuid.UUID | None) -> ActionType | None:
             return action_types.get(type_id) if type_id else None
 
         result: list[FreeCandidate] = []
-        meta: dict = {}
+        meta: dict[tuple[Kind, uuid.UUID], Meta] = {}
         for task in tasks.values():
             subs = subs_by_task.get(task.id, [])
-            items: list[tuple[str, uuid.UUID, Subtask | None, int]] = []
+            items: list[tuple[Literal["subtask", "task"], uuid.UUID, Subtask | None, int]] = []
             if subs:
                 for st in subs:
                     if st.status != SubtaskStatus.todo:
@@ -94,10 +115,10 @@ class FreeService:
                     items.append(("subtask", st.id, st, st.estimate_min))
             elif task.estimate_min:
                 items.append(("task", task.id, None, task.estimate_min))
-            for kind, id, st, estimate in items:
-                at = type_of((st.action_type_id if st else None) or task.action_type_id)
-                if st is not None and st.time_window:
-                    windows = windows_from_json(st.time_window)
+            for kind, id, sub, estimate in items:
+                at = type_of((sub.action_type_id if sub else None) or task.action_type_id)
+                if sub is not None and sub.time_window:
+                    windows = windows_from_json(sub.time_window)
                 elif task.time_window:
                     windows = windows_from_json(task.time_window)
                 else:
@@ -113,13 +134,13 @@ class FreeService:
                     FreeCandidate(
                         kind,
                         id,
-                        st.title if st else task.title,
+                        sub.title if sub else task.title,
                         calibrated(estimate, coefs.get(key, 1.0)),
                         windows,
                         rank=rank,
                     )
                 )
-                meta[(kind, id)] = (task.title if st else None, task.id, task.deadline)
+                meta[(kind, id)] = (task.title if sub else None, task.id, task.deadline)
 
         s = effective_settings(self.user)
         work = (
@@ -179,8 +200,8 @@ class FreeService:
             subtitle, task_id, deadline = meta[(c.kind, c.id)]
             result.append(
                 FreeSuggestion(
-                    kind=c.kind,  # type: ignore[arg-type]
-                    id=c.id,  # type: ignore[arg-type]
+                    kind=c.kind,
+                    id=c.id,
                     title=c.title,
                     minutes=c.minutes,
                     subtitle=subtitle,
@@ -190,48 +211,68 @@ class FreeService:
             )
         return result
 
+    async def _lock_source(self, kind: str, id: uuid.UUID) -> Task | Subtask | BacklogItem:
+        """Источник блока под блокировкой: второе «Начать» ждёт первое."""
+        model = SOURCE_MODEL[kind]
+        obj: Task | Subtask | BacklogItem | None = await self.db.scalar(
+            select(model)
+            .where(model.id == id, model.user_id == self.user_id, model.deleted_at.is_(None))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if obj is None:
+            raise InvalidDataError("Это дело уже нельзя взять — обновите список")
+        return obj
+
+    async def _started_block(self, kind: str, id: uuid.UUID, start: datetime) -> Event | None:
+        return await self.db.scalar(
+            select(Event).where(
+                Event.user_id == self.user_id,
+                Event.deleted_at.is_(None),
+                Event.source_type == SOURCE_TYPE[kind],
+                Event.source_id == id,
+                Event.status == EventStatus.planned,
+                Event.start == start,
+            )
+        )
+
     async def start(self, kind: str, id: uuid.UUID) -> Event:
-        """Поставить блок на «сейчас», закреплённым. Коммитит."""
+        """Поставить блок на «сейчас», закреплённым. Коммитит.
+
+        Повторное «Начать» в ту же минуту (двойное нажатие) возвращает тот же блок."""
+        if kind not in SOURCE_MODEL:
+            raise InvalidDataError("Это дело уже нельзя взять — обновите список")
+        source = await self._lock_source(kind, id)
+        start = self.now.replace(second=0, microsecond=0)
+        if (already := await self._started_block(kind, id, start)) is not None:
+            return already
         candidates, _ = await self.candidates()
         found = next((c for c in candidates if c.kind == kind and c.id == id), None)
         if found is None:
             raise InvalidDataError("Это дело уже нельзя взять — обновите список")
-        start = self.now.replace(second=0, microsecond=0)
         end = start + timedelta(minutes=found.minutes)
-        if kind == "subtask":
+        if isinstance(source, Subtask):
             await TaskService(self.db, self.user).schedule(
                 id, SubtaskSchedule(start=start, end=end)
             )
-            event = await self.db.scalar(
-                select(Event).where(
-                    Event.user_id == self.user_id,
-                    Event.deleted_at.is_(None),
-                    Event.source_type == SourceType.subtask,
-                    Event.source_id == id,
-                    Event.status == EventStatus.planned,
-                    Event.start == start,
-                )
-            )
-            assert event is not None
+            event = await self._started_block(kind, id, start)
+            if event is None:
+                raise RuntimeError(f"Блок подзадачи {id} не поставлен")
             return event
-        if kind == "task":
-            task = await self.db.get(Task, id)
-            assert task is not None
+        if isinstance(source, Task):
             event = Event(
                 user_id=self.user_id,
                 kind=EventKind.subtask,
-                title=task.title,
-                subject_id=task.subject_id,
+                title=source.title,
+                subject_id=source.subject_id,
                 source_type=SourceType.task,
                 source_id=id,
             )
         else:
-            item = await self.db.get(BacklogItem, id)
-            assert item is not None
             event = Event(
                 user_id=self.user_id,
                 kind=EventKind.backlog,
-                title=item.title,
+                title=source.title,
                 source_type=SourceType.backlog_item,
                 source_id=id,
             )

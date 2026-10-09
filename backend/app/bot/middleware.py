@@ -29,7 +29,10 @@ class AccessMiddleware(BaseMiddleware):
     """
 
     async def __call__(self, handler: Handler, event: TelegramObject, data: dict[str, Any]) -> Any:
-        assert isinstance(event, Update)
+        if not isinstance(
+            event, Update
+        ):  # middleware висит на dp.update — сюда приходят только они
+            return await handler(event, data)
         tg_user: TgUser | None = data.get("event_from_user")
         chat = data.get("event_chat")
         if tg_user is None or tg_user.is_bot or chat is None or chat.type != "private":

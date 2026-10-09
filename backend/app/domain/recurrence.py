@@ -156,7 +156,8 @@ def expand_class_rule(
 
     span: DateRange | None = DateRange(semester.start, semester.classes_end)
     if rule.valid_from or rule.valid_to:
-        span = span.intersect(DateRange(rule.valid_from or date.min, rule.valid_to or date.max))
+        valid = DateRange(rule.valid_from or date.min, rule.valid_to or date.max)
+        span = DateRange(semester.start, semester.classes_end).intersect(valid)
     if span is not None and window is not None:
         span = span.intersect(window)
     if span is None:
@@ -166,8 +167,9 @@ def expand_class_rule(
     d = span.start + timedelta(days=(rule.weekday - span.start.isoweekday()) % 7)
     result: list[Occurrence] = []
     while d <= span.end:
+        # Parity и RuleParity — разные перечисления с общими значениями odd / even
         parity_ok = rule.parity == RuleParity.all or (
-            week_parity(d, semester.start, semester.first_week_parity) == rule.parity
+            week_parity(d, semester.start, semester.first_week_parity).value == rule.parity.value
         )
         if parity_ok and not _is_day_off(d, days_off):
             start, end = _wall_interval(d, times[0], times[1], tz)
@@ -217,6 +219,14 @@ def parse_rrule(value: str) -> rrule:
     if not isinstance(rule, rrule) or rule._freq not in _ALLOWED_FREQ:
         raise ValueError("Повтор допускается не чаще раза в день")
     return rule
+
+
+def has_occurrences(value: str) -> bool:
+    """Есть ли у правила хоть одно вхождение. Для «невозможного» правила
+    (30 февраля) dateutil перебирает дни до 9999 года — секунда CPU, поэтому
+    вызывать из потока, а не из event loop (`ensure_has_occurrences`)."""
+    start = datetime(2000, 1, 1)
+    return parse_rrule(value).replace(dtstart=start).after(start, inc=True) is not None
 
 
 def rrule_dates(

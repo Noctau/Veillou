@@ -298,7 +298,7 @@ class _Builder:
             if not exprs:
                 continue  # недобор не зависит от решения
             short = self.m.new_int_var(0, q.need, f"short{q.id}")
-            self.m.add(short + sum(exprs) >= q.need)
+            self.m.add(short + cp_model.LinearExpr.sum(exprs) >= q.need)
             self.objective.append(W_QUOTA * short)
 
     def add_order(self) -> None:
@@ -327,7 +327,7 @@ class _Builder:
 
     def add_objective(self) -> None:
         m, prep, n = self.m, self.prep, self.prep.grid.n
-        previous = defaultdict(dict)
+        previous: defaultdict[BlockId, dict[int, int]] = defaultdict(dict)
         for pl in prep.inp.previous:
             slot = prep.grid.floor(pl.start)
             if 0 <= slot < n:
@@ -363,7 +363,9 @@ class _Builder:
                 first = b.parts[0]
                 day_lo = {d.index: d.lo for d in prep.days}
                 tod = m.new_int_var(0, n, f"tod{pb.index}")
-                since = first.start - sum(day_lo[d] * x for d, x in first.days.items())
+                since = first.start - cp_model.LinearExpr.sum(
+                    [day_lo[d] * x for d, x in first.days.items()]
+                )
                 m.add(tod == since).only_enforce_if(b.pres)
                 self.objective.append(W_MORNING * tod)
         m.minimize(sum(self.objective))
@@ -438,7 +440,7 @@ def _complete_hint(builder: _Builder, hint: Solution, time_limit_s: float, worke
     _params(solver, time_limit_s, workers, presolve=False)
     if solver.solve(fixed) not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return False
-    builder.m.clear_hints()
+    builder.m.clear_hints()  # type: ignore[no-untyped-call]  # нет аннотации в стабах ortools
     hint_proto = builder.m.proto.solution_hint
     values = solver.response_proto.solution
     hint_proto.vars.extend(range(len(values)))

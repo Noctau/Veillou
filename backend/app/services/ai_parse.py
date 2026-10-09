@@ -32,7 +32,7 @@ from app.schemas.ai import ParseDraft, PhotoDraft
 from app.schemas.backlog import BacklogCreate
 from app.schemas.task import TaskCreate
 from app.services import jobs
-from app.services.ai import call_llm
+from app.services.ai import call_llm, enqueue_ai
 from app.services.backlog import BacklogService
 from app.services.breakdown import load_catalog
 from app.services.quickadd import Created, create_from_text, parse_text, subject_refs
@@ -41,6 +41,8 @@ from app.services.tasks import TaskRepo, TaskService
 # Название задания, созданного из фото без подписи: распознавание его заменит
 PHOTO_TITLE = "Задание с фото"
 MAX_IMAGES = 4
+# Больше в vision-модель не шлём: файл целиком в памяти и ещё раз в base64
+MAX_IMAGE_BYTES = 15 * 1024 * 1024
 
 
 def _subject_names(refs: list[SubjectRef]) -> dict[str, uuid.UUID]:
@@ -85,11 +87,8 @@ class AIParseService:
         self.storage = storage or get_storage()
 
     async def _enqueue(self, kind: JobKind, payload: dict[str, Any]) -> uuid.UUID:
-        job_id = await jobs.enqueue(
-            self.db, kind, user_id=self.user_id, payload=payload, max_attempts=1
-        )
+        job_id = await enqueue_ai(self.db, kind, user_id=self.user_id, payload=payload)
         await self.db.commit()
-        assert job_id is not None
         return job_id
 
     # ---------- текст ----------
@@ -157,6 +156,7 @@ class AIParseService:
                 Attachment.owner_type == AttachmentOwner.task,
                 Attachment.owner_id == task_id,
                 Attachment.mime.like("image/%"),
+                Attachment.size <= MAX_IMAGE_BYTES,
             )
             .order_by(Attachment.position, Attachment.created_at)
             .limit(MAX_IMAGES)
@@ -173,7 +173,7 @@ class AIParseService:
     ) -> uuid.UUID:
         await self.tasks.get_or_404(task_id)
         if not await self._has_images(task_id):
-            raise InvalidDataError("У задания нет фото")
+            raise InvalidDataError("У задания нет фото (или все больше 15 МБ)")
         return await self._enqueue(
             JobKind.ai_photo, {"task_id": str(task_id), "origin": origin, **extra}
         )
@@ -187,6 +187,7 @@ class AIParseService:
                 Attachment.owner_type == AttachmentOwner.task,
                 Attachment.owner_id == task_id,
                 Attachment.mime.like("image/%"),
+                Attachment.size <= MAX_IMAGE_BYTES,
             )
             .limit(1)
         )
@@ -248,21 +249,6 @@ class AIParseService:
         draft = await self.recognize(task, job.id)
         job.result = draft.model_dump(mode="json")
         return draft
-
-
-async def _user(db: AsyncSession, job: Job) -> User:
-    user = await db.get(User, job.user_id)
-    if user is None:
-        raise jobs.JobFailedError("Пользователь удалён")
-    return user
-
-
-async def handle_parse_job(db: AsyncSession, job: Job) -> None:
-    await AIParseService(db, await _user(db, job)).run_parse(job)
-
-
-async def handle_photo_job(db: AsyncSession, job: Job) -> None:
-    await AIParseService(db, await _user(db, job)).run_photo(job)
 
 
 async def create_from_draft(

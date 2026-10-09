@@ -62,9 +62,7 @@ async def undo_plan(svc: Service) -> PlanUndoResult:
     """Откатить последнее применение (за сутки). Блоки, которые после него
     правили руками, остаются как есть."""
     rev, restored, skipped = await svc.undo()
-    read = revision_read(rev)
-    assert read is not None
-    return PlanUndoResult(revision=read, restored=restored, skipped=skipped)
+    return PlanUndoResult(revision=revision_read(rev), restored=restored, skipped=skipped)
 
 
 # ---------- разовый лимит учёбы ----------

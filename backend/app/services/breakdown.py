@@ -58,7 +58,7 @@ from app.schemas.ai import (
     TemplateUpdate,
 )
 from app.services import jobs
-from app.services.ai import call_llm
+from app.services.ai import call_llm, enqueue_ai
 from app.services.base import UserScopedRepository
 from app.services.calibration import DEFAULT_ACTION, coefficients
 from app.services.catalog import ensure_defaults
@@ -138,11 +138,10 @@ class BreakdownService:
         }
         if chat_id is not None:
             payload["chat_id"] = chat_id
-        job_id = await jobs.enqueue(
-            self.db, JobKind.ai_breakdown, user_id=self.user_id, payload=payload, max_attempts=1
+        job_id = await enqueue_ai(
+            self.db, JobKind.ai_breakdown, user_id=self.user_id, payload=payload
         )
         await self.db.commit()
-        assert job_id is not None
         return job_id
 
     async def _free_minutes(self, task: Task, catalog: Catalog, act: str) -> int | None:
@@ -262,8 +261,11 @@ class BreakdownService:
     # ---------- «Запланировать» ----------
 
     async def apply(self, task_id: uuid.UUID, data: BreakdownApply) -> Task:
-        """Несделанные шаги → присланные. Блоки старых шагов убираются. Коммитит."""
-        task = await self.tasks.get_or_404(task_id)
+        """Несделанные шаги → присланные. Блоки старых шагов убираются. Коммитит.
+
+        Задание блокируется: параллельное «Запланировать» ждёт и заменяет уже
+        записанные шаги, а не добавляет второй комплект."""
+        task = await self.tasks.get_or_404(task_id, for_update=True)
         if task.recurrence:
             raise InvalidDataError("Регулярное задание не разбивается на шаги")
         catalog = await load_catalog(self.db, self.user_id)
@@ -301,8 +303,8 @@ class BreakdownService:
             )
             for e in events:
                 e.deleted_at = now
-            for s in todo:
-                s.deleted_at = now
+            for old in todo:
+                old.deleted_at = now
         # Задание шло одним блоком (без шагов) — теперь блоки будут у шагов
         task_events = await self.db.scalars(
             select(Event).where(
@@ -316,8 +318,8 @@ class BreakdownService:
         for e in task_events:
             e.deleted_at = now
 
-        for position, s in enumerate(done):
-            s.position = position
+        for position, kept in enumerate(done):
+            kept.position = position
         ids = [uuid.uuid4() for _ in data.steps]
         for i, step in enumerate(data.steps):
             self.db.add(
@@ -446,10 +448,3 @@ class BreakdownService:
         t = await self.templates.get_or_404(id)
         self.templates.soft_delete(t)
         await self.db.commit()
-
-
-async def handle_breakdown_job(db: AsyncSession, job: Job) -> None:
-    user = await db.get(User, job.user_id)
-    if user is None:
-        raise jobs.JobFailedError("Пользователь удалён")
-    await BreakdownService(db, user).run(job)

@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import ColumnElement
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, now_utc, wall_to_utc
@@ -52,7 +53,7 @@ from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
 from app.services.calibration import recalibrate
 from app.services.catalog import ensure_defaults
-from app.services.recurring_tasks import sync_recurring_task
+from app.services.recurring_tasks import ensure_has_occurrences, sync_recurring_task
 
 
 class TaskRepo(UserScopedRepository[Task]):
@@ -161,7 +162,7 @@ class TaskService:
         project_id: uuid.UUID | None = None,
         due_before: Any = None,
     ) -> list[TaskRead]:
-        where = []
+        where: list[ColumnElement[bool]] = []
         if statuses:
             where.append(Task.status.in_(statuses))
         if subject_id:
@@ -274,6 +275,8 @@ class TaskService:
     async def create(self, data: TaskCreate) -> TaskDetail:
         fields = data.model_dump(exclude={"subtasks"})
         fields["time_window"] = data.model_dump(mode="json")["time_window"]
+        if data.recurrence:
+            await ensure_has_occurrences(data.recurrence)
         await self._check_refs(fields)
         await self._resolve_milestone(fields, None)
 
@@ -348,6 +351,8 @@ class TaskService:
         task = await self.tasks.get_or_404(id)
         changes = patch.model_dump(exclude_unset=True)
         _reject_nulls(changes, _TASK_REQUIRED)
+        if changes.get("recurrence"):
+            await ensure_has_occurrences(changes["recurrence"])
         await self._check_refs(changes)
         await self._resolve_milestone(changes, task)
         if "time_window" in changes:
@@ -523,7 +528,9 @@ class TaskService:
             subtasks = await self.subtasks.find_all(Subtask.task_id == task.id)
         by_id = {s.id: s for s in subtasks}
         for e in await self._subtask_events(by_id, statuses=[EventStatus.planned]):
-            subtask = by_id[e.source_id]  # type: ignore[index]
+            if e.source_id is None:
+                continue
+            subtask = by_id[e.source_id]
             e.title = subtask.title
             e.subject_id = task.subject_id
             e.color = await self._color(subtask, task)

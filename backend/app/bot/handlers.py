@@ -10,6 +10,8 @@
   «Перенести всё», «По одному», «Взять на неделю» (дальше — «Применить план»).
 """
 
+import contextlib
+import html
 import io
 
 from aiogram import Bot, F, Router
@@ -50,7 +52,8 @@ HELP = (
 async def start_with_code(
     message: Message, command: CommandObject, db: AsyncSession, user: User | None
 ) -> None:
-    assert message.from_user is not None and command.args is not None
+    if message.from_user is None or command.args is None:  # фильтр deep_link гарантирует
+        return
     try:
         linked = await telegram.link_by_code(db, command.args, tg_user_id=message.from_user.id)
     except telegram.LinkError as exc:
@@ -123,12 +126,14 @@ async def download(bot: Bot, file_id: str) -> bytes:
 
 async def photo(message: Message, db: AsyncSession, user: User, bot: Bot) -> None:
     """Фото (или картинка файлом) — задание с этим фото; ИИ распознаёт текст и срок."""
+    name: str | None
     if message.photo:
         file_id, mime, name = message.photo[-1].file_id, "image/jpeg", "photo.jpg"
-    else:
-        assert message.document is not None
+    elif message.document is not None:
         doc = message.document
         file_id, mime, name = doc.file_id, doc.mime_type or "image/jpeg", doc.file_name
+    else:  # фильтр пропускает только фото и картинки-документы
+        return
     caption = (message.caption or "").strip()
     parsed = await quickadd.parse_text(db, user, caption[:500]) if caption else None
     data = await download(bot, file_id)
@@ -143,12 +148,15 @@ async def photo(message: Message, db: AsyncSession, user: User, bot: Bot) -> Non
     )
     await AttachmentService(db, user, get_storage()).upload(AttachmentOwner.task, task.id, upload)
     placeholder = await message.reply("📷 Распознаю фото…")
-    await AIParseService(db, user).start_photo(
-        task.id,
-        origin=AIOrigin.telegram,
-        chat_id=message.chat.id,
-        message_id=placeholder.message_id,
-    )
+    try:
+        await AIParseService(db, user).start_photo(
+            task.id,
+            origin=AIOrigin.telegram,
+            chat_id=message.chat.id,
+            message_id=placeholder.message_id,
+        )
+    except AppError as exc:  # квота ИИ: задание с фото уже есть, распознать позже из приложения
+        await ai.replace_text(message, placeholder, f"📷 {html.escape(exc.message)}")
 
 
 # ---------- кнопки карточки «Создано» ----------
@@ -205,7 +213,9 @@ async def quick_add_callback(callback: CallbackQuery, db: AsyncSession, user: Us
         return
 
     # op == "to": сменить тип — пересоздать из исходного текста
-    assert data.target is not None
+    if data.target is None:  # parse_quick_add не пропускает «to» без цели
+        await callback.answer()
+        return
     text = _source_text(callback)
     if text is None:
         await callback.answer("Не нашёл исходное сообщение — напишите заново", show_alert=True)
@@ -215,10 +225,8 @@ async def quick_add_callback(callback: CallbackQuery, db: AsyncSession, user: Us
     except AppError as exc:
         await callback.answer(exc.message, show_alert=True)
         return
-    try:
+    with contextlib.suppress(AppError):  # старое уже удалено в приложении — не страшно
         await quickadd.delete_created(db, user, data.kind, data.id)
-    except AppError:
-        pass  # старое уже удалено в приложении — не страшно
     await callback.answer(cards.KIND_DONE[data.target])
     await _edit(callback, cards.created_text(created, tz, now), cards.created_keyboard(created))
 

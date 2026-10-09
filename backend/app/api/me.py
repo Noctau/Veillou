@@ -20,7 +20,7 @@ async def read_settings(user: CurrentUser) -> UserSettings:
 
 @router.patch("/settings")
 async def update_settings(
-    patch: UserSettingsPatch,  # type: ignore[valid-type]
+    patch: UserSettingsPatch,  # type: ignore[valid-type]  # модель создаётся в рантайме (_partial)
     user: CurrentUser,
     db: SessionDep,
 ) -> UserSettings:

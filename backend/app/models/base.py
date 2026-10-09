@@ -36,6 +36,7 @@ class EntityMixin:
 class UserOwnedMixin(EntityMixin):
     """Всё, что принадлежит пользователю. Любой запрос фильтруется по user_id."""
 
+    # declared_attr вызывается на классе — первый аргумент cls
     @declared_attr
-    def user_id(cls) -> Mapped[uuid.UUID]:
+    def user_id(cls) -> Mapped[uuid.UUID]:  # noqa: N805
         return mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)

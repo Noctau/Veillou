@@ -15,10 +15,12 @@ from app.schemas.event import (
     EventUpdate,
     RecurringEventCreate,
     RecurringEventUpdate,
+    check_event_bounds,
 )
 from app.services.backlog import on_backlog_event_status
 from app.services.base import UserScopedRepository, apply_fields, validate_patch
 from app.services.exams import ExamService
+from app.services.recurring_tasks import ensure_has_occurrences
 from app.services.schedule_sync import SeriesSync
 from app.services.tasks import on_subtask_event_status
 
@@ -105,10 +107,10 @@ class EventService:
         for name in ("title", "start", "end", "status", "is_pinned", "note"):
             if name in changes and changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
-        start = changes.get("start", event.start)
-        end = changes.get("end", event.end)
-        if end <= start:
-            raise InvalidDataError("Конец должен быть позже начала")
+        try:
+            check_event_bounds(changes.get("start", event.start), changes.get("end", event.end))
+        except ValueError as exc:
+            raise InvalidDataError(str(exc)) from exc
         for name, value in changes.items():
             setattr(event, name, value)
         if event.template_id is not None and _is_manual_edit(changes):
@@ -149,6 +151,7 @@ class EventService:
         return await self.recurring.find_all(order_by=[RecurringEvent.start_time])
 
     async def create_recurring(self, data: RecurringEventCreate) -> RecurringEvent:
+        await ensure_has_occurrences(data.rrule)
         rec = RecurringEvent()
         apply_fields(rec, data)
         self.recurring.add(rec)
@@ -159,7 +162,10 @@ class EventService:
 
     async def update_recurring(self, id: uuid.UUID, patch: RecurringEventUpdate) -> RecurringEvent:
         rec = await self.recurring.get_or_404(id)
-        apply_fields(rec, validate_patch(rec, patch, RecurringEventCreate))
+        data = validate_patch(rec, patch, RecurringEventCreate)
+        if data.rrule != rec.rrule:
+            await ensure_has_occurrences(data.rrule)
+        apply_fields(rec, data)
         await self.db.flush()
         await self.sync.sync_recurring(rec)
         await self.db.commit()

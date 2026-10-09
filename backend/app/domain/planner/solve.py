@@ -18,6 +18,7 @@ from time import perf_counter
 from app.domain.planner.check import violations
 from app.domain.planner.contracts import (
     AtRisk,
+    BlockId,
     Placement,
     PlanDiff,
     PlanInput,
@@ -92,7 +93,7 @@ def _blamed_on_rest(inp: PlanInput, risks: list[AtRisk]) -> list[AtRisk]:
         replace(inp, settings=replace(s, free_evenings_per_week=0, weekend_half_days=0))
     )
     solution = solve_greedy(relaxed)
-    fixed: set = set()
+    fixed: set[BlockId] = set()
     for block_id in suspects:
         parts = solution.get(block_id)
         pb = relaxed.by_id[block_id]

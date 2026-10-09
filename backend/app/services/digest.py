@@ -85,7 +85,8 @@ async def task_progress(db: AsyncSession, tasks: list[Task]) -> dict[object, flo
 
 
 def deadline_line(t: Task, share: float, tz: ZoneInfo, today: date) -> str:
-    assert t.deadline is not None
+    if t.deadline is None:  # в секции дедлайнов — только задания со сроком
+        return t.title
     local = t.deadline.astimezone(tz)
     when = fmt_day(local.date(), today)
     if local.strftime("%H:%M") != "23:59":

@@ -30,7 +30,11 @@ class _SubjectRepo(UserScopedRepository[Subject]):
 
 _REQUIRED = {"subject_id", "title", "author", "kind", "required", "status", "note"}
 # Обязательное и непрочитанное — выше
-_STATUS_ORDER = {SourceStatus.reading: 0, SourceStatus.to_read: 1, SourceStatus.done: 2}
+_STATUS_ORDER: dict[str, int] = {
+    SourceStatus.reading: 0,
+    SourceStatus.to_read: 1,
+    SourceStatus.done: 2,
+}
 
 
 class SourceService:

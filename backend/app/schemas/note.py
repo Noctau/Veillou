@@ -7,7 +7,7 @@ from typing import Annotated
 from pydantic import Field, HttpUrl, StringConstraints
 
 from app.domain.enums import ClassType, NoteKind
-from app.schemas.common import InputModel, ReadModel, UTCMoment
+from app.schemas.common import InputModel, ReadModel, SaneDate, UTCMoment
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 Body = Annotated[str, StringConstraints(max_length=200_000)]
@@ -20,7 +20,7 @@ class NoteCreate(InputModel):
     kind: NoteKind = NoteKind.text
     subject_id: uuid.UUID | None = Field(default=None, description="null — предмет пары")
     event_id: uuid.UUID | None = Field(default=None, description="Пара, к которой конспект")
-    class_date: date | None = Field(default=None, description="null — дата пары или сегодня")
+    class_date: SaneDate | None = Field(default=None, description="null — дата пары или сегодня")
     body_md: Body = ""
     url: HttpUrl | None = None
 
@@ -30,7 +30,7 @@ class NoteUpdate(InputModel):
     kind: NoteKind | None = None
     subject_id: uuid.UUID | None = None
     event_id: uuid.UUID | None = None
-    class_date: date | None = None
+    class_date: SaneDate | None = None
     body_md: Body | None = None
     url: HttpUrl | None = None
 

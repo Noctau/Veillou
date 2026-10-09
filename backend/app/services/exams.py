@@ -11,6 +11,7 @@
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,7 +154,8 @@ class ExamService:
                 Event.status.in_([EventStatus.planned, EventStatus.done]),
                 order_by=[Event.start],
             ):
-                placed[e.source_id].append(e)  # type: ignore[index]
+                if e.source_id is not None:
+                    placed[e.source_id].append(e)
         numbers = {str(q.id): q.number for q in questions}
         name = (subject.short_name or subject.name) if subject else "Экзамен"
         session_reads = []
@@ -401,8 +403,8 @@ class ExamService:
         renamed: list[ExamSession] = []
         for plan in desired:
             ids = list(plan.question_ids)
-            x = current.pop((plan.date, str(plan.kind)), None)
-            if x is None:
+            existing = current.pop((plan.date, str(plan.kind)), None)
+            if existing is None:
                 self.sessions.add(
                     ExamSession(
                         exam_id=exam.id,
@@ -414,10 +416,10 @@ class ExamService:
                     )
                 )
                 changed = True
-            elif x.question_ids != ids or x.minutes != plan.minutes:
-                if x.question_ids != ids:
-                    renamed.append(x)
-                x.question_ids, x.minutes = ids, plan.minutes
+            elif existing.question_ids != ids or existing.minutes != plan.minutes:
+                if existing.question_ids != ids:
+                    renamed.append(existing)
+                existing.question_ids, existing.minutes = ids, plan.minutes
                 changed = True
         for x in current.values():
             self.sessions.soft_delete(x)
@@ -437,7 +439,9 @@ class ExamService:
             Event.source_id.in_(by_id),
             Event.status == EventStatus.planned,
         ):
-            x = by_id[e.source_id]  # type: ignore[index]
+            if e.source_id is None:
+                continue
+            x = by_id[e.source_id]
             nums = [numbers[q] for q in x.question_ids if q in numbers]
             e.title = session_title(ExamSessionKind(x.kind), name, nums)
 
@@ -522,5 +526,5 @@ async def upcoming_exams(
     ]
 
 
-def days_until(exam: Exam, today: date, tz) -> int:
+def days_until(exam: Exam, today: date, tz: ZoneInfo) -> int:
     return (local_date(exam.starts_at, tz) - today).days

@@ -10,19 +10,31 @@
 Прошлое и сделанное не трогается.
 """
 
+import logging
 import uuid
 from datetime import date, datetime, timedelta
 
+import anyio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, now_utc
+from app.domain import recurrence
 from app.domain.enums import EventStatus, SourceType, SubtaskStatus, TaskStatus
 from app.domain.recurrence import DateRange, rrule_dates
 from app.models import Event, Subtask, Task, User
 
+log = logging.getLogger(__name__)
+
 HORIZON_DAYS = 60
 DEFAULT_ESTIMATE_MIN = 30
+
+
+async def ensure_has_occurrences(value: str) -> None:
+    """400, если правило повтора не даёт ни одного вхождения (проверка — в потоке)."""
+    if not await anyio.to_thread.run_sync(recurrence.has_occurrences, value):
+        raise InvalidDataError("Правило повтора не даёт ни одного дня")
 
 
 async def sync_recurring_task(db: AsyncSession, task: Task, today: date) -> int:
@@ -108,6 +120,11 @@ async def roll_all_recurring_tasks(db: AsyncSession, *, now: datetime | None = N
     created = 0
     for task, timezone in rows.all():
         today = now.astimezone(get_tz(timezone)).date()
-        created += await sync_recurring_task(db, task, today)
+        try:
+            # Точка сохранения: ошибка одного задания не откатывает остальные
+            async with db.begin_nested():
+                created += await sync_recurring_task(db, task, today)
+        except Exception:
+            log.exception("Докатка регулярного задания %s упала", task.id)
     await db.commit()
     return created

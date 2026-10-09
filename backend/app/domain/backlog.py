@@ -6,6 +6,7 @@
 считает сервис по расписанию), «нужен ноутбук» время не ограничивает.
 """
 
+import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -124,7 +125,7 @@ def condition_windows(
 
 @dataclass(frozen=True)
 class Candidate:
-    id: object
+    id: uuid.UUID
     created: date
     desired_by: date | None = None
     planned_week: date | None = None
@@ -137,7 +138,7 @@ def priority(created: date, desired_by: date | None, today: date) -> int:
     return 1 + age_bonus + (DESIRED_BONUS if soon else 0)
 
 
-def rank_key(c: Candidate, week: date) -> tuple:
+def rank_key(c: Candidate, week: date) -> tuple[bool, bool, date, date, str]:
     """Порядок предложений: не сделанное на прошлых неделях → с желаемым сроком
     (ближе — раньше) → самые старые."""
     carried = c.planned_week is not None and c.planned_week < week

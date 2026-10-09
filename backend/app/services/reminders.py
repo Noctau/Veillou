@@ -9,13 +9,14 @@
 досылает их или пропускает как устаревшие.
 """
 
+import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +34,8 @@ from app.notify import builder
 from app.notify.builder import Candidate, Planned, TimeRange, Window, windows_from_json
 from app.schemas.settings import ReminderRule, UserSettings
 from app.services.settings import effective_settings
+
+log = logging.getLogger(__name__)
 
 # На сколько вперёд держим напоминания (окно докатывает периодическая пересборка)
 HORIZON = timedelta(days=8)
@@ -283,7 +286,7 @@ async def sync_user_reminders(
                 index_where=Reminder.deleted_at.is_(None),
             )
         )
-        stats.created += result.rowcount or 0  # type: ignore[attr-defined]
+        stats.created += cast(CursorResult[Any], result).rowcount or 0
     await db.commit()
     return stats
 
@@ -299,7 +302,11 @@ async def sync_all_users(db: AsyncSession, now: datetime | None = None) -> int:
         await db.scalars(select(User.id).where(User.deleted_at.is_(None)))
     )
     for user_id in ids:
-        await sync_user_reminders(db, user_id, now)
+        try:
+            await sync_user_reminders(db, user_id, now)
+        except Exception:
+            log.exception("Пересборка напоминаний пользователя %s упала", user_id)
+            await db.rollback()
     return len(ids)
 
 

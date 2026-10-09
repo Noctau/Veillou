@@ -7,7 +7,7 @@ from app.ai.prompts import ExistingMilestone, MilestonesContext, milestones_mess
 from app.core.time import get_tz, local_date, now_utc
 from app.domain.projects import MilestoneDates, RawMilestone, behind_days, normalize_milestones
 
-from .test_ai import ai_logs, fake, job_result, run_jobs  # noqa: F401
+from .test_ai import ai_logs, fake, job_result, run_ai_jobs, run_jobs  # noqa: F401
 from .test_projects import add_milestone, make_project
 from .test_schedule_api import API, other_client
 from .test_tasks import make_task
@@ -88,10 +88,13 @@ def test_prompt_has_context():
     )
     system, user, redo = milestones_messages(ctx)
     assert "этапы" in system.content
-    assert "15 июня 2027" in user.content and "через 250 дн." in user.content
+    assert "15 июня 2027" in user.content
+    assert "через 250 дн." in user.content
     assert "Тема согласована — 2026-10-20 (выполнен)" in user.content
-    assert "Найти статьи" in user.content and "6 ч" in user.content
-    assert "поменьше этапов" in redo.content and "Обзор — 2026-12-01" in redo.content
+    assert "Найти статьи" in user.content
+    assert "6 ч" in user.content
+    assert "поменьше этапов" in redo.content
+    assert "Обзор — 2026-12-01" in redo.content
 
 
 # ---------- джоба и экран проверки ----------
@@ -119,18 +122,21 @@ async def test_suggest_and_save(auth_client, fake):  # noqa: F811
             warning="Уточните требования кафедры",
         )
     )
-    assert await run_jobs() == 1
+    assert await run_ai_jobs() == 1
     job = await job_result(auth_client, job_id)
     assert job["status"] == "done", job
     draft = job["result"]
-    assert draft["type"] == "milestones" and draft["project_id"] == project["id"]
+    assert draft["type"] == "milestones"
+    assert draft["project_id"] == project["id"]
     assert [(m["title"], m["date"]) for m in draft["milestones"]] == [
         ("Обзор литературы готов", d(60)),
         ("Защита", d(240)),  # прижато к итоговому сроку
     ]
     assert draft["warning"] == "Уточните требования кафедры"
     prompt = fake.calls[0][0][1].content
-    assert "ВКР про муссоны" in prompt and "Тема согласована" in prompt and "Найти статьи" in prompt
+    assert "ВКР про муссоны" in prompt
+    assert "Тема согласована" in prompt
+    assert "Найти статьи" in prompt
     assert (await ai_logs())[0].purpose == "milestones"
 
     # Проект не изменился, пока не сохранили
@@ -156,7 +162,8 @@ async def test_regenerate_with_comment(auth_client, fake):  # noqa: F811
     fake.push(answer(("Защита", d(200))))
     await run_jobs()
     messages = fake.calls[0][0]
-    assert "без предзащиты" in messages[-1].content and "Предзащита" in messages[-1].content
+    assert "без предзащиты" in messages[-1].content
+    assert "Предзащита" in messages[-1].content
 
 
 async def test_nothing_new_fails_with_message(auth_client, fake):  # noqa: F811
@@ -168,7 +175,8 @@ async def test_nothing_new_fails_with_message(auth_client, fake):  # noqa: F811
     fake.push(answer(("Защита", d(30))))
     await run_jobs()
     job = await job_result(auth_client, job_id)
-    assert job["status"] == "failed" and "новых этапов" in job["error"]
+    assert job["status"] == "failed"
+    assert "новых этапов" in job["error"]
 
 
 async def test_dismiss_hides_draft(auth_client, fake):  # noqa: F811
@@ -190,3 +198,32 @@ async def test_bulk_validation_and_privacy(auth_client, session):
         assert (await other.post(url, json={"milestones": [{"title": "x"}]})).status_code == 404
         suggest = f"{API}/projects/{project['id']}/milestones/suggest"
         assert (await other.post(suggest, json={})).status_code == 404
+
+
+async def test_dismiss_checks_project_and_draft(auth_client, session, user):
+    """L-22: «Отмена» по чужому/несуществующему проекту или джобе — 404, не молчаливое 204."""
+    project = (await auth_client.post(f"{API}/projects", json={"title": "ВКР"})).json()
+    other = (await auth_client.post(f"{API}/projects", json={"title": "Другой"})).json()
+    zero = "00000000-0000-0000-0000-000000000000"
+    url = f"{API}/projects/{zero}/milestones/suggest/{zero}/dismiss"
+    assert (await auth_client.post(url)).status_code == 404
+    url = f"{API}/projects/{project['id']}/milestones/suggest/{zero}/dismiss"
+    assert (await auth_client.post(url)).status_code == 404
+
+    from app.models import Job
+
+    job = Job(
+        user_id=user.id,
+        kind="ai.milestones",
+        payload={"project_id": project["id"]},
+        status="done",
+        run_at=now_utc(),
+        result={"milestones": []},
+    )
+    session.add(job)
+    await session.commit()
+    # Джоба другого проекта
+    url = f"{API}/projects/{other['id']}/milestones/suggest/{job.id}/dismiss"
+    assert (await auth_client.post(url)).status_code == 404
+    url = f"{API}/projects/{project['id']}/milestones/suggest/{job.id}/dismiss"
+    assert (await auth_client.post(url)).status_code == 204

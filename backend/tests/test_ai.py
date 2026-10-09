@@ -52,6 +52,12 @@ async def run_jobs(bot=None) -> int:
     return await jobs.run_ready(session_factory, build_handlers(bot))
 
 
+async def run_ai_jobs(bot=None) -> int:
+    """Только ИИ-джобы: отложенные на секунды пересборки (reminders.sync, plan.preview)
+    под нагрузкой тоже успевают стать готовыми — счёт по всем джобам нестабилен."""
+    return await jobs.run_ready(session_factory, build_handlers(bot), kinds=AI_JOB_KINDS)
+
+
 async def job_result(client: AsyncClient, job_id: str) -> dict:
     resp = await client.get(f"{API}/jobs/{job_id}")
     assert resp.status_code == 200, resp.text
@@ -123,16 +129,19 @@ async def test_breakdown_draft(auth_client, fake):
     assert (await job_result(auth_client, job_id))["status"] == "pending"
 
     fake.push(breakdown_answer())
-    assert await run_jobs() == 1
+    assert await run_ai_jobs() == 1
     job = await job_result(auth_client, job_id)
-    assert job["status"] == "done" and job["error"] is None
+    assert job["status"] == "done"
+    assert job["error"] is None
     draft = job["result"]
-    assert draft["type"] == "breakdown" and draft["task_id"] == task["id"]
+    assert draft["type"] == "breakdown"
+    assert draft["task_id"] == task["id"]
     titles = [s["title"] for s in draft["steps"]]
     assert titles == ["Найти 3 источника", "Написать текст", "Согласовать тему с преподавателем"]
     assert draft["steps"][1]["depends_on"] == [0]
     assert draft["total_estimate_min"] == 145
-    assert draft["free_minutes"] > 0 and draft["coef"] == 1.0
+    assert draft["free_minutes"] > 0
+    assert draft["coef"] == 1.0
     types = {a["key"]: a["id"] for a in (await auth_client.get(f"{API}/action-types")).json()}
     assert draft["steps"][2]["action_type_id"] == types["people"]
     assert draft["category_id"] is not None
@@ -142,11 +151,16 @@ async def test_breakdown_draft(auth_client, fake):
 
     # В промпте — описание, дедлайн и свободное время
     prompt = fake.calls[0][0][1].content
-    assert "10 страниц" in prompt and "Дедлайн:" in prompt and "Свободного времени" in prompt
+    assert "10 страниц" in prompt
+    assert "Дедлайн:" in prompt
+    assert "Свободного времени" in prompt
 
     logs = await ai_logs()
-    assert len(logs) == 1 and logs[0].ok and logs[0].purpose == "breakdown"
-    assert str(logs[0].job_id) == job_id and logs[0].prompt_tokens == 10
+    assert len(logs) == 1
+    assert logs[0].ok
+    assert logs[0].purpose == "breakdown"
+    assert str(logs[0].job_id) == job_id
+    assert logs[0].prompt_tokens == 10
 
 
 async def test_regenerate_with_comment(auth_client, fake):
@@ -177,7 +191,8 @@ async def test_invalid_answer_twice_fails_without_retry(auth_client, fake):
     fake.push("не json", breakdown_answer(subtasks=[]))
     await run_jobs()
     job = await job_result(auth_client, job_id)
-    assert job["status"] == "failed" and job["result"] is None
+    assert job["status"] == "failed"
+    assert job["result"] is None
     assert "ИИ ответил непонятно" in job["error"]
     assert [log.ok for log in await ai_logs()] == [False, False]
     # Без повторов: очередь пуста
@@ -211,11 +226,13 @@ async def test_unavailable_provider_queues_until_back(auth_client, fake):
     await run_jobs()
     for job_id in (first, second):
         job = await job_result(auth_client, job_id)
-        assert job["status"] == "pending" and job["error"] is None
+        assert job["status"] == "pending"
+        assert job["error"] is None
         assert "в очереди" in job["waiting"]
     async with session_factory() as db:
         row = await db.get(Job, uuid.UUID(first))
-        assert row is not None and row.attempts == 0  # ожидание — не попытка
+        assert row is not None
+        assert row.attempts == 0
 
     # Ещё не появился — проверяем первой джобой в очереди, остальные ждут, без лимита попыток
     fake.push(httpx.ConnectError("нет"))
@@ -228,7 +245,8 @@ async def test_unavailable_provider_queues_until_back(auth_client, fake):
     assert "ещё" in fake.calls[-1][0][-1].content
     for job_id in (first, second):
         job = await job_result(auth_client, job_id)
-        assert job["status"] == "done" and job["waiting"] is None
+        assert job["status"] == "done"
+        assert job["waiting"] is None
         assert job["result"]["type"] == "breakdown"
 
 
@@ -248,7 +266,8 @@ async def test_queue_gives_up_after_max_wait(auth_client, fake, monkeypatch):
     fake.push(httpx.ConnectError("нет"))
     await run_jobs()
     job = await job_result(auth_client, job_id)
-    assert job["status"] == "failed" and "так и не стал доступен" in job["error"]
+    assert job["status"] == "failed"
+    assert "так и не стал доступен" in job["error"]
 
 
 async def test_latest_breakdown_on_task(auth_client, fake):
@@ -262,7 +281,8 @@ async def test_latest_breakdown_on_task(auth_client, fake):
     fake.push(breakdown_answer())
     await run_jobs()
     ready = (await auth_client.get(latest)).json()
-    assert ready["id"] == job_id and ready["result"]["type"] == "breakdown"
+    assert ready["id"] == job_id
+    assert ready["result"]["type"] == "breakdown"
 
     body = {"steps": ready["result"]["steps"], "plan": False, "job_id": job_id}
     resp = await auth_client.post(f"{API}/tasks/{task['id']}/breakdown/apply", json=body)
@@ -341,7 +361,8 @@ async def test_apply_replaces_open_steps_and_previews_plan(auth_client):
 
     # Превью плана посчитано сразу, но ничего не применено
     proposal = data["plan"]["proposal"]
-    assert proposal is not None and proposal["added"] >= 3
+    assert proposal is not None
+    assert proposal["added"] >= 3
     async with session_factory() as db:
         planned = await db.scalar(
             select(func.count()).where(
@@ -368,7 +389,8 @@ async def test_apply_without_plan_and_validation(auth_client):
     resp = await auth_client.post(
         url, json={"steps": [{"title": "А", "estimate_min": 30}], "plan": False}
     )
-    assert resp.status_code == 200 and resp.json()["plan"] is None
+    assert resp.status_code == 200
+    assert resp.json()["plan"] is None
 
 
 # ---------- шаблоны ----------
@@ -454,8 +476,10 @@ async def test_ai_parse_card(auth_client, fake):
     )
     await run_jobs()
     draft = (await job_result(auth_client, job_id))["result"]
-    assert draft["type"] == "parse" and draft["kind"] == "task"
-    assert draft["title"] == "Доклад про Эль-Ниньо" and draft["task_type"] == "report"
+    assert draft["type"] == "parse"
+    assert draft["kind"] == "task"
+    assert draft["title"] == "Доклад про Эль-Ниньо"
+    assert draft["task_type"] == "report"
     assert draft["subject_id"] == subject["id"]
     deadline = datetime.fromisoformat(draft["deadline"])
     assert deadline == wall_to_utc(date(2030, 1, 9), time(23, 59), TZ)
@@ -504,7 +528,8 @@ async def test_recognize_photo_fills_task(auth_client, fake):
     assert "3.1–3.5 из задачника" in detail["description"]
     assert detail["task_type"] == "homework"
     _, model = fake.calls[0]
-    assert model == "fake-vision" and fake.calls[0][0][-1].images
+    assert model == "fake-vision"
+    assert fake.calls[0][0][-1].images
 
 
 async def test_recognize_needs_images(auth_client):
@@ -520,10 +545,12 @@ async def test_failed_job_reports_error(auth_client, fake):
     await auth_client.delete(f"{API}/tasks/{task['id']}")
     await run_jobs()
     job = await job_result(auth_client, job_id)
-    assert job["status"] == JobStatus.failed and job["error"] == "Задание удалено"
+    assert job["status"] == JobStatus.failed
+    assert job["error"] == "Задание удалено"
     async with session_factory() as db:
         row = await db.get(Job, uuid.UUID(job_id))
-        assert row is not None and row.attempts == 1
+        assert row is not None
+        assert row.attempts == 1
 
 
 @pytest.mark.parametrize(

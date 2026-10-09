@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from app.core.time import ensure_aware, local_date, wall_to_utc
 from app.domain.planner.contracts import (
@@ -140,7 +141,7 @@ class Domain:
         return cls(tuple((lo, hi - length) for lo, hi in free if hi - lo >= length))
 
     def __contains__(self, slot: object) -> bool:
-        return any(lo <= slot <= hi for lo, hi in self.intervals)  # type: ignore[operator]
+        return isinstance(slot, int) and any(lo <= slot <= hi for lo, hi in self.intervals)
 
     def __bool__(self) -> bool:
         return bool(self.intervals)
@@ -248,13 +249,13 @@ class Prepared:
 # ---------- построение ----------
 
 
-def _dates(grid: Grid, tz) -> list[date]:
+def _dates(grid: Grid, tz: ZoneInfo) -> list[date]:
     first = local_date(grid.t0, tz) - timedelta(days=1)
     last = local_date(grid.end, tz) + timedelta(days=1)
     return [first + timedelta(days=i) for i in range((last - first).days + 1)]
 
 
-def _daily(d: date, start: time, end: time, tz) -> tuple[datetime, datetime]:
+def _daily(d: date, start: time, end: time, tz: ZoneInfo) -> tuple[datetime, datetime]:
     """Ежедневный интервал дня `d`; `end <= start` — до следующего дня."""
     end_date = d + timedelta(days=1) if end <= start else d
     return wall_to_utc(d, start, tz), wall_to_utc(end_date, end, tz)
@@ -268,7 +269,7 @@ def _work_windows(s: PlanSettings) -> tuple[Window, ...]:
 
 
 def window_slots(
-    grid: Grid, windows: Sequence[Window], dates: Sequence[date], tz
+    grid: Grid, windows: Sequence[Window], dates: Sequence[date], tz: ZoneInfo
 ) -> list[Interval]:
     return merge(
         grid.inner(*_daily(d, w.start, w.end, tz))
@@ -302,7 +303,7 @@ def busy_slots(inp: PlanInput, grid: Grid, dates: Sequence[date]) -> list[Interv
     return merge(holes)
 
 
-def _days(grid: Grid, s: PlanSettings, dates: Sequence[date], tz) -> list[Day]:
+def _days(grid: Grid, s: PlanSettings, dates: Sequence[date], tz: ZoneInfo) -> list[Day]:
     days: list[Day] = []
     bounds = [grid.ceil(wall_to_utc(d, s.sleep.end, tz)) for d in dates]
     for d, lo, hi in zip(dates, bounds, bounds[1:], strict=False):

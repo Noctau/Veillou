@@ -6,7 +6,7 @@ from pydantic import Field, StringConstraints, field_validator
 
 from app.domain.enums import BacklogCondition, BacklogStatus
 from app.schemas.catalog import TimeWindow, Windows
-from app.schemas.common import InputModel, ReadModel, UTCMoment
+from app.schemas.common import InputModel, ReadModel, SaneDate, UTCMoment
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 Note = Annotated[str, StringConstraints(max_length=5000)]
@@ -26,7 +26,7 @@ class BacklogCreate(InputModel):
     )
     action_type_id: uuid.UUID | None = None
     estimate_min: Estimate | None = None
-    desired_by: date | None = None
+    desired_by: SaneDate | None = None
     conditions: Conditions = Field(default_factory=list)
     time_window: Windows | None = None
 
@@ -39,7 +39,7 @@ class BacklogUpdate(InputModel):
     category_id: uuid.UUID | None = None
     action_type_id: uuid.UUID | None = None
     estimate_min: Estimate | None = None
-    desired_by: date | None = None
+    desired_by: SaneDate | None = None
     conditions: Conditions | None = None
     time_window: Windows | None = None
     status: BacklogStatus | None = None

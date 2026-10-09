@@ -26,17 +26,22 @@ class UserScopedRepository[M: UserOwnedMixin]:
         self.session = session
         self.user_id = user_id
 
-    def select(self) -> Select[tuple[M]]:
+    def select(self) -> Select[M]:
         return select(self.model).where(
             self.model.user_id == self.user_id,
             self.model.deleted_at.is_(None),
         )
 
-    async def get(self, id: uuid.UUID) -> M | None:
-        return await self.session.scalar(self.select().where(self.model.id == id))
+    async def get(self, id: uuid.UUID, *, for_update: bool = False) -> M | None:
+        """`for_update` — заблокировать строку до конца транзакции: параллельный запрос
+        с тем же объектом подождёт и увидит уже изменённое (двойное нажатие)."""
+        stmt = self.select().where(self.model.id == id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        return await self.session.scalar(stmt)
 
-    async def get_or_404(self, id: uuid.UUID) -> M:
-        obj = await self.get(id)
+    async def get_or_404(self, id: uuid.UUID, *, for_update: bool = False) -> M:
+        obj = await self.get(id, for_update=for_update)
         if obj is None:
             raise NotFoundError(self.not_found_message)
         return obj
