@@ -58,7 +58,9 @@ async def test_session_token_is_stored_hashed(
     stored = await session.scalar(
         select(UserSession.token_hash).where(UserSession.user_id == user.id)
     )
-    assert stored is not None and stored != token and len(stored) == 64
+    assert stored is not None
+    assert stored != token
+    assert len(stored) == 64
 
 
 async def test_login_wrong_password_or_unknown_email(client: AsyncClient, user: User):
@@ -151,3 +153,38 @@ async def test_set_password(client: AsyncClient, session: AsyncSession, user: Us
     await users.set_password(session, user, "another-password")
     assert (await login(client)).status_code == 401
     assert (await login(client, password="another-password")).status_code == 200
+
+
+# ---------- L-10: сессии ----------
+
+
+async def test_password_change_revokes_sessions(
+    client: AsyncClient, user: User, session: AsyncSession
+):
+    assert (await login(client)).status_code == 200
+    assert (await client.get(f"{API}/me")).status_code == 200
+    await users.set_password(session, user, "new-password-123")
+    assert (await client.get(f"{API}/me")).status_code == 401
+
+
+async def test_prune_removes_old_sessions(user: User, session: AsyncSession):
+    now = now_utc()
+    for expires, deleted in (
+        (now - timedelta(days=40), None),  # давно истекла
+        (now + timedelta(days=5), now - timedelta(days=40)),  # давно вышли
+        (now + timedelta(days=5), None),  # живая
+    ):
+        session.add(
+            UserSession(
+                user_id=user.id,
+                token_hash=f"{expires.timestamp()}{deleted}"[:64],
+                expires_at=expires,
+                last_seen_at=now,
+                deleted_at=deleted,
+            )
+        )
+    await session.commit()
+    await auth.prune_sessions(session)
+    left = list(await session.scalars(select(UserSession)))
+    assert len(left) == 1
+    assert left[0].deleted_at is None

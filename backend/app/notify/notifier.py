@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+import requests
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -21,7 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import now_utc
 from app.models import PushSubscription, User
-from app.notify.message import ACTION_TITLES, TELEGRAM_ONLY, Message
+from app.notify.message import ACTION_TITLES, PUSH_PAYLOAD_LIMIT, TELEGRAM_ONLY, Message
+from app.notify.push_hosts import push_host_allowed
+
+__all__ = ["push_host_allowed"]
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +108,12 @@ class TelegramSender:
 
 
 def push_payload(msg: Message) -> str:
-    """То, что получает service worker в событии push."""
+    """То, что получает service worker в событии push (не больше PUSH_PAYLOAD_LIMIT байт)."""
+    fitted = msg.fit(lambda m: len(_push_json(m).encode()) <= PUSH_PAYLOAD_LIMIT)
+    return _push_json(fitted)
+
+
+def _push_json(msg: Message) -> str:
     data = {
         "title": msg.title,
         "body": msg.plain_body(),
@@ -125,6 +134,9 @@ class WebPushSender:
         self.public_key = public_key
         self.private_key = private_key
         self.subject = subject
+        # Push-сервисы не редиректят; редирект — повод не идти дальше (SSRF)
+        self.session = requests.Session()
+        self.session.max_redirects = 0
 
     def _post(self, sub: PushSubscription, data: str, ttl: int) -> None:
         webpush(
@@ -138,6 +150,7 @@ class WebPushSender:
             ttl=ttl,
             headers={"Urgency": "high"},
             timeout=15,
+            requests_session=self.session,
         )
 
     async def send(self, db: AsyncSession, user: User, msg: Message, ttl: int) -> Delivery:
@@ -148,7 +161,12 @@ class WebPushSender:
                 )
             )
         )
+        for sub in [s for s in subs if not push_host_allowed(s.endpoint)]:
+            log.warning("Push-подписка %s на неизвестный сервис — удаляю", sub.id)
+            await db.delete(sub)
+            subs.remove(sub)
         if not subs:
+            await db.commit()
             return skipped("Нет push-подписок")
         data = push_payload(msg)
         ok, errors = 0, []

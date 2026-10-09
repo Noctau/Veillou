@@ -19,6 +19,7 @@
 
 import asyncio
 import logging
+import signal
 from collections.abc import Awaitable, Callable
 from datetime import datetime, time, timedelta
 
@@ -29,9 +30,10 @@ from app.core.config import settings
 from app.core.db import engine, session_factory
 from app.core.time import get_tz, now_utc
 from app.domain.enums import AI_JOB_KINDS, JobKind, ReminderStatus
+from app.heartbeat import beat
 from app.models import Reminder
 from app.notify.notifier import Notifier, Sender, TelegramSender, WebPushSender
-from app.services import jobs, login_guard
+from app.services import auth, jobs, login_guard
 from app.services.ai import prune_log
 from app.services.dispatch import dispatch_due, next_due_at
 from app.services.project_ai import handle_milestones_job
@@ -74,6 +76,7 @@ async def nightly() -> None:
         await jobs.prune(db)
         await prune_log(db)
         await login_guard.prune(db)
+        await auth.prune_sessions(db)
         await db.execute(
             delete(Reminder).where(
                 Reminder.status != ReminderStatus.pending,
@@ -168,7 +171,18 @@ async def sleep_time() -> float:
     return min(poll, max(0.5, (due - now_utc()).total_seconds()))
 
 
+def stop_on_signals(task: asyncio.Task[None]) -> None:
+    """SIGTERM (docker stop) и SIGINT — отмена главной задачи: finally закроет бота и пул БД.
+    Без этого Python умирает на SIGTERM сразу, а аренды строк ждут истечения."""
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, task.cancel)
+
+
 async def main() -> None:
+    task = asyncio.current_task()
+    if task is not None:
+        stop_on_signals(task)
     notifier, closers = build_notifier()
     handlers = build_handlers(closers[0] if closers else None)
     ai_task: asyncio.Task[None] | None = None
@@ -181,6 +195,7 @@ async def main() -> None:
         ai_task = asyncio.create_task(ai_loop(handlers))
         while True:
             await safely("Цикл очередей", lambda: tick(notifier, handlers))
+            await safely("Heartbeat", lambda: beat("worker"))
             if loop.time() >= next_nightly:
                 await safely("Ночная джоба", nightly)
                 next_nightly = loop.time() + seconds_until(NIGHTLY_AT, now_utc())
@@ -193,6 +208,8 @@ async def main() -> None:
                 log.exception("Не удалось узнать время ближайшего напоминания")
                 pause = settings.WORKER_POLL_SEC
             await asyncio.sleep(pause)
+    except asyncio.CancelledError:
+        log.info("Воркер остановлен")
     finally:
         if ai_task is not None:
             ai_task.cancel()

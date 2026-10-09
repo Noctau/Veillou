@@ -10,6 +10,7 @@ from app.ai.provider import (
     LLMError,
     LLMInvalidError,
     LLMProvider,
+    LLMRejectedError,
     LLMUnavailableError,
     Message,
     OllamaProvider,
@@ -31,15 +32,26 @@ def make_provider(
     model: str,
     vision_model: str | None,
 ) -> LLMProvider:
-    common = {
-        "timeout": settings.LLM_TIMEOUT_SEC,
-        "connect_timeout": settings.LLM_CONNECT_TIMEOUT_SEC,
-        "temperature": settings.LLM_TEMPERATURE,
-        "max_tokens": settings.LLM_MAX_TOKENS,
-    }
     if kind == "openai":
-        return OpenAICompatProvider(base_url, api_key, model, vision_model, **common)
-    return OllamaProvider(base_url, model, vision_model, **common)
+        return OpenAICompatProvider(
+            base_url,
+            api_key,
+            model,
+            vision_model,
+            timeout=settings.LLM_TIMEOUT_SEC,
+            connect_timeout=settings.LLM_CONNECT_TIMEOUT_SEC,
+            temperature=settings.LLM_TEMPERATURE,
+            max_tokens=settings.LLM_MAX_TOKENS,
+        )
+    return OllamaProvider(
+        base_url,
+        model,
+        vision_model,
+        timeout=settings.LLM_TIMEOUT_SEC,
+        connect_timeout=settings.LLM_CONNECT_TIMEOUT_SEC,
+        temperature=settings.LLM_TEMPERATURE,
+        max_tokens=settings.LLM_MAX_TOKENS,
+    )
 
 
 def build_provider() -> LLMProvider:
@@ -83,6 +95,7 @@ __all__ = [
     "LLMError",
     "LLMInvalidError",
     "LLMProvider",
+    "LLMRejectedError",
     "LLMUnavailableError",
     "Message",
     "build_provider",

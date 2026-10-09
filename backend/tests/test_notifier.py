@@ -42,7 +42,8 @@ def test_push_payload_actions_only_with_token():
     assert json.loads(push_payload(msg(actions=ACTIONS)))["actions"] == []
     data = json.loads(push_payload(msg(actions=ACTIONS, action_token="tok", url="/tasks/1")))
     assert [a["action"] for a in data["actions"]] == ["done", "snooze", "tomorrow"]
-    assert data["token"] == "tok" and data["url"] == "/tasks/1"
+    assert data["token"] == "tok"
+    assert data["url"] == "/tasks/1"
     assert data["body"] == "a & b"
 
 
@@ -84,8 +85,8 @@ def _gone(code: int) -> WebPushException:
 
 
 async def test_push_removes_expired_subscriptions(session, user, monkeypatch):
-    await _subscribe(session, user, "https://push/ok")
-    await _subscribe(session, user, "https://push/gone")
+    await _subscribe(session, user, "https://fcm.googleapis.com/fcm/send/ok")
+    await _subscribe(session, user, "https://fcm.googleapis.com/fcm/send/gone")
     sent: list[str] = []
 
     def fake_webpush(subscription_info, **kwargs):
@@ -97,13 +98,13 @@ async def test_push_removes_expired_subscriptions(session, user, monkeypatch):
     sender = WebPushSender("pub", "priv", "mailto:x@y.z")
     result = await sender.send(session, user, msg(), 60)
     assert result.status == DeliveryStatus.sent
-    assert sent == ["https://push/ok"]
+    assert sent == ["https://fcm.googleapis.com/fcm/send/ok"]
     endpoints = list(await session.scalars(select(PushSubscription.endpoint)))
-    assert endpoints == ["https://push/ok"]
+    assert endpoints == ["https://fcm.googleapis.com/fcm/send/ok"]
 
 
 async def test_push_temporary_error_fails(session, user, monkeypatch):
-    await _subscribe(session, user, "https://push/a")
+    await _subscribe(session, user, "https://fcm.googleapis.com/fcm/send/a")
 
     def fake_webpush(**kwargs):
         raise _gone(500)

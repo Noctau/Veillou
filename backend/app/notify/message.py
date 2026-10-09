@@ -5,6 +5,7 @@ Telegram рисует заголовки разделов жирным (HTML), p
 
 import html
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -21,6 +22,11 @@ ACTION_TITLES = {
 }
 # Только в Telegram: в пуше раскрывать нечего
 TELEGRAM_ONLY = frozenset({ReminderAction.pick})
+
+# Telegram принимает до 4096 символов текста; считаем по HTML (он длиннее видимого
+# текста) и с запасом. Web Push — до 4 КБ после шифрования (~100 байт сверху).
+TELEGRAM_TEXT_LIMIT = 4000
+PUSH_PAYLOAD_LIMIT = 3500
 
 WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 WEEKDAYS_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
@@ -67,12 +73,48 @@ class Message:
             parts.append(f"{s.heading}\n{block}" if s.heading else block)
         return "\n\n".join(p for p in parts if p)
 
-    def telegram_html(self) -> str:
+    def _html(self) -> str:
         parts = [f"<b>{html.escape(self.title)}</b>"]
         for s in self.sections:
             lines = "\n".join(html.escape(line) for line in s.lines)
             parts.append(f"<b>{html.escape(s.heading)}</b>\n{lines}" if s.heading else lines)
         return "\n\n".join(p for p in parts if p)
+
+    def telegram_html(self) -> str:
+        """HTML для Telegram, не длиннее лимита: лишние строки — «…и ещё N»."""
+        return self.fit(lambda m: len(m._html()) <= TELEGRAM_TEXT_LIMIT)._html()
+
+    def _keep(self, k: int) -> "Message":
+        """Первые `k` строк (по порядку секций), остальные — одной строкой «…и ещё N»."""
+        total = sum(len(s.lines) for s in self.sections)
+        sections: list[Section] = []
+        left = k
+        for s in self.sections:
+            if left <= 0:
+                break
+            sections.append(Section(s.heading, s.lines[:left]))
+            left -= len(s.lines)
+        more = f"…и ещё {total - k}"
+        if sections:
+            last = sections[-1]
+            sections[-1] = Section(last.heading, (*last.lines, more))
+        else:
+            sections.append(Section(None, (more,)))
+        return replace(self, sections=tuple(sections))
+
+    def fit(self, fits: Callable[["Message"], bool]) -> "Message":
+        """Самая полная версия сообщения, для которой `fits` истинно (строки
+        отбрасываются с конца). Если не влезает и одна строка — только «…и ещё N»."""
+        if fits(self):
+            return self
+        lo, hi = 0, sum(len(s.lines) for s in self.sections) - 1
+        while lo < hi:  # наибольшее k, при котором влезает
+            mid = (lo + hi + 1) // 2
+            if fits(self._keep(mid)):
+                lo = mid
+            else:
+                hi = mid - 1
+        return self._keep(lo)
 
 
 def lines(*items: str | None) -> tuple[str, ...]:

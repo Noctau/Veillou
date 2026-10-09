@@ -2,13 +2,13 @@ import uuid
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, Header, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.exceptions import NotFoundError
-from app.core.storage import FileTooLargeError, Storage, get_storage
+from app.core.storage import Storage, get_storage
 from app.domain.enums import AttachmentOwner
 from app.schemas.attachment import AttachmentOrder, AttachmentRead, AttachmentUpdate
 from app.services.attachments import AttachmentService, is_inline_safe, resolve_signed, to_read
@@ -26,12 +26,6 @@ router = APIRouter(prefix="/attachments", tags=["attachments"])
 files_router = APIRouter(prefix="/files", tags=["attachments"])
 
 
-def _limit_body(content_length: Annotated[int | None, Header()] = None) -> None:
-    # Отсекаем заведомо большие загрузки до того, как тело ляжет во временный файл
-    if content_length and content_length > (settings.MAX_UPLOAD_MB + 1) * 1024 * 1024:
-        raise FileTooLargeError(f"Файл больше {settings.MAX_UPLOAD_MB} МБ")
-
-
 @router.get("")
 async def list_attachments(
     owner_type: AttachmentOwner, owner_id: uuid.UUID, svc: Service
@@ -40,14 +34,15 @@ async def list_attachments(
     return [to_read(a) for a in await svc.list(owner_type, owner_id)]
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(_limit_body)])
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def upload_attachment(
     svc: Service,
     owner_type: Annotated[AttachmentOwner, Form()],
     owner_id: Annotated[uuid.UUID, Form()],
     file: Annotated[UploadFile, File()],
 ) -> AttachmentRead:
-    """До MAX_UPLOAD_MB (100 МБ). Одинаковые файлы хранятся один раз (sha256)."""
+    """До MAX_UPLOAD_MB (100 МБ; тело больше отсекает BodySizeLimitMiddleware ещё до
+    разбора). Одинаковые файлы хранятся один раз (sha256)."""
     return to_read(await svc.upload(owner_type, owner_id, file))
 
 
@@ -57,7 +52,7 @@ async def reorder_attachments(data: AttachmentOrder, svc: Service) -> list[Attac
     return [to_read(a) for a in await svc.reorder(data)]
 
 
-@router.post("/{attachment_id}/replace", dependencies=[Depends(_limit_body)])
+@router.post("/{attachment_id}/replace")
 async def replace_attachment(
     attachment_id: uuid.UUID, svc: Service, file: Annotated[UploadFile, File()]
 ) -> AttachmentRead:

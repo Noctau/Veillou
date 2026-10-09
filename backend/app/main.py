@@ -27,9 +27,11 @@ from app.api import (
     tasks,
     telegram,
 )
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.db import engine
 from app.core.exceptions import ERROR_RESPONSES, register_exception_handlers
+from app.core.logs import install as install_log_filters
 
 
 @asynccontextmanager
@@ -44,6 +46,7 @@ def _operation_id(route: APIRoute) -> str:
 
 
 def create_app() -> FastAPI:
+    install_log_filters()
     app = FastAPI(
         title=settings.APP_NAME,
         debug=settings.DEBUG,
@@ -52,6 +55,7 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+    app.add_middleware(BodySizeLimitMiddleware)
 
     api = APIRouter(prefix=settings.API_PREFIX, responses=ERROR_RESPONSES)
     api.include_router(health.router)

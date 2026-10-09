@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -102,5 +102,20 @@ async def logout(db: AsyncSession, token: str) -> None:
         update(UserSession)
         .where(UserSession.token_hash == hash_token(token), UserSession.deleted_at.is_(None))
         .values(deleted_at=now_utc())
+    )
+    await db.commit()
+
+
+# Сколько хранить истёкшие и закрытые сессии (для разбора «кто входил»)
+KEEP_SESSIONS = timedelta(days=30)
+
+
+async def prune_sessions(db: AsyncSession) -> None:
+    """Ночная чистка: давно истёкшие и закрытые сессии удаляются."""
+    cutoff = now_utc() - KEEP_SESSIONS
+    await db.execute(
+        delete(UserSession).where(
+            or_(UserSession.expires_at < cutoff, UserSession.deleted_at < cutoff)
+        )
     )
     await db.commit()

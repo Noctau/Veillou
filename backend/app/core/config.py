@@ -1,12 +1,16 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import PostgresDsn, SecretStr, computed_field, field_validator, model_validator
+from pydantic import PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEV_SECRET = "dev-insecure-secret-change-me"
+# Значение по умолчанию только для разработки: в проде запрещено валидатором ниже
+DEV_SECRET = "dev-insecure-secret-change-me"  # noqa: S105  # nosec B105
+MIN_PROD_SECRET_LEN = 32
 
 
 class Settings(BaseSettings):
@@ -46,6 +50,8 @@ class Settings(BaseSettings):
     # Файлы (вложения, фото конспектов). MVP — диск сервера.
     STORAGE_DIR: Path = REPO_ROOT / "data" / "files"
     MAX_UPLOAD_MB: int = 100
+    # Тело остальных запросов (JSON): самый большой — конспект до 200 000 символов
+    MAX_REQUEST_BODY_KB: int = 2048
     FILE_URL_TTL_MIN: int = 60
 
     TELEGRAM_BOT_TOKEN: SecretStr | None = None
@@ -60,9 +66,20 @@ class Settings(BaseSettings):
     VAPID_PUBLIC_KEY: str | None = None
     VAPID_PRIVATE_KEY: SecretStr | None = None
     VAPID_SUBJECT: str = "mailto:admin@localhost"
+    # Push-сервисы браузеров, на которые можно слать (endpoint подписки — от клиента)
+    PUSH_ALLOWED_HOSTS: list[str] = [
+        "fcm.googleapis.com",  # Chrome, Edge, Opera, Android
+        "android.googleapis.com",
+        "*.push.services.mozilla.com",  # Firefox
+        "*.push.apple.com",  # Safari
+        "*.notify.windows.com",  # старый Edge
+    ]
 
     # Как часто воркер проверяет очереди (точность напоминаний — не хуже минуты)
     WORKER_POLL_SEC: float = 10.0
+    # Куда worker и bot пишут heartbeat для healthcheck (app/heartbeat.py). /tmp внутри
+    # контейнера, файлы — пустые метки времени: подмена даёт лишь неверный healthcheck
+    HEARTBEAT_DIR: Path = Path("/tmp/veillou")  # noqa: S108  # nosec B108
 
     # ИИ (M10). ollama — нативный /api/chat; openai — любой OpenAI-совместимый API
     # (base url вида https://…/v1). Модели: текст и картинки (фото задания).
@@ -90,6 +107,10 @@ class Settings(BaseSettings):
     LLM_QUEUE_MAX_HOURS: float = 72.0
     # Хранить ai_log столько дней
     AI_LOG_KEEP_DAYS: int = 90
+    # Квота ИИ на пользователя: одновременно ждущих запросов и запросов за сутки
+    # (запасной провайдер платный, очередь ИИ — одна на всех)
+    AI_MAX_PENDING: int = 5
+    AI_DAILY_LIMIT: int = 200
 
     @field_validator("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_USERNAME", mode="before")
     @classmethod
@@ -120,15 +141,49 @@ class Settings(BaseSettings):
         # `SECRET_KEY=` в .env — не задан
         return value or DEV_SECRET
 
+    @field_validator("DEFAULT_TIMEZONE")
+    @classmethod
+    def _known_tz(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"DEFAULT_TIMEZONE: неизвестный часовой пояс {value!r}") from exc
+        return value
+
+    @field_validator("APP_URL")
+    @classmethod
+    def _http_url(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"https?://[^/\s]+(/\S*)?", value):
+            raise ValueError("APP_URL: нужен адрес вида https://veillou.example.com")
+        return value
+
+    @field_validator("VAPID_SUBJECT")
+    @classmethod
+    def _vapid_subject(cls, value: str) -> str:
+        if not value.startswith(("mailto:", "https://")):
+            raise ValueError("VAPID_SUBJECT: mailto:… или https://…")
+        return value
+
     @model_validator(mode="after")
-    def _prod_secret(self) -> "Settings":
-        if self.ENV == "prod" and self.SECRET_KEY.get_secret_value() == DEV_SECRET:
-            raise ValueError("В проде задайте SECRET_KEY в .env")
+    def _consistent(self) -> "Settings":
+        secret = self.SECRET_KEY.get_secret_value()
+        if self.ENV == "prod" and (secret == DEV_SECRET or len(secret) < MIN_PROD_SECRET_LEN):
+            raise ValueError(
+                f"В проде задайте SECRET_KEY в .env, не короче {MIN_PROD_SECRET_LEN} символов "
+                "(openssl rand -hex 32)"
+            )
+        if self.LLM_FALLBACK_PROVIDER and not (
+            self.LLM_FALLBACK_BASE_URL and self.LLM_FALLBACK_MODEL
+        ):
+            raise ValueError(
+                "LLM_FALLBACK_PROVIDER задан — нужны LLM_FALLBACK_BASE_URL и LLM_FALLBACK_MODEL"
+            )
         return self
 
-    @computed_field
+    # Не computed_field: тот попадает в repr() и model_dump() — с паролем БД в открытом виде.
+    # Имя — как у остальных настроек (капсом)
     @property
-    def DATABASE_URL(self) -> str:
+    def DATABASE_URL(self) -> str:  # noqa: N802
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=self.POSTGRES_USER,

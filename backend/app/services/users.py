@@ -1,21 +1,15 @@
-import uuid
-
 from email_validator import EmailNotValidError, validate_email
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import ConflictError
 from app.core.security import MAX_PASSWORD_LENGTH, hash_password_async
-from app.core.time import is_valid_tz
-from app.models import User
+from app.core.time import is_valid_tz, now_utc
+from app.models import User, UserSession
 from app.services.catalog import ensure_defaults
 
 MIN_PASSWORD_LENGTH = 8
-
-
-async def get_user(session: AsyncSession, user_id: uuid.UUID) -> User | None:
-    return await session.scalar(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
@@ -61,6 +55,12 @@ async def create_user(
 
 
 async def set_password(session: AsyncSession, user: User, password: str) -> None:
+    """Новый пароль; все сессии пользователя закрываются (старый мог утечь)."""
     validate_password(password)
     user.password_hash = await hash_password_async(password)
+    await session.execute(
+        update(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.deleted_at.is_(None))
+        .values(deleted_at=now_utc())
+    )
     await session.commit()

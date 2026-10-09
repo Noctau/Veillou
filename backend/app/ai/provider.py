@@ -12,7 +12,7 @@ import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -85,6 +85,23 @@ class LLMInvalidError(LLMError):
     message = "ИИ ответил непонятно — попробуйте ещё раз"
 
 
+class LLMRejectedError(LLMError):
+    """API отклонил запрос (4xx: ключ, модель, формат) — ждать бессмысленно."""
+
+    message = "ИИ отклонил запрос — проверьте ключ и модель в настройках сервера"
+
+
+# 4xx, после которых стоит повторить позже (перегрузка, таймаут прокси)
+TRANSIENT_STATUSES = frozenset({408, 409, 425, 429})
+
+
+def _rejected(exc: Exception) -> bool:
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return False
+    code = exc.response.status_code
+    return 400 <= code < 500 and code not in TRANSIENT_STATUSES
+
+
 class LLMProvider(Protocol):
     name: str
 
@@ -154,7 +171,7 @@ def model_schema(schema: type[BaseModel]) -> dict[str, Any]:
             return [clean(v) for v in node]
         return node
 
-    return clean(full)  # type: ignore[no-any-return]
+    return cast(dict[str, Any], clean(full))
 
 
 FIX_PROMPT = (
@@ -210,7 +227,8 @@ class ChatProvider:
             request = _log_request(msgs)
             try:
                 raw = await self._chat(msgs, json_schema, model, schema.__name__)
-            except (httpx.HTTPError, ValueError, KeyError) as exc:
+            # Index/TypeError — ответ не того формата (прокси отдал не то): как недоступность
+            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
                 attempts.append(
                     Attempt(
                         self.name,
@@ -221,6 +239,8 @@ class ChatProvider:
                         error=_error_text(exc)[:2000],
                     )
                 )
+                if _rejected(exc):
+                    raise LLMRejectedError(attempts=attempts) from exc
                 raise LLMUnavailableError(attempts=attempts) from exc
             latency = int((time.monotonic() - started) * 1000)
             try:
@@ -447,7 +467,9 @@ class FallbackProvider:
             except LLMUnavailableError as exc:
                 attempts += exc.attempts
                 self.down_until = self.clock() + self.cooldown_sec
-            except LLMInvalidError as exc:
+            except (LLMInvalidError, LLMRejectedError) as exc:
+                # Не по схеме или отклонён (ключ/модель) — запасной, но без паузы:
+                # основной доступен
                 attempts += exc.attempts
         try:
             result = await self.fallback.complete_json(messages, schema, images)

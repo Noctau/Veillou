@@ -25,7 +25,7 @@ def test_extract_json_tolerates_think_fences_and_chatter():
     assert extract_json('{"value": 1}') == {"value": 1}
     assert extract_json('<think>хм</think>\n```json\n{"value": 2}\n```') == {"value": 2}
     assert extract_json('Вот ответ: {"value": 3}. Удачи!') == {"value": 3}
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Expecting value"):
         extract_json("нет json")
 
 
@@ -44,7 +44,8 @@ async def test_one_retry_with_error_text():
     assert [a.ok for a in result.attempts] == [False, True]
     retry_msgs, _ = fake.calls[1]
     assert retry_msgs[-2].role == "assistant"
-    assert "value" in retry_msgs[-1].content and "не прошёл проверку" in retry_msgs[-1].content
+    assert "value" in retry_msgs[-1].content
+    assert "не прошёл проверку" in retry_msgs[-1].content
 
 
 async def test_two_invalid_answers_fail():
@@ -68,7 +69,8 @@ async def test_images_go_to_vision_model_and_last_user_message():
     result = await fake.complete_json(MSGS, Answer, images=[Image(b"jpg")])
     msgs, model = fake.calls[0]
     assert model == "fake-vision"
-    assert msgs[-1].images and not msgs[0].images
+    assert msgs[-1].images
+    assert not msgs[0].images
     assert result.attempts[0].request[-1]["images"] == 1
 
 
@@ -167,7 +169,7 @@ def test_subject_enum_in_schema():
     assert subject["enum"] == ["Климатология", "Физика атмосферы", ""]
     assert schema.model_validate(parsed(subject="Климатология")).subject == "Климатология"
     assert schema.model_validate(parsed(subject="")).subject is None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="предмет не из списка"):
         schema.model_validate(parsed(subject="История"))
     assert with_subjects(AIParsed, []) is AIParsed
     # Порядок полей — как в модели: kind первым
@@ -178,11 +180,12 @@ def test_parsed_empty_strings_and_time():
     p = AIParsed.model_validate(parsed(deadline_date="2026-10-15", deadline_time="9:30"))
     assert p.deadline_wall() == (date(2026, 10, 15), time(9, 30))
     empty = AIParsed.model_validate(parsed(deadline_time="null"))
-    assert empty.deadline_date is None and empty.deadline_time is None
+    assert empty.deadline_date is None
+    assert empty.deadline_time is None
     assert empty.deadline_wall() is None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="ЧЧ:ММ"):
         AIParsed.model_validate(parsed(deadline_time="25:00"))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="пустое название"):
         AIParsed.model_validate(parsed(title="  "))
 
 
@@ -212,7 +215,8 @@ async def test_ollama_request_and_reply():
     assert path == "/api/chat"
     assert body["model"] == "qwen2.5vl:7b"
     assert body["format"]["properties"]["value"]["type"] == "integer"
-    assert body["stream"] is False and body["think"] is False
+    assert body["stream"] is False
+    assert body["think"] is False
     assert body["messages"][-1]["images"] == ["AA=="]
     assert result.value.value == 5
     assert (result.attempts[0].prompt_tokens, result.attempts[0].completion_tokens) == (11, 3)
@@ -265,7 +269,8 @@ async def test_openai_compat_request_and_reply():
     assert body["response_format"]["json_schema"]["name"] == "Answer"
     content = body["messages"][-1]["content"]
     assert content[1]["image_url"]["url"] == "data:image/png;base64,AA=="
-    assert result.value.value == 9 and result.attempts[0].prompt_tokens == 4
+    assert result.value.value == 9
+    assert result.attempts[0].prompt_tokens == 4
 
 
 # ---------- запасной провайдер ----------
@@ -379,3 +384,60 @@ def test_ai_queue_backoff():
     # ИИ ответил — дальше без пауз, очередь разбирается подряд
     assert ai_pause(JobOutcome.done, 9) == (0.0, 0)
     assert ai_pause(JobOutcome.failed, 2) == (0.0, 0)
+
+
+# ---------- L-04: постоянные ошибки API не ждут в очереди ----------
+
+
+@pytest.mark.parametrize("code", [400, 401, 403, 404, 422])
+async def test_client_errors_are_rejected_not_unavailable(code: int):
+    from app.ai.provider import LLMRejectedError
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(code)))
+    provider = OpenAICompatProvider("http://o/v1", "key", "m", client=client)
+    provider.json_object = True  # без повтора с json_object на 400
+    with pytest.raises(LLMRejectedError):
+        await provider.complete_json(MSGS, Answer)
+
+
+@pytest.mark.parametrize("code", [408, 429, 500, 502, 503])
+async def test_transient_errors_stay_unavailable(code: int):
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(code)))
+    provider = OllamaProvider("http://o", "m", client=client)
+    with pytest.raises(LLMUnavailableError):
+        await provider.complete_json(MSGS, Answer)
+
+
+@pytest.mark.parametrize("body", [{"choices": []}, {"choices": [None]}, {"choices": "x"}])
+async def test_malformed_envelope_is_unavailable(body: dict):
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body))
+    )
+    provider = OpenAICompatProvider("http://o/v1", None, "m", client=client)
+    with pytest.raises(LLMUnavailableError):
+        await provider.complete_json(MSGS, Answer)
+
+
+async def test_fallback_after_rejected_primary_without_cooldown():
+    from app.ai.provider import FallbackProvider, LLMRejectedError
+
+    primary = FakeProvider([LLMRejectedError(), '{"value": 5}'])
+    backup = FakeProvider(['{"value": 7}'])
+    provider = FallbackProvider(primary, backup, clock=Clock())
+    assert (await provider.complete_json(MSGS, Answer)).value.value == 7
+    assert (await provider.complete_json(MSGS, Answer)).value.value == 5
+
+
+async def test_rejected_request_fails_job_at_once(session, user):
+    from app.ai import set_provider
+    from app.ai.provider import LLMRejectedError
+    from app.domain.enums import AIPurpose
+    from app.services.ai import call_llm
+    from app.services.jobs import JobFailedError
+
+    set_provider(FakeProvider([LLMRejectedError()]))
+    try:
+        with pytest.raises(JobFailedError):
+            await call_llm(session, user.id, AIPurpose.parse, MSGS, Answer)
+    finally:
+        set_provider(None)

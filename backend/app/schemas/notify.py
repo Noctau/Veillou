@@ -3,9 +3,10 @@
 import uuid
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from app.domain.enums import ReminderAction, ReminderKind
+from app.notify.push_hosts import push_host_allowed
 from app.schemas.common import InputModel, ReadModel, UTCMoment
 from app.schemas.settings import Channel
 
@@ -23,6 +24,13 @@ class PushSubscriptionCreate(InputModel):
     endpoint: Annotated[str, StringConstraints(pattern=r"^https://", max_length=2000)]
     keys: PushKeys
     device_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
+
+    @field_validator("endpoint")
+    @classmethod
+    def _known_service(cls, value: str) -> str:
+        if not push_host_allowed(value):
+            raise ValueError("Неизвестный push-сервис")
+        return value
 
 
 class PushUnsubscribe(InputModel):
