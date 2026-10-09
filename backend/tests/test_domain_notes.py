@@ -1,3 +1,4 @@
+import time
 from datetime import date
 
 import pytest
@@ -42,3 +43,20 @@ def test_excerpt_cuts_on_word():
 
 def test_excerpt_long_word():
     assert excerpt("а" * 30, limit=10) == "а" * 10 + "…"
+
+
+@pytest.mark.parametrize(
+    "unit",
+    ["[", "![](", "[](", "[a](", "[a](b(", "$", "```", "$$"],
+)
+def test_excerpt_is_linear_on_pathological_input(unit):
+    """M-04: тело конспекта до 200 000 символов не должно вешать сервер."""
+    markdown = unit * (200_000 // len(unit))
+    started = time.perf_counter()
+    excerpt(markdown)
+    assert time.perf_counter() - started < 0.5
+
+
+def test_excerpt_strips_links_with_parentheses_in_url():
+    text = "см. [учебник](https://example.com) и [вики](https://w.org/a_(b))"
+    assert excerpt(text) == "см. учебник и вики"
