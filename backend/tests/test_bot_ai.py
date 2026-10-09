@@ -92,7 +92,8 @@ async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, sessio
     fake.push(parse_answer())
     await run_jobs(tg.bot)
     card = sent(tg, EditMessageText)[-1]
-    assert "Реферат о муссонах" in card.text and "Реферат" in card.text
+    assert "Реферат о муссонах" in card.text
+    assert "Реферат" in card.text
     labels = [t for t, _ in buttons(card.reply_markup)]
     assert labels == ["Создать и разбить", "Создать", "Изменить"]
 
@@ -100,8 +101,10 @@ async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, sessio
     await press(tg, mk, as_message(card))
     [task] = await tasks(session)
     task_id = task.id
-    assert task.title == "Реферат о муссонах" and task.task_type == "essay"
-    assert "ГОСТ" in task.description and task.deadline is not None
+    assert task.title == "Реферат о муссонах"
+    assert task.task_type == "essay"
+    assert "ГОСТ" in task.description
+    assert task.deadline is not None
     assert "Разбиваю на шаги" in sent(tg, EditMessageText)[-1].text
 
     # Повторное нажатие не создаёт второе задание
@@ -112,7 +115,8 @@ async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, sessio
     await run_jobs(tg.bot)
     steps = sent(tg, SendMessage)[-1]
     assert "Шаги для «Реферат о муссонах»" in steps.text
-    assert "1. Найти 3 источника" in steps.text and "(после 1)" in steps.text
+    assert "1. Найти 3 источника" in steps.text
+    assert "(после 1)" in steps.text
     kb = buttons(steps.reply_markup)
     assert kb[0][0] == "Запланировать"
     assert any("Поправить" in t for t, _ in kb)
@@ -120,14 +124,16 @@ async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, sessio
     await press(tg, kb[0][1], as_message(steps))
     session.expire_all()
     subtasks = list(await session.scalars(select(Subtask).where(Subtask.task_id == task_id)))
-    assert len(subtasks) == 3 and all(s.status == SubtaskStatus.todo for s in subtasks)
+    assert len(subtasks) == 3
+    assert all(s.status == SubtaskStatus.todo for s in subtasks)
     plan_msg = sent(tg, SendMessage)[-1]
     assert plan_msg.text.startswith("Превью плана")
     apply = next(cb for t, cb in buttons(plan_msg.reply_markup) if t == "Применить план")
 
     await press(tg, apply, as_message(plan_msg))
     rev = await session.scalar(select(PlanRevision).order_by(PlanRevision.created_at.desc()))
-    assert rev is not None and rev.status == "applied"
+    assert rev is not None
+    assert rev.status == "applied"
 
 
 async def test_edit_to_backlog_and_raw(tg, linked, session, fake):
@@ -139,7 +145,8 @@ async def test_edit_to_backlog_and_raw(tg, linked, session, fake):
     await press(tg, edit, as_message(card))
     markup = tg.session.sent[-1].reply_markup  # type: ignore[attr-defined]
     labels = dict(buttons(markup))
-    assert "→ В ящик" in labels and "Как написано, без ИИ" in labels
+    assert "→ В ящик" in labels
+    assert "Как написано, без ИИ" in labels
 
     await press(tg, labels["→ В ящик"], as_message(card))
     items = list(await session.scalars(select(BacklogItem)))
@@ -156,7 +163,8 @@ async def test_ai_unavailable_waits_in_queue_then_answers(tg, linked, fake):
     fake.push(httpx.ConnectError("нет"))
     await run_jobs(tg.bot)
     edits = sent(tg, EditMessageText)
-    assert len(edits) == 1 and "в очереди" in edits[0].text
+    assert len(edits) == 1
+    assert "в очереди" in edits[0].text
 
     # Снова недоступен — второй раз не пишем
     fake.push(httpx.ConnectError("нет"))
@@ -167,7 +175,8 @@ async def test_ai_unavailable_waits_in_queue_then_answers(tg, linked, fake):
     fake.push(parse_answer())
     await run_ai_later(10, tg.bot)
     card = sent(tg, EditMessageText)[-1]
-    assert "Реферат о муссонах" in card.text and card.message_id == edits[0].message_id
+    assert "Реферат о муссонах" in card.text
+    assert card.message_id == edits[0].message_id
 
 
 async def test_ai_error_reported_in_chat(tg, linked, fake):
@@ -196,15 +205,18 @@ async def test_photo_creates_task_and_recognizes(tg, linked, session, fake, monk
     [task] = await tasks(session)
     assert task.title == "Задание с фото"
     [att] = list(await session.scalars(select(Attachment)))
-    assert att.owner_id == task.id and att.mime == "image/jpeg"
+    assert att.owner_id == task.id
+    assert att.mime == "image/jpeg"
     assert sent(tg, SendMessage)[-1].text == "📷 Распознаю фото…"
 
     fake.push(photo_answer(title="Задачи 1–5", text="Решить задачи 1–5", task_type="homework"))
     await run_jobs(tg.bot)
     card = sent(tg, EditMessageText)[-1]
-    assert "Задачи 1–5" in card.text and "Решить задачи 1–5" in card.text
+    assert "Задачи 1–5" in card.text
+    assert "Решить задачи 1–5" in card.text
     assert [t for t, _ in buttons(card.reply_markup)] == ["Разбить на шаги", "Открыть", "Удалить"]
     async with session_factory() as db:
         fresh = await db.get(Task, task.id)
-        assert fresh is not None and fresh.task_type == "homework"
+        assert fresh is not None
+        assert fresh.task_type == "homework"
         assert (await db.get(User, fresh.user_id)) is not None

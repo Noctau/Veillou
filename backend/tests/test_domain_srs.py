@@ -51,7 +51,8 @@ def test_week_plan_learn_reviews_and_run():
     assert run == {day(6): tuple(f"q{i}" for i in range(1, 7))}
     reviews = by_kind(plans, K.review)
     # q1 выучен в день 0: повторения 1, 3 (7 — после прогона, отброшено)
-    assert "q1" in reviews[day(1)] and "q1" in reviews[day(3)]
+    assert "q1" in reviews[day(1)]
+    assert "q1" in reviews[day(3)]
     assert all(d < day(6) for d in reviews)
     minutes = {(p.date, p.kind): p.minutes for p in plans}
     assert minutes[(day(0), K.learn)] == 45
@@ -126,7 +127,8 @@ def test_closed_review_day_shifts_reviews():
     q = Question("a", 1, S.learned, learned_on=day(-1))
     closed = frozenset({(TODAY, K.review)})
     reviews = by_kind(build([q], TODAY, day(10), P, closed), K.review)
-    assert TODAY not in reviews and day(1) in reviews
+    assert TODAY not in reviews
+    assert day(1) in reviews
 
 
 def test_closed_run_is_not_planned_again():

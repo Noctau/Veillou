@@ -20,10 +20,12 @@ async def test_create_guesses_action_type_and_category(auth_client):
     item = await make_item(auth_client)
     assert item["action_type_id"] == types["institutions"]["id"]
     assert item["category_id"] == cats["home"]["id"]
-    assert item["status"] == "active" and item["conditions"] == []
+    assert item["status"] == "active"
+    assert item["conditions"] == []
 
     unknown = await make_item(auth_client, title="Что-то своё")
-    assert unknown["action_type_id"] is None and unknown["category_id"] is None
+    assert unknown["action_type_id"] is None
+    assert unknown["category_id"] is None
 
     personal = cats["personal"]["id"]
     explicit = await make_item(auth_client, title="Купить подарок", category_id=personal)
@@ -65,7 +67,8 @@ async def test_done_archive_and_restore(auth_client):
     assert await listing(auth_client, "archived") == ["Записаться к стоматологу"]
 
     resp = await auth_client.patch(url, json={"status": "active"})
-    assert resp.json()["archived_at"] is None and resp.json()["done_at"] is None
+    assert resp.json()["archived_at"] is None
+    assert resp.json()["done_at"] is None
     resp = await auth_client.patch(url, json={"status": "done"})
     assert resp.json()["done_at"] is not None
     assert await listing(auth_client, "done") == ["Записаться к стоматологу"]

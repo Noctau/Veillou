@@ -37,7 +37,8 @@ async def test_suggests_steps_then_backlog(auth_client, user):
     kinds = [(r.kind, str(r.id)) for r in result]
     assert ("subtask", c["id"]) not in kinds  # 2 часа в 60 минут не влезают
     assert kinds[-1] == ("backlog", str(item.id))
-    assert result[0].kind == "subtask" and result[0].subtitle == "Реферат"
+    assert result[0].kind == "subtask"
+    assert result[0].subtitle == "Реферат"
 
 
 async def test_dependencies_respected(auth_client, user):
@@ -71,7 +72,8 @@ async def test_start_subtask_pins_block_now(auth_client, user):
     _, (a,) = await task_with_steps(auth_client, 30)
     now = at(TUE, 10, 7)
     event = await free(user, "start", "subtask", uuid.UUID(a["id"]), now=now)
-    assert event.is_pinned and event.start == at(TUE, 10, 7)
+    assert event.is_pinned
+    assert event.start == at(TUE, 10, 7)
     assert event.end - event.start == timedelta(minutes=30)
 
 
@@ -82,7 +84,9 @@ async def test_start_backlog_item(auth_client, user):
         [e] = list(
             await db.scalars(select(Event).where(Event.source_type == SourceType.backlog_item))
         )
-    assert e.kind == EventKind.backlog and e.is_pinned and not e.is_fixed
+    assert e.kind == EventKind.backlog
+    assert e.is_pinned
+    assert not e.is_fixed
 
 
 async def test_free_api(auth_client, user):

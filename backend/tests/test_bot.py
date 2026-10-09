@@ -94,7 +94,8 @@ async def active_backlog(session: AsyncSession) -> list[BacklogItem]:
 
 async def test_free_text_to_backlog(tg, session, linked):
     [reply] = await tg.send("записаться к стоматологу")
-    assert "В ящике" in reply and "Записаться к стоматологу" in reply
+    assert "В ящике" in reply
+    assert "Записаться к стоматологу" in reply
     [item] = await active_backlog(session)
     assert item.title == "Записаться к стоматологу"
     assert ("Изменить", f"qa:edit:b:{item.id.hex}") in buttons(last_markup(tg))
@@ -103,7 +104,8 @@ async def test_free_text_to_backlog(tg, session, linked):
 async def test_add_task_with_deadline(tg, session, linked):
     """/add — всегда быстрый разбор, без ИИ (свободный текст без предмета ушёл бы в ИИ)."""
     [reply] = await tg.send("/add сдать реферат до 15 окт")
-    assert "Задание" in reply and "до " in reply
+    assert "Задание" in reply
+    assert "до " in reply
     [task] = await active_tasks(session)
     assert task.deadline is not None
     assert task.task_type == "essay"
@@ -126,7 +128,8 @@ async def test_free_text_event(tg, session, linked):
     event = await session.scalar(select(Event).where(Event.kind == EventKind.personal))
     assert event is not None
     local = event.start.astimezone(TZ)
-    assert local.time() == time(19) and event.end - event.start == timedelta(hours=1)
+    assert local.time() == time(19)
+    assert event.end - event.start == timedelta(hours=1)
 
 
 async def test_edit_switch_backlog_to_task(tg, session, linked):
@@ -145,7 +148,8 @@ async def test_edit_switch_backlog_to_task(tg, session, linked):
     [task] = await active_tasks(session)
     assert task.title == "Записаться к стоматологу"
     edit = tg.session.sent[-1]
-    assert isinstance(edit, EditMessageText) and "Задание" in edit.text
+    assert isinstance(edit, EditMessageText)
+    assert "Задание" in edit.text
 
 
 async def test_edit_to_event_without_time_is_refused(tg, session, linked):
@@ -199,8 +203,10 @@ async def test_today(tg, session, linked):
     await session.commit()
     [reply] = await tg.send("/today")
     assert "10:45–12:20 Климатология (лекция) · ауд. 1234" in reply
-    assert "Дедлайны недели" in reply and "Реферат" in reply
-    assert "Из долгого ящика" in reply and "стоматологу" in reply
+    assert "Дедлайны недели" in reply
+    assert "Реферат" in reply
+    assert "Из долгого ящика" in reply
+    assert "стоматологу" in reply
 
 
 async def test_today_shows_overdue(tg, session, linked):
@@ -217,8 +223,11 @@ async def test_today_shows_overdue(tg, session, linked):
     await session.commit()
     [reply] = await tg.send("/today")
     overdue, week = reply.split("Дедлайны недели")
-    assert "Просрочено" in overdue and "Эссе" in overdue and "Лаба" not in overdue
-    assert "Лаба" in week and "Эссе" not in week
+    assert "Просрочено" in overdue
+    assert "Эссе" in overdue
+    assert "Лаба" not in overdue
+    assert "Лаба" in week
+    assert "Эссе" not in week
 
 
 async def test_today_empty(tg, linked):

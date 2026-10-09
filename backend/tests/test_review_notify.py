@@ -78,7 +78,8 @@ async def test_sync_creates_review_reminders(session, user):
     weeklies = [r for r in rows if r.kind == ReminderKind.weekly_review]
     assert len(evenings) >= 7
     assert all(r.fire_at.astimezone(TZ).strftime("%H:%M") == "21:30" for r in evenings)
-    assert weeklies and all(r.fire_at.astimezone(TZ).isoweekday() == 7 for r in weeklies)
+    assert weeklies
+    assert all(r.fire_at.astimezone(TZ).isoweekday() == 7 for r in weeklies)
     assert all(r.fire_at.astimezone(TZ).strftime("%H:%M") == "19:00" for r in weeklies)
 
 
@@ -142,7 +143,8 @@ async def test_weekly_message_and_accept(auth_client, user):
         db.add(r)
         await db.commit()
         msg = await render(db, u, r, at(SUN, 19))
-        assert msg is not None and msg.title == "Разбор недели"
+        assert msg is not None
+        assert msg.title == "Разбор недели"
         assert msg.actions == (ReminderAction.accept,)
         assert any("Стоматолог" in line for s in msg.sections for line in s.lines)
         result = await reminder_actions.perform(db, u, r, ReminderAction.accept, now=at(SUN, 19))
@@ -186,7 +188,8 @@ async def test_morning_digest_has_plan_and_backlog(auth_client, user):
     sections = {s.heading: s.lines for s in msg.sections}
     assert any("ауд. 1801" in line for line in sections["Пары"])
     plan = sections["План на день"]
-    assert len(plan) == 2 and all("Шаг — Реферат" in line for line in plan)
+    assert len(plan) == 2
+    assert all("Шаг — Реферат" in line for line in plan)
     assert any("Стоматолог" in line for line in sections["Из долгого ящика"])
 
 
@@ -209,7 +212,8 @@ async def test_today_digest_shows_upcoming_exam(auth_client, user):
         digest = Digest(db, u)
         msg = await digest.day(digest.today)
     exams = next(s for s in msg.sections if s.heading == "Экзамены")
-    assert "Экзамен: Климатология" in exams.lines[0] and "через 3 дня" in exams.lines[0]
+    assert "Экзамен: Климатология" in exams.lines[0]
+    assert "через 3 дня" in exams.lines[0]
 
 
 # ---------- бот ----------

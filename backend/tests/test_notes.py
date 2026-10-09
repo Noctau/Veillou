@@ -78,7 +78,8 @@ async def test_text_note_crud(auth_client: AsyncClient):
     assert note["class_date"] == "2026-10-06"
     assert note["kind"] == "text"
     assert note["excerpt"] == "Лекция 3 Уравнение …"
-    assert note["event"] is None and note["attachments_count"] == 0
+    assert note["event"] is None
+    assert note["attachments_count"] == 0
 
     resp = await auth_client.patch(
         f"{API}/notes/{note['id']}", json={"title": "Термодинамика", "body_md": "новое"}

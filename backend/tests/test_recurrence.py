@@ -118,7 +118,8 @@ def test_single_holiday_skipped():
         rule, FALL, BELLS, MSK, days_off=[DateRange(date(2026, 11, 4), date(2026, 11, 4))]
     )
     assert date(2026, 11, 4) not in dates(occ)
-    assert date(2026, 10, 28) in dates(occ) and date(2026, 11, 11) in dates(occ)
+    assert date(2026, 10, 28) in dates(occ)
+    assert date(2026, 11, 11) in dates(occ)
 
 
 def test_holiday_range_skips_whole_week():
@@ -247,7 +248,7 @@ def test_rrule_overnight_and_dst():
     ["", "FREQ=HOURLY", "FREQ=WEEKLY;BYHOUR=10", "DTSTART:20260101\nRRULE:FREQ=DAILY", "bogus"],
 )
 def test_parse_rrule_rejects(value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"(?i)повтор|правил"):
         parse_rrule(value)
 
 

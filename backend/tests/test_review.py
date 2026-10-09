@@ -101,7 +101,8 @@ async def test_reschedule_all_moves_to_preview(auth_client, user):
     evening = at(MON, 21, 30)
     moved, rev = await review(user, "reschedule", now=evening)
     assert moved == 2
-    assert rev is not None and PlanReason.missed in rev.reasons
+    assert rev is not None
+    assert PlanReason.missed in rev.reasons
     # Старые блоки — «не сделано», новые предложены на завтра и дальше
     statuses = {e.status for e in await events_of(user, EventKind.subtask)}
     assert statuses == {EventStatus.missed}
@@ -130,7 +131,8 @@ async def test_reschedule_warns_about_deadline(auth_client, user):
     await task_with_steps(auth_client, 120, 120, deadline=at(MON + timedelta(days=1), 12))
     await apply_preview(user)
     _, rev = await review(user, "reschedule", now=at(MON, 21, 30))
-    assert rev is not None and rev.at_risk
+    assert rev is not None
+    assert rev.at_risk
     assert rev.at_risk[0]["group_kind"] == "task"
 
 
@@ -174,7 +176,9 @@ async def test_only_items_taken_for_week_are_planned(auth_client, user):
     blocks = {b.id: b for b in snap.inp.blocks}
     assert set(blocks) == {f"backlog_item:{taken.id}"}
     block = blocks[f"backlog_item:{taken.id}"]
-    assert block.filler and not block.splittable and block.group_id is None
+    assert block.filler
+    assert not block.splittable
+    assert block.group_id is None
     assert block.deadline == at(NEXT_MON, 0)
 
 
@@ -188,7 +192,8 @@ async def test_backlog_goes_after_study_and_into_its_week(auth_client, user):
     assert start.astimezone(TZ).date() < NEXT_MON
     await call(user, "apply", rev.id)
     [box] = await events_of(user, EventKind.backlog)
-    assert box.source_id == item.id and not box.is_fixed
+    assert box.source_id == item.id
+    assert not box.is_fixed
 
 
 async def test_on_class_days_condition(auth_client, user):
@@ -274,14 +279,16 @@ async def test_weekly_confirm_plans_items(auth_client, user):
     b = await add_item(user, "Паспорт", estimate_min=60, conditions=["weekday_daytime"])
     sunday = at(SUN, 19)
     rev = await review(user, "confirm_week", [a.id, b.id], now=sunday)
-    assert rev is not None and PlanReason.weekly in rev.reasons
+    assert rev is not None
+    assert PlanReason.weekly in rev.reasons
     adds = [o for o in ops_of(rev, "add") if o["source_type"] == "backlog_item"]
     assert {o["source_id"] for o in adds} == {str(a.id), str(b.id)}
     for o in adds:
         local = datetime.fromisoformat(o["after"]["start"]).astimezone(TZ)
         assert NEXT_MON <= local.date() < NEXT_MON + timedelta(days=7)
         if o["source_id"] == str(b.id):
-            assert local.isoweekday() <= 5 and time(9) <= local.time() < time(18)
+            assert local.isoweekday() <= 5
+            assert time(9) <= local.time() < time(18)
     week = await review(user, "weekly", now=sunday)
     assert {i.id for i in week.planned} == {a.id, b.id}
     assert len(week.suggestions) <= 1
@@ -332,4 +339,5 @@ async def test_weekly_api(auth_client, user):
 
 
 def test_dates():
-    assert MON == date(2030, 1, 7) and SUN.isoweekday() == 7
+    assert date(2030, 1, 7) == MON
+    assert SUN.isoweekday() == 7

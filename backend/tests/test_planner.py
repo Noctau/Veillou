@@ -79,7 +79,8 @@ def risks(result: PlanResult) -> dict:
 
 def test_empty_input():
     result = solve(PlanInput(now=at(MON, 8), tz=TZ, blocks=()))
-    assert result.placements == () and result.at_risk == ()
+    assert result.placements == ()
+    assert result.at_risk == ()
     assert result.stats.blocks == 0
 
 

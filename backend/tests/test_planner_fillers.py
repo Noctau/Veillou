@@ -48,7 +48,8 @@ def test_filler_takes_what_is_left(limit):
     study = Block("study", 60, windows=STUDY, deadline=at(TUE, 23))
     filler = Block("box", 60, filler=True)
     result = plan(study, filler, settings=NO_REST, time_limit_s=limit)
-    assert parts(result, "study") and parts(result, "box")
+    assert parts(result, "study")
+    assert parts(result, "box")
     assert start(result, "study") <= start(result, "box")
     assert result.at_risk == ()
 
@@ -71,7 +72,8 @@ def test_filler_does_not_count_as_study():
         "box", 60, filler=True, counts_as_study=False, deadline=at(MON, 23), buffer_days=0
     )
     result = plan(study, filler, settings=settings)
-    assert parts(result, "study") and parts(result, "box")
+    assert parts(result, "study")
+    assert parts(result, "box")
 
 
 @pytest.mark.parametrize("limit", [0, 0.5])
@@ -96,7 +98,8 @@ def test_allowed_days_night_belongs_to_previous_day():
     )
     result = plan(block, settings=settings)
     local = start(result, "late").astimezone(TZ)
-    assert local.date() == WED and local.hour == 0
+    assert local.date() == WED
+    assert local.hour == 0
 
 
 # ---------- риск «не хватает времени без отдыха» ----------

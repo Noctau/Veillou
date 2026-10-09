@@ -25,7 +25,7 @@ def test_now_utc_is_aware_utc():
 
 
 def test_get_tz_unknown():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown timezone"):
         get_tz("Mars/Olympus")
     assert not is_valid_tz("")
     assert is_valid_tz("Europe/Moscow")
@@ -56,7 +56,7 @@ def test_wall_to_utc_crosses_utc_midnight():
 
 
 def test_wall_to_utc_rejects_aware_time():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="naive"):
         wall_to_utc(date(2026, 9, 1), time(9, 0, tzinfo=UTC), MSK)
 
 

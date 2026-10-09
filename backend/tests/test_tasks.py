@@ -35,11 +35,13 @@ async def test_create_task_with_defaults(auth_client):
     assert task["action_type_id"] == types["study"]["id"]
     assert task["category_id"] == cats["study"]["id"]
     assert task["deadline"] == "2026-10-15T20:59:00Z"
-    assert task["status"] == "active" and task["priority"] == "normal"
+    assert task["status"] == "active"
+    assert task["priority"] == "normal"
     assert [s["title"] for s in task["subtasks"]] == ["Найти источники", "Написать"]
     assert [s["position"] for s in task["subtasks"]] == [0, 1]
     assert task["subtasks"][1]["estimate_min"] == 30
-    assert task["subtasks_total"] == 2 and task["progress"] == 0
+    assert task["subtasks_total"] == 2
+    assert task["progress"] == 0
 
 
 async def test_category_follows_action_type(auth_client):
@@ -64,7 +66,8 @@ async def test_progress_and_done_sync(auth_client):
 
     # Снятие отметки сбрасывает и оценку «как прошло»
     resp = await auth_client.patch(f"{API}/subtasks/{first['id']}", json={"status": "todo"})
-    assert resp.json()["actual_feel"] is None and resp.json()["done_at"] is None
+    assert resp.json()["actual_feel"] is None
+    assert resp.json()["done_at"] is None
 
     resp = await auth_client.patch(f"{API}/tasks/{task['id']}", json={"status": "done"})
     assert resp.json()["done_at"] is not None
@@ -144,16 +147,20 @@ async def test_schedule_subtask_and_calendar_sync(auth_client):
     resp = await auth_client.post(url, json={"start": "2026-10-07T18:00:00+03:00"})
     assert resp.status_code == 200, resp.text
     [block] = resp.json()["events"]
-    assert block["start"] == "2026-10-07T15:00:00Z" and block["end"] == "2026-10-07T16:30:00Z"
+    assert block["start"] == "2026-10-07T15:00:00Z"
+    assert block["end"] == "2026-10-07T16:30:00Z"
     assert block["is_pinned"]
 
     cal = await auth_client.get(
         f"{API}/calendar", params={"from": "2026-10-07T00:00:00Z", "to": "2026-10-08T00:00:00Z"}
     )
     [event] = cal.json()["events"]
-    assert event["kind"] == "subtask" and not event["is_fixed"]
-    assert event["source_type"] == "subtask" and event["source_id"] == sub["id"]
-    assert event["title"] == "Глава 1" and event["color"] == cats["study"]["color"]
+    assert event["kind"] == "subtask"
+    assert not event["is_fixed"]
+    assert event["source_type"] == "subtask"
+    assert event["source_id"] == sub["id"]
+    assert event["title"] == "Глава 1"
+    assert event["color"] == cats["study"]["color"]
 
     # Перенос — тот же блок
     resp = await auth_client.post(url, json={"start": "2026-10-08T10:00:00+03:00"})

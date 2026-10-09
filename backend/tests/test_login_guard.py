@@ -46,7 +46,8 @@ async def test_password_check_runs_outside_event_loop(
     monkeypatch.setattr(security._password_hash, "verify", spy)
     assert (await login(client)).status_code == 200
     assert (await login(client, "wrong-password")).status_code == 401
-    assert seen and loop_thread not in seen
+    assert seen
+    assert loop_thread not in seen
 
 
 async def test_concurrent_password_checks_are_bounded(

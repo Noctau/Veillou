@@ -92,7 +92,8 @@ async def test_categories_crud(auth_client):
     )
     assert resp.status_code == 201, resp.text
     health = resp.json()
-    assert health["key"] is None and health["position"] == 4
+    assert health["key"] is None
+    assert health["position"] == 4
 
     resp = await auth_client.patch(f"{API}/categories/{health['id']}", json={"name": "Врачи"})
     assert resp.json()["name"] == "Врачи"

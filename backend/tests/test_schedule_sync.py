@@ -62,9 +62,13 @@ async def test_rule_materializes_from_today(setup, session: AsyncSession):
     events = await live_events(session)
     assert [e.occurrence_date for e in events] == THURSDAYS
     first = events[0]
-    assert first.kind == "class" and first.is_fixed
-    assert first.title == "Климатология" and first.color == "#10b981"
-    assert first.location == "1801" and first.class_type == "seminar" and first.pair_number == 2
+    assert first.kind == "class"
+    assert first.is_fixed
+    assert first.title == "Климатология"
+    assert first.color == "#10b981"
+    assert first.location == "1801"
+    assert first.class_type == "seminar"
+    assert first.pair_number == 2
     assert first.start == datetime(2026, 10, 8, 7, 45, tzinfo=UTC)  # 10:45 МСК
     assert str(first.template_id) == setup["rule"]["id"]
 
@@ -106,7 +110,8 @@ async def test_series_edit_keeps_manually_moved_class(
     assert kept.start == datetime(2026, 10, 16, 10, 0, tzinfo=UTC)
 
     updated = by_id[other.id]
-    assert updated.location == "2105" and updated.pair_number == 1
+    assert updated.location == "2105"
+    assert updated.pair_number == 1
     assert updated.start == datetime(2026, 10, 22, 6, 0, tzinfo=UTC)  # 09:00 МСК
 
 
@@ -119,7 +124,8 @@ async def test_cancelled_class_not_resurrected(
     events = await live_events(session)
     assert len(events) == 12
     cancelled = next(e for e in events if e.id == target.id)
-    assert cancelled.status == "cancelled" and cancelled.detached
+    assert cancelled.status == "cancelled"
+    assert cancelled.detached
 
 
 async def test_reset_returns_to_series(setup, auth_client: AsyncClient, session: AsyncSession):
@@ -137,7 +143,8 @@ async def test_day_off_removes_and_restores(setup, auth_client: AsyncClient, ses
     )
     day_off = resp.json()
     dates = [e.occurrence_date for e in await live_events(session)]
-    assert date(2026, 11, 5) not in dates and len(dates) == 11
+    assert date(2026, 11, 5) not in dates
+    assert len(dates) == 11
 
     await auth_client.delete(f"{API}/days-off/{day_off['id']}")
     assert [e.occurrence_date for e in await live_events(session)] == THURSDAYS
@@ -231,5 +238,6 @@ async def test_reset_past_occurrence(setup, auth_client: AsyncClient, session: A
     clock["now"] = datetime(2026, 10, 20, 4, 0, tzinfo=UTC)
     resp = await auth_client.post(f"{API}/events/{target.id}/reset")
     data = resp.json()
-    assert data["detached"] is False and data["location"] == "1801"
+    assert data["detached"] is False
+    assert data["location"] == "1801"
     assert data["start"] == "2026-10-08T07:45:00Z"

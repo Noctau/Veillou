@@ -17,6 +17,12 @@ dependencies = [
     "pywebpush>=2.5.0",
     "ortools>=9.15.6755",
     "httpx>=0.27",
+    # Импортируются напрямую (а не только через fastapi / pywebpush / pydantic[email])
+    "starlette>=0.46",
+    "anyio>=4.6",
+    "cryptography>=43",
+    "requests>=2.32",
+    "email-validator>=2.2",
 ]
 
 [dependency-groups]
@@ -25,6 +31,9 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.6",
     "hypothesis>=6.168.5",
+    "pytest-cov>=6",
+    "mypy>=1.18",
+    "deptry>=0.23",
 ]
 
 [tool.uv]
@@ -36,16 +45,52 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 
+[tool.mypy]
+strict = true
+# Ловит переменную, которая в этой ветке ещё не присвоена (или осталась от другого цикла)
+enable_error_code = ["possibly-undefined", "redundant-expr", "truthy-bool"]
+files = ["app", "scripts"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# Нет type hints у библиотек
+module = ["pywebpush.*", "ortools.*", "dateutil.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+# SQLAlchemy async работает через greenlet: без этого coverage не видит код после await
+concurrency = ["greenlet", "thread"]
+source = ["app"]
+omit = ["app/ai/evals/*"]
+
+[tool.coverage.report]
+fail_under = 88
+show_missing = true
+skip_covered = true
+
+[tool.deptry]
+# uvicorn — сервер (CLI), asyncpg — драйвер в DSN, python-multipart — разбор форм в FastAPI
+known_first_party = ["app", "scripts"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["uvicorn", "asyncpg", "python-multipart"]
+
+[tool.deptry.package_module_name_map]
+python-dateutil = "dateutil"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "RUF"]
+select = ["E", "F", "W", "I", "UP", "B", "S", "SIM", "RUF", "ASYNC", "PT", "N"]
 ignore = ["RUF001", "RUF002", "RUF003"]  # кириллица в строках/комментариях
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["B011"]
+# assert — суть pytest; пароли и токены в тестах — фикстуры; random — генерация данных
+# в property-тестах; subprocess — запуск CLI с фиксированными аргументами
+"tests/**" = ["B011", "S101", "S105", "S106", "S107", "S311", "S603"]
 # Тексты промптов не переносим — модели читают их как есть
 "app/ai/prompts.py" = ["E501"]
 

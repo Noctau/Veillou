@@ -46,7 +46,9 @@ async def test_recurring_materializes_90_days(auth_client, session: AsyncSession
     assert dates[-1] <= date(2027, 1, 4)
     assert len(dates) == 26
     first = events[0]
-    assert first.kind == "rest" and first.is_fixed and first.title == "Бассейн"
+    assert first.kind == "rest"
+    assert first.is_fixed
+    assert first.title == "Бассейн"
     assert first.start == datetime(2026, 10, 6, 16, 0, tzinfo=UTC)
     assert first.end == datetime(2026, 10, 6, 17, 30, tzinfo=UTC)
 
@@ -87,7 +89,8 @@ async def test_rrule_change_and_delete(auth_client, session: AsyncSession, clock
         f"{API}/recurring-events/{rec['id']}", json={"rrule": "FREQ=WEEKLY;BYDAY=SA"}
     )
     dates = [e.occurrence_date for e in await live_events(session)]
-    assert all(d.isoweekday() == 6 for d in dates) and len(dates) == 13
+    assert all(d.isoweekday() == 6 for d in dates)
+    assert len(dates) == 13
 
     resp = await auth_client.delete(f"{API}/recurring-events/{rec['id']}")
     assert resp.status_code == 204
@@ -116,7 +119,8 @@ async def test_reset_recurring_occurrence(auth_client, session: AsyncSession, cl
     target = (await live_events(session))[0]
     await auth_client.patch(f"{API}/events/{target.id}", json={"title": "Тренажёрка"})
     resp = await auth_client.post(f"{API}/events/{target.id}/reset")
-    assert resp.json()["title"] == "Бассейн" and resp.json()["detached"] is False
+    assert resp.json()["title"] == "Бассейн"
+    assert resp.json()["detached"] is False
 
 
 # ---------- календарь ----------
@@ -168,7 +172,8 @@ async def test_calendar_cancelled_class_included(auth_client, session: AsyncSess
         f"{API}/calendar", params={"from": "2026-10-06T00:00:00Z", "to": "2026-10-07T00:00:00Z"}
     )
     (event,) = resp.json()["events"]
-    assert event["status"] == "cancelled" and event["template_id"] == rec["id"]
+    assert event["status"] == "cancelled"
+    assert event["template_id"] == rec["id"]
 
 
 async def test_calendar_validation(auth_client):
@@ -224,7 +229,8 @@ async def test_mark_done_does_not_detach(auth_client, session: AsyncSession, clo
     await create_recurring(auth_client, kind="personal")
     target = (await live_events(session))[0]
     resp = await auth_client.patch(f"{API}/events/{target.id}", json={"status": "done"})
-    assert resp.json()["status"] == "done" and resp.json()["detached"] is False
+    assert resp.json()["status"] == "done"
+    assert resp.json()["detached"] is False
     # Отмена — ручная правка
     resp = await auth_client.patch(f"{API}/events/{target.id}", json={"status": "cancelled"})
     assert resp.json()["detached"] is True

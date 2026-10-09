@@ -114,7 +114,8 @@ async def test_snapshot_blocks(auth_client, user):
     assert first.duration_min == 60
     assert first.priority == 3
     assert first.group_id == task["id"]
-    assert first.counts_as_study and first.splittable
+    assert first.counts_as_study
+    assert first.splittable
     assert first.windows  # окно «самостоятельной учёбы»
     assert blocks[f"subtask:{b['id']}"].depends_on == (f"subtask:{a['id']}",)
     assert blocks[f"task:{whole['id']}"].duration_min == 120
@@ -126,7 +127,8 @@ async def test_snapshot_people_prefers_morning_and_own_buffer(auth_client, user)
     task, _ = await task_with_steps(auth_client, 30, action_type_id=people["id"])
     await auth_client.patch(f"{API}/tasks/{task['id']}", json={"deadline_buffer_days": 0})
     (block,) = (await snapshot(user)).inp.blocks
-    assert block.prefer_morning and not block.counts_as_study
+    assert block.prefer_morning
+    assert not block.counts_as_study
     assert block.buffer_days == 0
     assert block.windows[0].end == time(19)
 
@@ -225,7 +227,9 @@ async def test_calibration_after_reset_counts_new_feels(auth_client, user, sessi
         f"{API}/subtasks/{b['id']}", json={"status": "done", "actual_feel": "slower"}
     )
     row = await session.scalar(select(Calibration).where(Calibration.user_id == user.id))
-    assert row is not None and row.samples == 1 and row.coef == pytest.approx(1.075)
+    assert row is not None
+    assert row.samples == 1
+    assert row.coef == pytest.approx(1.075)
 
 
 # ---------- превью → применить → откатить ----------
@@ -236,7 +240,8 @@ async def test_preview_apply_undo(auth_client, user):
     await auth_client.patch(f"{API}/subtasks/{b['id']}", json={"depends_on": [a["id"]]})
 
     rev = await call(user, "preview")
-    assert rev is not None and rev.status == PlanRevisionStatus.proposed
+    assert rev is not None
+    assert rev.status == PlanRevisionStatus.proposed
     assert len(ops_of(rev, "add")) == 2
     assert rev.at_risk == []
 
@@ -245,7 +250,8 @@ async def test_preview_apply_undo(auth_client, user):
     events = await flexible_events(user)
     assert [str(e.source_id) for e in events] == [a["id"], b["id"]]
     assert all(not e.is_fixed and not e.is_pinned for e in events)
-    assert events[0].start >= NOW and events[0].end <= events[1].start
+    assert events[0].start >= NOW
+    assert events[0].end <= events[1].start
     # Блоки видны и у подзадачи
     detail = (await auth_client.get(f"{API}/subtasks/{a['id']}")).json()
     assert len(detail["events"]) == 1
@@ -303,7 +309,8 @@ async def test_undo_skips_blocks_changed_by_hand(auth_client, user):
     _, restored, skipped = await call(user, "undo")
     assert (restored, skipped) == (1, 1)
     (left,) = await flexible_events(user)
-    assert left.id == first.id and left.is_pinned
+    assert left.id == first.id
+    assert left.is_pinned
 
 
 async def test_apply_stale_preview_recomputes(auth_client, user):
@@ -314,7 +321,8 @@ async def test_apply_stale_preview_recomputes(auth_client, user):
     with pytest.raises(PlanStaleError):
         await call(user, "apply", rev.id)
     fresh = await call(user, "proposal")
-    assert fresh is not None and fresh.id != rev.id
+    assert fresh is not None
+    assert fresh.id != rev.id
     assert len(ops_of(fresh, "add")) == 2
     assert await flexible_events(user) == []
     with pytest.raises(PlanStaleError):
@@ -339,7 +347,8 @@ async def test_same_preview_is_reused_and_dismissed_not_repeated(auth_client, us
     assert await call(user, "preview", [PlanReason.changes]) is None
     # Кнопка «Перепланировать» показывает и отклонённое
     forced = await call(user, "preview", force=True)
-    assert forced is not None and forced.id != rev.id
+    assert forced is not None
+    assert forced.id != rev.id
 
 
 async def test_new_preview_supersedes_old(auth_client, user):
@@ -358,7 +367,8 @@ async def test_at_risk_in_preview(auth_client, user):
     rev = await call(user, "preview")
     assert rev is not None
     assert {r["reason"] for r in rev.at_risk} <= {"no_time", "no_slots"}
-    assert rev.at_risk and rev.at_risk[0]["task_id"] == task["id"]
+    assert rev.at_risk
+    assert rev.at_risk[0]["task_id"] == task["id"]
     assert rev.at_risk[0]["group_title"] == "Реферат"
     assert rev.at_risk[0]["group_kind"] == "task"
 
@@ -427,7 +437,8 @@ async def test_recurring_occurrence_stays_in_its_day(auth_client, user):
     first = min(occ, key=lambda b: b.earliest)
     assert first.earliest == wall_to_utc(today, time(0), TZ)
     assert first.deadline == wall_to_utc(today + timedelta(days=1), time(0), TZ)
-    assert first.buffer_days == 0 and not first.splittable
+    assert first.buffer_days == 0
+    assert not first.splittable
 
 
 # ---------- триггеры и фон ----------
@@ -510,7 +521,8 @@ async def test_preview_job_through_queue(auth_client, session, user):
     while await jobs.run_one(session_factory, handlers, now=later):
         pass
     rev = await call(user, "proposal", now=None)
-    assert rev is not None and rev.reasons == ["changes"]
+    assert rev is not None
+    assert rev.reasons == ["changes"]
 
 
 async def test_nightly_marks_yesterday_missed_and_previews(auth_client, user):
@@ -542,7 +554,8 @@ async def test_nightly_marks_yesterday_missed_and_previews(auth_client, user):
         assert (await db.get(Event, yesterday.id)).status == EventStatus.missed
         assert (await db.get(Event, today.id)).status == EventStatus.planned
     rev = await call(user, "proposal")
-    assert rev is not None and rev.reasons == ["nightly"]
+    assert rev is not None
+    assert rev.reasons == ["nightly"]
 
 
 # ---------- API ----------
@@ -557,10 +570,12 @@ async def test_api_flow(auth_client, user):
     resp = await auth_client.post(f"{API}/plan/preview")
     assert resp.status_code == 200, resp.text
     proposal = resp.json()["proposal"]
-    assert proposal["added"] == 1 and proposal["moved"] == 0
+    assert proposal["added"] == 1
+    assert proposal["moved"] == 0
     assert proposal["reasons"] == ["manual"]
     (change,) = proposal["changes"]
-    assert change["op"] == "add" and change["title"] == "Доклад"
+    assert change["op"] == "add"
+    assert change["title"] == "Доклад"
 
     resp = await auth_client.post(f"{API}/plan/revisions/{proposal['id']}/apply")
     assert resp.status_code == 200, resp.text

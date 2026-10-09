@@ -34,7 +34,8 @@ async def project_events(user) -> list[Event]:
 
 
 def test_reserve_chunks():
-    assert reserve_chunks(0) == [] and reserve_chunks(20) == []
+    assert reserve_chunks(0) == []
+    assert reserve_chunks(20) == []
     assert reserve_chunks(30) == [30]
     assert reserve_chunks(90) == [90]
     assert reserve_chunks(100) == [60, 60]
@@ -65,7 +66,8 @@ async def test_snapshot_quotas_and_reserve(auth_client, user):
     assert len(reserve) == 8
     assert {b.duration_min for b in reserve} == {90}
     assert all(b.quota == tag and b.group_id == tag and b.counts_as_study for b in reserve)
-    assert reserve[0].earliest == at(MON, 0) and reserve[0].deadline == at(NEXT_MON, 0)
+    assert reserve[0].earliest == at(MON, 0)
+    assert reserve[0].deadline == at(NEXT_MON, 0)
 
 
 async def test_project_steps_count_toward_norm(auth_client, user):
@@ -113,9 +115,11 @@ async def test_done_earlier_this_week_reduces_target(auth_client, user):
 async def test_preview_apply_reserve_blocks(auth_client, user):
     project = await make_project(auth_client, weekly_norm_min=180)
     rev = await call(user, "preview")
-    assert rev is not None and rev.at_risk == []
+    assert rev is not None
+    assert rev.at_risk == []
     adds = [o for o in rev.ops if o["op"] == "add"]
-    assert len(adds) == 4 and all(o["kind"] == EventKind.project for o in adds)
+    assert len(adds) == 4
+    assert all(o["kind"] == EventKind.project for o in adds)
     await call(user, "apply", rev.id)
 
     events = await project_events(user)
@@ -153,8 +157,10 @@ async def test_impossible_norm_is_a_project_risk(auth_client, user):
     project = await make_project(auth_client, weekly_norm_min=60 * 60)
     rev = await call(user, "preview")
     risks = [r for r in rev.at_risk if r["reason"] == "quota"]
-    assert risks and all(r["group_kind"] == "project" for r in risks)
-    assert risks[0]["group_id"] == project["id"] and risks[0]["group_title"] == "ВКР"
+    assert risks
+    assert all(r["group_kind"] == "project" for r in risks)
+    assert risks[0]["group_id"] == project["id"]
+    assert risks[0]["group_title"] == "ВКР"
     # Неразмещённые резервные блоки сами угрозой не считаются
     assert {r["reason"] for r in rev.at_risk} == {"quota"}
 

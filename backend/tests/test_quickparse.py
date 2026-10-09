@@ -41,13 +41,15 @@ def test_essay_with_subject_and_deadline():
     assert r.task_type == TaskType.essay
     assert r.date == date(2026, 10, 15)
     assert r.deadline == eod(date(2026, 10, 15))
-    assert r.is_deadline and r.kind_hint == KindHint.task
+    assert r.is_deadline
+    assert r.kind_hint == KindHint.task
 
 
 def test_report_by_friday_inflected_subject():
     r = p("доклад по физике атмосферы к пятнице")
     assert (r.title, r.subject_id, r.task_type) == ("Доклад", "fiz", TaskType.report)
-    assert r.date == date(2026, 10, 9) and r.is_deadline
+    assert r.date == date(2026, 10, 9)
+    assert r.is_deadline
 
 
 def test_homework_in_two_weeks():
@@ -66,8 +68,10 @@ def test_number_words():
 def test_reading_chapter_numeric_date():
     r = p("прочитать главу 3 учебника по климатологии к 12.10")
     assert r.title == "Прочитать главу 3 учебника"
-    assert r.subject_id == "clim" and r.task_type == TaskType.reading
-    assert r.date == date(2026, 10, 12) and r.is_deadline
+    assert r.subject_id == "clim"
+    assert r.task_type == TaskType.reading
+    assert r.date == date(2026, 10, 12)
+    assert r.is_deadline
 
 
 def test_lab_short_name_bare_date():
@@ -81,12 +85,14 @@ def test_submit_coursework_month_name():
     r = p("сдать курсовую 1 декабря")
     assert r.title == "Сдать курсовую"
     assert r.task_type == TaskType.coursework
-    assert r.date == date(2026, 12, 1) and r.is_deadline
+    assert r.date == date(2026, 12, 1)
+    assert r.is_deadline
 
 
 def test_exam_prep_next_year():
     r = p("подготовиться к экзамену по климатологии до 20 января")
-    assert r.task_type == TaskType.exam_prep and r.subject_id == "clim"
+    assert r.task_type == TaskType.exam_prep
+    assert r.subject_id == "clim"
     assert r.date == date(2027, 1, 20)
     assert r.title == "Подготовиться к экзамену"
 
@@ -112,32 +118,39 @@ def test_study_by_time_today():
     r = p("решить задачи к 18:00")
     assert r.title == "Решить задачи"
     assert r.deadline == datetime(2026, 10, 6, 18, 0, tzinfo=MSK)
-    assert r.is_deadline and r.kind_hint == KindHint.task
+    assert r.is_deadline
+    assert r.kind_hint == KindHint.task
 
 
 def test_end_of_month_deadline():
     r = p("отчёт для работы до конца месяца")
     assert r.title == "Отчёт для работы"
-    assert r.date == date(2026, 10, 31) and r.is_deadline
+    assert r.date == date(2026, 10, 31)
+    assert r.is_deadline
     assert r.kind_hint == KindHint.task
 
 
 def test_message_supervisor_by_friday():
     r = p("написать научруку до пятницы")
     assert r.title == "Написать научруку"
-    assert r.date == date(2026, 10, 9) and r.kind_hint == KindHint.task
+    assert r.date == date(2026, 10, 9)
+    assert r.kind_hint == KindHint.task
 
 
 def test_word_srok_marks_deadline():
     r = p("лабораторная по физат, срок 30 октября")
     assert r.title == "Лабораторная"
-    assert r.subject_id == "fiz" and r.date == date(2026, 10, 30) and r.is_deadline
+    assert r.subject_id == "fiz"
+    assert r.date == date(2026, 10, 30)
+    assert r.is_deadline
 
 
 def test_task_without_date():
     r = p("сдать реферат")
-    assert r.date is None and r.deadline is None
-    assert r.task_type == TaskType.essay and r.kind_hint == KindHint.task
+    assert r.date is None
+    assert r.deadline is None
+    assert r.task_type == TaskType.essay
+    assert r.kind_hint == KindHint.task
 
 
 # ---------- события ----------
@@ -146,7 +159,8 @@ def test_task_without_date():
 def test_tomorrow_at_14_is_event():
     r = p("завтра в 14 консультация по динмету")
     assert r.kind_hint == KindHint.event
-    assert r.title == "Консультация" and r.subject_id == "dyn"
+    assert r.title == "Консультация"
+    assert r.subject_id == "dyn"
     assert (r.date, r.time) == (date(2026, 10, 7), time(14, 0))
 
 
@@ -194,14 +208,16 @@ def test_slash_date_with_time():
 def test_plain_backlog():
     r = p("записаться к стоматологу")
     assert r.title == "Записаться к стоматологу"
-    assert r.date is None and r.kind_hint == KindHint.backlog
+    assert r.date is None
+    assert r.kind_hint == KindHint.backlog
 
 
 def test_backlog_with_desired_date():
     r = p("купить продукты завтра")
     assert r.title == "Купить продукты"
     assert r.date == date(2026, 10, 7)
-    assert not r.is_deadline and r.kind_hint == KindHint.backlog
+    assert not r.is_deadline
+    assert r.kind_hint == KindHint.backlog
 
 
 def test_next_week_is_soft():
@@ -214,13 +230,15 @@ def test_next_week_is_soft():
 def test_in_a_week_backlog():
     r = p("через неделю вернуть книгу в библиотеку")
     assert r.title == "Вернуть книгу в библиотеку"
-    assert r.date == date(2026, 10, 13) and r.kind_hint == KindHint.backlog
+    assert r.date == date(2026, 10, 13)
+    assert r.kind_hint == KindHint.backlog
 
 
 def test_duration_and_weekday():
     r = p("убраться дома в субботу на 2 часа")
     assert r.title == "Убраться дома"
-    assert r.date == date(2026, 10, 10) and r.time is None
+    assert r.date == date(2026, 10, 10)
+    assert r.time is None
     assert r.duration_min == 120
 
 
@@ -253,7 +271,8 @@ def test_month_relative_and_half_hour():
 
 def test_invalid_date_left_in_title():
     r = p("встреча 31.02")
-    assert r.date is None and r.title == "Встреча 31.02"
+    assert r.date is None
+    assert r.title == "Встреча 31.02"
 
 
 @pytest.mark.parametrize(
@@ -267,7 +286,8 @@ def test_invalid_date_left_in_title():
 )
 def test_counts_are_not_times(text, title):
     r = p(text)
-    assert r.time is None and r.title == title
+    assert r.time is None
+    assert r.title == title
 
 
 def test_hours_word_and_daypart():
@@ -302,7 +322,8 @@ def test_short_name_needs_exact_match():
 
 def test_subject_kept_in_title_if_nothing_else():
     r = p("климатология завтра")
-    assert r.subject_id == "clim" and r.title == "Климатология"
+    assert r.subject_id == "clim"
+    assert r.title == "Климатология"
 
 
 @pytest.mark.parametrize("text", ["", "   ", "до", "завтра"])
@@ -312,7 +333,7 @@ def test_degenerate_input(text):
 
 
 def test_naive_now_rejected():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="с часовым поясом"):
         parse("x", datetime(2026, 10, 6, 15, 0))
 
 

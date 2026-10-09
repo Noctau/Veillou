@@ -46,7 +46,8 @@ async def test_project_crud_and_progress(auth_client):
     )
     assert project["category_id"] == cats["study"]["id"]
     assert project["contacts"][0]["role"] == "научный руководитель"
-    assert project["milestones"] == [] and project["next_milestone"] is None
+    assert project["milestones"] == []
+    assert project["next_milestone"] is None
 
     topic = await add_milestone(
         auth_client, project["id"], title="Тема согласована", date="2026-10-20"
@@ -98,7 +99,8 @@ async def test_single_work_default(auth_client):
     a = await make_project(auth_client, is_work_default=True)
     b = await make_project(auth_client, title="Другой", is_work_default=True)
     projects = {p["id"]: p for p in (await auth_client.get(f"{API}/projects")).json()}
-    assert not projects[a["id"]]["is_work_default"] and projects[b["id"]]["is_work_default"]
+    assert not projects[a["id"]]["is_work_default"]
+    assert projects[b["id"]]["is_work_default"]
     resp = await auth_client.patch(f"{API}/projects/{a['id']}", json={"is_work_default": True})
     assert resp.json()["is_work_default"]
     projects = {p["id"]: p for p in (await auth_client.get(f"{API}/projects")).json()}
@@ -112,7 +114,8 @@ async def test_delete_project_keeps_tasks(auth_client):
     assert (await auth_client.delete(f"{API}/projects/{project['id']}")).status_code == 204
     assert (await auth_client.get(f"{API}/projects/{project['id']}")).status_code == 404
     kept = await get_task(auth_client, task["id"])
-    assert kept["project_id"] is None and kept["milestone_id"] is None
+    assert kept["project_id"] is None
+    assert kept["milestone_id"] is None
 
 
 async def test_delete_milestone_unlinks_tasks(auth_client):
@@ -121,7 +124,8 @@ async def test_delete_milestone_unlinks_tasks(auth_client):
     task = await make_task(auth_client, milestone_id=stage["id"])
     assert (await auth_client.delete(f"{API}/milestones/{stage['id']}")).status_code == 204
     kept = await get_task(auth_client, task["id"])
-    assert kept["project_id"] == project["id"] and kept["milestone_id"] is None
+    assert kept["project_id"] == project["id"]
+    assert kept["milestone_id"] is None
 
 
 async def test_project_task_inherits_category(auth_client):
@@ -186,10 +190,12 @@ async def test_recurring_meetings_materialize(auth_client, session: AsyncSession
     assert task["recurrence_start"] == "2026-10-06"
     dates = [s["occurrence_date"] for s in task["subtasks"]]
     # Четверги с 08.10 по 05.12 (60 дней)
-    assert dates[0] == "2026-10-08" and dates[-1] == "2026-12-03"
+    assert dates[0] == "2026-10-08"
+    assert dates[-1] == "2026-12-03"
     assert len(dates) == 9
     first = task["subtasks"][0]
-    assert first["title"] == "Встреча с научруком" and first["estimate_min"] == 60
+    assert first["title"] == "Встреча с научруком"
+    assert first["estimate_min"] == 60
     assert task["action_type_id"] == types["people"]["id"]
     # Регулярное не входит в прогресс проекта
     detail = (await auth_client.get(f"{API}/projects/{project['id']}")).json()

@@ -161,7 +161,8 @@ def test_task_window_only_thursday():
     only_thu = (Window(frozenset({4}), time(10), time(17)),)
     data = inp(Block("b", 60, windows=only_thu))
     days = {a.date() for a, _ in ranges(data)}
-    assert days and all(d.isoweekday() == 4 for d in days)
+    assert days
+    assert all(d.isoweekday() == 4 for d in days)
     assert free_on(data, THU) == [(time(10), time(13)), (time(14), time(17))]
 
 

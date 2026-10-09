@@ -108,7 +108,9 @@ async def fresh_user(session: AsyncSession, user: User) -> User:
 async def test_link_flow(tg: BotHarness, session: AsyncSession, user: User):
     code = await telegram.create_link_code(session, user)
     replies = await tg.send(f"/start {code.code}")
-    assert len(replies) == 1 and "привязан" in replies[0] and user.email in replies[0]
+    assert len(replies) == 1
+    assert "привязан" in replies[0]
+    assert user.email in replies[0]
     assert (await fresh_user(session, user)).tg_user_id == TG_ID
 
     # Теперь пользователь «свой»: бот отвечает на обычные сообщения
@@ -221,4 +223,5 @@ async def test_api_deep_link_without_bot_username(
 ):
     monkeypatch.setattr(settings, "TELEGRAM_BOT_USERNAME", None)
     data = (await auth_client.post(f"{URL}/link-code")).json()
-    assert data["deep_link"] is None and len(data["code"]) == 16
+    assert data["deep_link"] is None
+    assert len(data["code"]) == 16
