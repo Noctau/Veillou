@@ -24,7 +24,7 @@ x-backend: &backend
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?}
@@ -42,28 +42,38 @@ services:
     <<: *backend
     restart: "no"
     command: ["alembic", "upgrade", "head"]
+    healthcheck:
+      disable: true
     depends_on:
       db:
         condition: service_healthy
 
   api:
     <<: *backend
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # healthcheck — из Dockerfile (GET /api/v1/health)
 
   worker:
     <<: *backend
     command: ["python", "-m", "app.worker"]
+    # Цикл трогает heartbeat раз в ≤10 с; ночная джоба может идти дольше — запас 5 минут
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.heartbeat", "worker", "300"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     # + сеть llm: через её шлюз (хост) воркер ходит в SSH-туннель до домашней Ollama
     networks: [default, llm]
 
   bot:
     <<: *backend
     command: ["python", "-m", "app.bot"]
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.heartbeat", "bot", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   web:
     build:

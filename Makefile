@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web db-up db-down migrate migration test lint fmt gen-api create-user bot worker install vapid-keys ai-evals \
+.PHONY: dev dev-api dev-web db-up db-down migrate migration test test-cov test-web lint typecheck audit fmt gen-api create-user bot worker install vapid-keys ai-evals \
 	deploy prod-ps prod-logs prod-create-user prod-backup prod-restore backup-pull
 
 COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env
@@ -7,6 +7,7 @@ BACK = cd backend && uv run
 install:
 	cd backend && uv sync
 	cd frontend && npm install
+	cp -n .env.example .env || true
 
 db-up:
 	$(COMPOSE) up -d --wait db
@@ -32,11 +33,30 @@ migration:
 
 test:
 	$(BACK) pytest
+	cd frontend && npm test
 
-lint:
+# Покрытие бэкенда (порог — [tool.coverage.report] в pyproject.toml)
+test-cov:
+	$(BACK) pytest --cov --cov-report=term --cov-report=html
+
+test-web:
+	cd frontend && npm test
+
+lint: typecheck
 	$(BACK) ruff check .
 	$(BACK) ruff format --check .
 	cd frontend && npx oxlint && npx tsc -b --noEmit
+
+typecheck:
+	$(BACK) mypy
+
+# Уязвимые зависимости и секреты (как в CI, job security)
+audit:
+	cd backend && uv export --locked --format requirements-txt --no-hashes > /tmp/veillou-req.txt \
+		&& uvx pip-audit -r /tmp/veillou-req.txt --no-deps --disable-pip
+	cd frontend && npm audit --omit=dev --audit-level=high
+	cd backend && uvx bandit -r app scripts -q --severity-level medium
+	docker run --rm -v "$(CURDIR):/repo" zricethezav/gitleaks:v8.21.2 git /repo --redact --no-banner
 
 fmt:
 	$(BACK) ruff check --fix .

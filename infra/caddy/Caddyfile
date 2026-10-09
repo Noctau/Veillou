@@ -11,16 +11,12 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		-Server
 	}
 
-	# Файлы до 100 МБ (бэкенд проверяет точнее)
-	request_body {
-		max_size 110MB
-	}
-
 	# «Поделиться» до того, как service worker установился: принять файлы некому —
-	# просто открываем быстрое добавление
+	# просто открываем быстрое добавление (тело не читается)
 	@share_without_sw {
 		method POST
 		path /share-target
@@ -28,10 +24,26 @@
 	redir @share_without_sw /add 303
 
 	handle /api/* {
+		# Тело: загрузки — до 100 МБ (бэкенд проверяет точнее), остальное — JSON до 2 МБ
+		@upload path /api/v1/attachments /api/v1/attachments/*/replace
+		request_body @upload {
+			max_size 110MB
+		}
+		@json not path /api/v1/attachments /api/v1/attachments/*/replace
+		request_body @json {
+			max_size 3MB
+		}
+		# PDF из /api/v1/files показывается во фрейме самого приложения.
+		# CSP не трогаем: у файлов бэкенд ставит свой (sandbox)
+		header X-Frame-Options SAMEORIGIN
 		reverse_proxy api:8000
 	}
 
 	handle {
+		# Страницы приложения: свои скрипты и стили; inline-стили нужны KaTeX, Radix,
+		# dnd-kit; data:/blob: — превью фото до загрузки и шрифты KaTeX
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		header X-Frame-Options DENY
 		root * /srv/www
 		# Сборка с хэшами в именах — навсегда; всё остальное (index.html, sw.js, manifest) — перепроверять
 		@hashed path /assets/*

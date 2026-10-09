@@ -1,7 +1,7 @@
 # Dev-окружение: только Postgres. API и фронт запускаются локально (make dev).
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-veillou}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-veillou}

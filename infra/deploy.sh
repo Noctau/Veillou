@@ -22,7 +22,7 @@ rsync -az --delete \
   ./ "$DEPLOY_HOST:$DEPLOY_DIR/"
 ssh "$DEPLOY_HOST" "echo $REV > '$DEPLOY_DIR/REVISION'"
 
-remote "$COMPOSE up -d --build --remove-orphans && docker image prune -f >/dev/null"
+remote "$COMPOSE build --pull && $COMPOSE up -d --remove-orphans && docker image prune -f >/dev/null"
 
 echo "→ жду api…"
 for _ in $(seq 1 30); do

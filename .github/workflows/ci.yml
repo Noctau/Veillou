@@ -9,6 +9,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Токену CI достаточно читать репозиторий
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -17,7 +21,7 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_USER: veillou
           POSTGRES_PASSWORD: veillou
@@ -35,8 +39,8 @@ jobs:
       POSTGRES_PASSWORD: veillou
       TEST_POSTGRES_DB: veillou_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
       - run: uv sync --locked
@@ -44,14 +48,18 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+      - name: mypy (strict)
+        run: uv run mypy
+      - name: dependencies declared (deptry)
+        run: uv run deptry .
       - name: migrations match models
         env:
           POSTGRES_DB: veillou_test
         run: |
           uv run alembic upgrade head
           uv run alembic check
-      - name: pytest
-        run: uv run pytest
+      - name: pytest + coverage (порог — pyproject.toml)
+        run: uv run pytest --cov --cov-report=term
 
   frontend:
     runs-on: ubuntu-latest
@@ -59,13 +67,13 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
       - run: npm ci
@@ -79,3 +87,49 @@ jobs:
           git diff --exit-code -- src/api/schema.d.ts
       - run: npx oxlint
       - run: npx tsc -b --noEmit
+      - run: npm test
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # gitleaks смотрит всю историю
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: secrets in history (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 git /repo --redact --no-banner
+      - name: Python dependencies (pip-audit)
+        working-directory: backend
+        run: |
+          uv export --locked --format requirements-txt --no-hashes > /tmp/requirements.txt
+          uvx pip-audit -r /tmp/requirements.txt --no-deps --disable-pip
+      - name: npm dependencies (runtime)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      - name: bandit
+        working-directory: backend
+        run: uvx bandit -r app scripts -q --severity-level medium
+      - name: trivy (код, конфиги, lock-файлы)
+        run: >-
+          docker run --rm -v "$PWD:/repo" aquasec/trivy:0.58.1 fs --quiet
+          --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed
+          --skip-dirs /repo/frontend/node_modules --ignorefile /repo/.trivyignore --exit-code 1 /repo
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: build images
+        run: |
+          docker build -t veillou-backend:ci backend
+          docker build -t veillou-web:ci -f infra/caddy/Dockerfile .
+          docker build -t veillou-backup:ci infra/backup
+      - name: scan images (trivy, только с готовым фиксом)
+        run: |
+          for image in veillou-backend:ci veillou-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 \
+              image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 "$image"
+          done

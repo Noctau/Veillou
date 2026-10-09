@@ -1,0 +1,39 @@
+# pre-commit install  — хуки перед каждым коммитом (те же проверки, что в CI, только быстрые)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^frontend/src/api/schema\.d\.ts$
+      - id: trailing-whitespace
+        exclude: ^frontend/src/api/schema\.d\.ts$
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (backend)
+        entry: bash -c 'cd backend && uv run ruff check --fix . && uv run ruff format .'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+      - id: mypy
+        name: mypy --strict (backend)
+        entry: bash -c 'cd backend && uv run mypy'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: oxlint
+        name: oxlint + tsc (frontend)
+        entry: bash -c 'cd frontend && npx oxlint && npx tsc -b --noEmit'
+        language: system
+        files: ^frontend/src/
+        pass_filenames: false

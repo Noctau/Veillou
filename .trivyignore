@@ -1,0 +1,5 @@
+# AVD-DS-0002 «нет USER в Dockerfile» — осознанно (AUDIT_REPORT.md, L-11):
+# - infra/backup: root нужен rsync --link-dest с сохранением владельцев и ротации снапшотов;
+# - infra/caddy: стартует от root только чтобы отдать тома пользователю caddy,
+#   затем entrypoint.sh сбрасывает права (su-exec), процесс Caddy — не root.
+AVD-DS-0002
