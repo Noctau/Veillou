@@ -3,11 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoginForm } from '@/features/auth/LoginForm'
 import { useMe } from '@/features/auth/useMe'
-
-/** Только относительные пути внутри приложения — защита от открытого редиректа. */
-function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
+import { safeNext } from '@/lib/url'
 
 export function LoginPage() {
   const [params] = useSearchParams()

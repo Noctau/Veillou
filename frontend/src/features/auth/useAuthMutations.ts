@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import type { components } from '@/api/schema'
+import { unsubscribeThisDevice } from '@/features/notifications/usePush'
 import { api } from '@/lib/api'
 import { clearOfflineData } from '@/lib/persist'
 import { queryKeys } from '@/lib/queryKeys'
@@ -23,6 +24,9 @@ export function useLogout() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
+      // Пока сессия жива: иначе устройство и после выхода получало бы напоминания
+      // (с кнопками, которые работают без входа). Сбой отписки выход не блокирует.
+      await unsubscribeThisDevice({ quick: true }).catch(() => undefined)
       await api.POST('/api/v1/auth/logout')
     },
     onSettled: async () => {

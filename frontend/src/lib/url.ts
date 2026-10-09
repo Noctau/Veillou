@@ -10,3 +10,11 @@ export function normalizeUrl(raw: string): string | null {
     return null
   }
 }
+
+/**
+ * `?next=` после входа: только путь внутри приложения — защита от открытого редиректа.
+ * «//host» и «/\\host» браузер читает как адрес другого сайта.
+ */
+export function safeNext(next: string | null): string {
+  return next && /^\/(?![/\\])/.test(next) ? next : '/'
+}

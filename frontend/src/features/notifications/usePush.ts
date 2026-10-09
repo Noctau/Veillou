@@ -16,11 +16,25 @@ export function pushUnsupportedReason(): string | null {
 
 const SW_TIMEOUT_MS = 10_000
 
-async function registration(): Promise<ServiceWorkerRegistration> {
+async function registration(timeoutMs = SW_TIMEOUT_MS): Promise<ServiceWorkerRegistration> {
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Service worker не запустился — обновите страницу')), SW_TIMEOUT_MS),
+    setTimeout(() => reject(new Error('Service worker не запустился — обновите страницу')), timeoutMs),
   )
   return Promise.race([navigator.serviceWorker.ready, timeout])
+}
+
+/**
+ * Отписать это устройство: сначала на сервере (иначе воркер продолжит слать), потом в браузере.
+ * `quick` — при выходе: не ждать service worker дольше пары секунд.
+ */
+export async function unsubscribeThisDevice({ quick = false } = {}): Promise<void> {
+  if (pushUnsupportedReason() !== null) return
+  const reg = await registration(quick ? 2_000 : SW_TIMEOUT_MS)
+  const sub = await reg.pushManager.getSubscription()
+  if (!sub) return
+  const { error } = await api.POST('/api/v1/me/push/unsubscribe', { body: { endpoint: sub.endpoint } })
+  if (error) throw error
+  await sub.unsubscribe()
 }
 
 function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
@@ -111,14 +125,7 @@ export function useSubscribePush() {
 export function useUnsubscribePush() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async () => {
-      const reg = await registration()
-      const sub = await reg.pushManager.getSubscription()
-      if (!sub) return
-      const { error } = await api.POST('/api/v1/me/push/unsubscribe', { body: { endpoint: sub.endpoint } })
-      if (error) throw error
-      await sub.unsubscribe()
-    },
+    mutationFn: () => unsubscribeThisDevice(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.push })
       queryClient.invalidateQueries({ queryKey: queryKeys.pushBrowser })
