@@ -27,6 +27,10 @@ async def _reset_schema() -> None:
     async with tmp.begin() as conn:
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
+        # БД одноразовая: коммиты без ожидания fsync (на медленном диске — в разы быстрее)
+        await conn.execute(
+            text(f'ALTER DATABASE "{settings.POSTGRES_DB}" SET synchronous_commit = off')
+        )
     await tmp.dispose()
 
 
@@ -42,10 +46,11 @@ def _migrated_db() -> None:
 @pytest.fixture(autouse=True)
 async def _clean_tables() -> AsyncIterator[None]:
     yield
-    tables = [t.name for t in Base.metadata.sorted_tables]
-    if tables:
-        async with engine.begin() as conn:
-            await conn.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
+    # DELETE, а не TRUNCATE: TRUNCATE пересоздаёт файлы таблиц и ждёт fsync — на Docker
+    # Desktop это секунды на каждый тест. Дети раньше родителей — порядок по внешним ключам.
+    async with engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
 
 
 @pytest.fixture(scope="session", autouse=True)
