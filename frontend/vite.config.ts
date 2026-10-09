@@ -6,9 +6,11 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Меняется вместе с API -> офлайн-кэш TanStack Query от старой схемы сбрасывается
+// Меняется вместе с API -> офлайн-кэш TanStack Query от старой схемы сбрасывается.
+// Хэш — от закоммиченных TS-типов (их генерирует make gen-api из той же схемы, CI
+// проверяет актуальность), а не от openapi.json: тот не в git, и чистый клон не собирался.
 const apiSchemaHash = createHash('sha256')
-  .update(readFileSync(path.resolve(__dirname, 'openapi.json')))
+  .update(readFileSync(path.resolve(__dirname, 'src/api/schema.d.ts')))
   .digest('hex')
   .slice(0, 12)
 

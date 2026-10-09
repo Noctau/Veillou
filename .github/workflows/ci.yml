@@ -69,6 +69,9 @@ jobs:
         with:
           enable-cache: true
       - run: npm ci
+      # До gen-api: openapi.json не в git, сборка с чистого клона не должна от него зависеть
+      - name: build from clean checkout
+        run: npx vite build
       - name: API types up to date (make gen-api)
         run: |
           cd ../backend && uv sync --locked && uv run python -m scripts.dump_openapi ../frontend/openapi.json
@@ -76,4 +79,3 @@ jobs:
           git diff --exit-code -- src/api/schema.d.ts
       - run: npx oxlint
       - run: npx tsc -b --noEmit
-      - run: npx vite build
