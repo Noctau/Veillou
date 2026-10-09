@@ -161,13 +161,13 @@ class WebPushSender:
                 )
             )
         )
+        # Неизвестный сервис не удаляем: если allowlist не учёл реальный push-сервис,
+        # хватит дописать его в PUSH_ALLOWED_HOSTS — переподписываться не придётся
         for sub in [s for s in subs if not push_host_allowed(s.endpoint)]:
-            log.warning("Push-подписка %s на неизвестный сервис — удаляю", sub.id)
-            await db.delete(sub)
+            log.warning("Push-подписка %s: сервис не в PUSH_ALLOWED_HOSTS — пропускаю", sub.id)
             subs.remove(sub)
         if not subs:
-            await db.commit()
-            return skipped("Нет push-подписок")
+            return skipped("Нет push-подписок на разрешённые сервисы")
         data = push_payload(msg)
         ok, errors = 0, []
         for sub in subs:

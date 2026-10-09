@@ -56,10 +56,11 @@ async def test_subscribe_rejects_unknown_service(auth_client: AsyncClient):
     assert ok.status_code == 204
 
 
-async def test_sender_drops_stored_unknown_endpoint(
+async def test_sender_skips_stored_unknown_endpoint(
     session: AsyncSession, user: User, monkeypatch: pytest.MonkeyPatch
 ):
-    """Строки, сохранённые до проверки, не отправляются и удаляются."""
+    """Строки, сохранённые до проверки, не отправляются, но и не удаляются (allowlist
+    мог не учесть реальный сервис — тогда хватит дописать его в настройку)."""
     session.add(
         PushSubscription(user_id=user.id, endpoint="https://evil.example/x", p256dh="k", auth="a")
     )
@@ -73,7 +74,7 @@ async def test_sender_drops_stored_unknown_endpoint(
     )
     assert called == []
     assert result.status == DeliveryStatus.skipped
-    assert list(await session.scalars(select(PushSubscription))) == []
+    assert len(list(await session.scalars(select(PushSubscription)))) == 1
 
 
 async def test_sender_does_not_follow_redirects(
