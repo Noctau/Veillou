@@ -1,5 +1,5 @@
 # pg_dump той же мажорной версии, что и сервер (16) + rsync для снапшотов файлов + cron (busybox)
-FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+FROM postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
 RUN apk add --no-cache rsync tzdata
 COPY backup.sh restore.sh entrypoint.sh /scripts/
 COPY crontab /etc/crontabs/root
