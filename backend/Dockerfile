@@ -1,6 +1,6 @@
 # Один образ на три процесса: api (по умолчанию), worker, bot — команда в docker-compose.prod.yml.
 # Базовые образы зафиксированы по digest (обновляет Dependabot, .github/dependabot.yml).
-FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
 
 # ---------- сборка окружения: uv нужен только здесь ----------
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS build
