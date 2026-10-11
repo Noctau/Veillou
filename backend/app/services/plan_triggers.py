@@ -5,8 +5,8 @@
 ставится джоба `plan.preview` (с дедупликацией и паузой — серия правок даёт
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
-Дела из ящика (взятые на неделю), дни подготовки к экзаменам и недельная
-норма проекта — тоже.
+Дела из ящика (взятые на неделю), дни подготовки к экзаменам, недельная
+норма проекта и лимиты нагрузки — тоже.
 
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
@@ -23,11 +23,13 @@ from app.domain.enums import EventStatus, PlanReason, SubtaskStatus, TaskStatus
 from app.models import (
     ActionType,
     BacklogItem,
+    BudgetDayOverride,
     Event,
     Exam,
     ExamSession,
+    LoadBudget,
+    LoadBudgetMember,
     Project,
-    StudyDayLimit,
     Subtask,
     Task,
     User,
@@ -41,7 +43,7 @@ TASK_FIELDS = {
     "estimate_min",
     "time_window",
     "action_type_id",
-    "task_type",
+    "task_type_id",
     "deadline_buffer_days",
     "project_id",
     "deleted_at",
@@ -54,6 +56,7 @@ BACKLOG_FIELDS = {
     "status",
     "estimate_min",
     "conditions",
+    "hours_action_type_id",
     "time_window",
     "action_type_id",
     "deleted_at",
@@ -100,7 +103,7 @@ def _relevant(obj: Any, is_new: bool) -> bool:
     if isinstance(obj, User):
         return not is_new and bool(_changed(obj, USER_FIELDS))
     if isinstance(obj, ActionType):
-        return is_new or bool(_changed(obj, {"windows", "deleted_at"}))
+        return is_new or bool(_changed(obj, {"windows", "prefer_morning", "deleted_at"}))
     if isinstance(obj, BacklogItem):
         if is_new:
             return obj.planned_week is not None
@@ -113,7 +116,9 @@ def _relevant(obj: Any, is_new: bool) -> bool:
         if is_new:
             return bool(obj.weekly_norm_min)
         return bool(_changed(obj, PROJECT_FIELDS))
-    return isinstance(obj, StudyDayLimit)
+    if isinstance(obj, LoadBudget):
+        return is_new or bool(_changed(obj, {"minutes_per_day", "deleted_at"}))
+    return isinstance(obj, LoadBudgetMember | BudgetDayOverride)
 
 
 def _reason(objs: list[Any]) -> PlanReason:

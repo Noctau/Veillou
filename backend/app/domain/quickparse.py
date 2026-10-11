@@ -13,7 +13,8 @@
   «утром / днём / вечером», «с 14 до 16»; длительность «на 2 часа», «на 30 мин»;
 - предмет — по названию, короткому имени и синонимам, с учётом падежей
   («по климатологии», «клим»);
-- тип задания — по словам «реферат», «доклад», «дз», «лаба», «прочитать»…
+- тип задачи и тип действия — по словарям слов, которые передаёт сервис
+  (сейчас — словари сида справочников, services/catalog.py; M21.1 — синонимы).
 
 Дедлайн (`is_deadline`) — если перед датой стоит «до» / «к» или есть слово
 «дедлайн / срок / сдать». Дата без времени как дедлайн — конец дня (23:59).
@@ -27,8 +28,6 @@ from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
 from dateutil.relativedelta import relativedelta
-
-from app.domain.enums import ActionTypeKey, TaskType
 
 
 class KindHint(StrEnum):
@@ -54,8 +53,11 @@ class ParseResult:
     deadline: datetime | None = None
     is_deadline: bool = False
     subject_id: Hashable | None = None
-    task_type: TaskType | None = None
-    action_type: ActionTypeKey | None = None
+    # id типов из словарей слов, которые передал сервис (`task_words`, `action_words`)
+    task_type: Hashable | None = None
+    action_type: Hashable | None = None
+    # Тип действия не узнан, но похоже на задачу — сервис подставит тип по умолчанию
+    default_action: bool = False
     kind_hint: KindHint = KindHint.backlog
 
 
@@ -103,57 +105,19 @@ WEEKDAYS: list[tuple[int, str]] = [
     (6, r"вс|воскресень[еяю]"),
 ]
 
-TASK_TYPES: list[tuple[TaskType, str]] = [
-    (TaskType.exam_prep, r"подготов[а-я]*\s+к\s+(?:экзамен|зачет|коллоквиум|контрольн)[а-я]*"),
-    (TaskType.exam_prep, r"(?:экзамен|зачет|коллоквиум|контрольн)[а-я]*"),
-    (TaskType.essay, r"реферат[а-я]*|эссе"),
-    (TaskType.report, r"доклад[а-я]*|презентаци[а-я]*|выступлени[а-я]*"),
-    (TaskType.coursework, r"курсов(?:ая|ую|ой)|курсач[а-я]*"),
-    (TaskType.lab, r"лаб[а-я]*|практикум[а-я]*"),
-    (TaskType.homework, r"дз|домашк[а-я]*|домашн[а-я]*\s+задани[а-я]*|упражнени[а-я]*"),
-    (TaskType.reading, r"(?:про|до)?чит[а-я]*|прочест[а-я]*|глав[а-я]*"),
-]
-
 # Глаголы учёбы без явного типа: тоже задание
 STUDY_VERBS = r"сдать|написать|решить|подготовить|выучить|доделать|оформить|отправить"
 
-# Тип действия по словам (ТЗ §4.8). Порядок важен: первое совпадение побеждает.
-ACTION_TYPES: list[tuple[ActionTypeKey, str]] = [
-    (
-        ActionTypeKey.institutions,
-        r"деканат[а-я]*|библиотек[а-я]*|врач[а-я]*|стоматолог[а-я]*|поликлиник[а-я]*|"
-        r"больниц[а-я]*|мфц|банк[а-я]*|паспорт[а-я]*|справк[а-я]*|военкомат[а-я]*|"
-        r"налогов[а-я]*|нотариус[а-я]*|записаться|запись",
-    ),
-    (
-        ActionTypeKey.people,
-        r"научрук[а-я]*|руководител[а-я]*|препод[а-я]*|старост[а-я]*|куратор[а-я]*|"
-        r"одногруппник[а-я]*|позвонить|созвониться|спросить|договориться|согласовать",
-    ),
-    (
-        ActionTypeKey.outside,
-        r"купить|магазин[а-я]*|аптек[а-я]*|посылк[а-я]*|почт[а-я]*|забрать|отнести|"
-        r"химчистк[а-я]*|ремонт[а-я]*",
-    ),
-    (
-        ActionTypeKey.home,
-        r"убра[а-я]*|уборк[а-я]*|постира[а-я]*|стирк[а-я]*|приготовить|готовк[а-я]*|"
-        r"помыть|пропылесосить|разобрать|погладить|полить|вынести",
-    ),
-    (
-        ActionTypeKey.personal,
-        r"спорт[а-я]*|зал|бассейн[а-я]*|йог[а-я]*|пробежк[а-я]*|кино|прогулк[а-я]*|"
-        r"погулять|подруг[а-я]*|друз[а-я]*|день\s+рождения",
-    ),
-]
+# Словарь: (id типа, regex слов). Порядок важен: первое совпадение побеждает
+Words = Sequence[tuple[Hashable, str]]
 
 
-def guess_action_type(text: str) -> ActionTypeKey | None:
-    """Тип действия по словам: «записаться к врачу» → учреждения. Без учёбы."""
+def guess(text: str, words: Words) -> Hashable | None:
+    """Тип по словам словаря: «записаться к врачу» → id типа «учреждения»."""
     normalized = _normalize(text)
-    for key, pattern in ACTION_TYPES:
+    for type_id, pattern in words:
         if re.search(_b(f"(?:{pattern})"), normalized):
-            return key
+            return type_id
     return None
 
 
@@ -286,8 +250,18 @@ def _clean_title(text: str) -> str:
     return text[:1].upper() + text[1:]
 
 
-def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> ParseResult:
-    """Разбирает строку быстрого ввода. `now` — aware, в TZ пользователя."""
+def parse(
+    text: str,
+    now: datetime,
+    subjects: Sequence[SubjectRef] = (),
+    task_words: Words = (),
+    action_words: Words = (),
+) -> ParseResult:
+    """Разбирает строку быстрого ввода. `now` — aware, в TZ пользователя.
+
+    `task_words` / `action_words` — словари типов задач и действий пользователя
+    (id, regex слов); пустые — типы не угадываются.
+    """
     if now.tzinfo is None:
         raise ValueError("now должен быть с часовым поясом")
     today = now.date()
@@ -462,9 +436,9 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
     if at is not None and day is None:
         day = today if at > now.time() else today + timedelta(days=1)
 
-    # Тип задания и предмет — по тексту без дат (в названии остаются)
-    task_type: TaskType | None = None
-    for candidate, pattern in TASK_TYPES:
+    # Тип задачи и предмет — по тексту без дат (в названии остаются)
+    task_type: Hashable | None = None
+    for candidate, pattern in task_words:
         if sc.find(_b(f"(?:{pattern})")):
             task_type = candidate
             break
@@ -491,14 +465,15 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
     if has_study_verb and day is not None and at is None:
         is_deadline = True
 
-    action_type = guess_action_type(title)
-    if action_type is None and (task_type or subject_id is not None or has_study_verb):
-        action_type = ActionTypeKey.study
+    action_type = guess(title, action_words)
+    default_action = action_type is None and bool(
+        task_type is not None or subject_id is not None or has_study_verb
+    )
 
     kind: KindHint
     if at is not None and not is_deadline and task_type is None:
         kind = KindHint.event
-    elif task_type or subject_id is not None or is_deadline:
+    elif task_type is not None or subject_id is not None or is_deadline:
         kind = KindHint.task
     else:
         kind = KindHint.backlog
@@ -514,6 +489,7 @@ def parse(text: str, now: datetime, subjects: Sequence[SubjectRef] = ()) -> Pars
         subject_id=subject_id,
         task_type=task_type,
         action_type=action_type,
+        default_action=default_action,
         kind_hint=kind,
     )
 

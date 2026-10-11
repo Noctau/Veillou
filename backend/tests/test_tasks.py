@@ -1,11 +1,33 @@
+import uuid
+
 from httpx import AsyncClient
 
 from .test_catalog import action_types, categories
 from .test_schedule_api import API, make_semester, make_subject, other_client
 
 
+async def make_task_type(client: AsyncClient, **over) -> dict:
+    body = {"name": "Реферат", "synonyms": ["реферат", "эссе"], "icon": "file-text", **over}
+    resp = await client.post(f"{API}/task-types", json=body)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def seed_task_type(session, user_id, key: str, name: str) -> uuid.UUID:
+    """Тип задачи с ключом сида — как у мигрированных пользователей Part 1 (словарь
+    быстрого ввода находит его по ключу до M21.1). Возвращает id."""
+    from app.models import TaskType
+
+    task_type = TaskType(user_id=user_id, key=key, name=name, synonyms=[], position=0)
+    session.add(task_type)
+    await session.flush()
+    type_id = task_type.id
+    await session.commit()
+    return type_id
+
+
 async def make_task(client: AsyncClient, **over) -> dict:
-    body = {"title": "Реферат", "task_type": "essay", **over}
+    body = {"title": "Реферат", **over}
     resp = await client.post(f"{API}/tasks", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -212,7 +234,7 @@ async def test_delete_task_removes_planned_blocks(auth_client):
 async def test_validation(auth_client):
     for bad in (
         {"title": ""},
-        {"title": "x", "task_type": "nope"},
+        {"title": "x", "task_type_id": "nope"},
         {"title": "x", "deadline": "2026-10-15T23:59:00"},  # без TZ
         {"title": "x", "subtasks": [{"title": "a", "estimate_min": 1}]},
         {"title": "x", "time_window": [{"weekdays": [], "start": "10:00", "end": "11:00"}]},

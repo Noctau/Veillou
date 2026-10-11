@@ -4,8 +4,8 @@ import { ConfirmButton } from '@/components/common/ConfirmButton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useActionTypes } from '@/features/catalog/useCatalog'
-import { TASK_TYPE_LABEL } from '@/lib/terms'
+import { byId, useActionTypes, useTaskTypes } from '@/features/catalog/useCatalog'
+import { WITHOUT_TYPE } from '@/lib/terms'
 
 import { plural } from './labels'
 import { useCalibration, useResetCalibration } from './usePlan'
@@ -20,9 +20,11 @@ function describe(coef: number): string {
 /** Калибровка оценок (M9.4): по отметкам «быстрее / как думала / дольше» на «сделано». */
 export function CalibrationSection() {
   const { data: rows, isPending } = useCalibration()
-  const { data: types } = useActionTypes()
+  const actionTypes = byId(useActionTypes().data)
+  const taskTypes = byId(useTaskTypes().data)
   const reset = useResetCalibration()
-  const typeName = new Map(types?.map((t) => [t.key, t.name]))
+  const name = (map: Map<string, { name: string }>, id: string | null) =>
+    (id && map.get(id)?.name) || WITHOUT_TYPE
 
   return (
     <Card>
@@ -30,7 +32,7 @@ export function CalibrationSection() {
         <CardTitle>Калибровка оценок</CardTitle>
         <CardDescription>
           После «сделано» можно отметить, быстрее или дольше вышло. План учитывает это и умножает оценки шагов на
-          коэффициент — отдельно для каждого типа задания и действия.
+          коэффициент — отдельно для каждого типа задачи и действия.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pt-2">
@@ -42,9 +44,9 @@ export function CalibrationSection() {
           <>
             <ul className="flex flex-col gap-1.5">
               {rows.map((r) => (
-                <li key={`${r.task_type}-${r.action_type}`} className="flex items-baseline gap-2 text-sm">
+                <li key={`${r.task_type_id}-${r.action_type_id}`} className="flex items-baseline gap-2 text-sm">
                   <span className="min-w-0 flex-1 truncate">
-                    {TASK_TYPE_LABEL[r.task_type]} · {typeName.get(r.action_type) ?? r.action_type}
+                    {name(taskTypes, r.task_type_id)} · {name(actionTypes, r.action_type_id)}
                   </span>
                   <span className="font-medium tabular-nums">×{r.coef.toFixed(2).replace('.', ',')}</span>
                   <span className="w-36 text-right text-xs text-muted-foreground">

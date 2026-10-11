@@ -1,13 +1,14 @@
-"""Перепланирование (M9): ревизии плана, разовые лимиты дня, калибровка.
+"""Перепланирование (M9): ревизии плана и калибровка.
 
 Ревизия — это и превью (`proposed`), и применённое изменение (`applied`):
 `ops` — что сделать с событиями, `undo` — как вернуть после применения.
 """
 
-from datetime import date, datetime
+import uuid
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Date, Float, Index, Integer, String, text
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,42 +45,29 @@ class PlanRevision(UserOwnedMixin, Base):
     undone_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
-class StudyDayLimit(UserOwnedMixin, Base):
-    """Разовый лимит учёбы на день («в чт можно 8 ч») — вариант при at_risk."""
-
-    __tablename__ = "study_day_limits"
-    __table_args__ = (
-        Index(
-            "uq_study_day_limits_user_date",
-            "user_id",
-            "date",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
-    )
-
-    date: Mapped[date] = mapped_column(Date)
-    minutes: Mapped[int] = mapped_column(Integer)
-
-
 class Calibration(UserOwnedMixin, Base):
-    """Коэффициент оценок по (тип задания, тип действия) — пересчитывается по истории
-    отметок «быстрее / ок / дольше» после `reset_at`."""
+    """Коэффициент оценок по (тип задачи, тип действия) — пересчитывается по истории
+    отметок «быстрее / ок / дольше» после `reset_at`. NULL — «без типа»."""
 
     __tablename__ = "calibrations"
     __table_args__ = (
         Index(
             "uq_calibrations_user_key",
             "user_id",
-            "task_type",
-            "action_type",
+            "task_type_id",
+            "action_type_id",
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
+            postgresql_nulls_not_distinct=True,
         ),
     )
 
-    task_type: Mapped[str] = mapped_column(String(20))
-    action_type: Mapped[str] = mapped_column(String(20))  # ActionTypeKey
+    task_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task_types.id", ondelete="CASCADE")
+    )
+    action_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("action_types.id", ondelete="CASCADE")
+    )
     coef: Mapped[float] = mapped_column(Float, default=1.0)
     samples: Mapped[int] = mapped_column(Integer, default=0)
     reset_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

@@ -466,7 +466,8 @@ export interface paths {
         /** List Action Types */
         get: operations["list_action_types"];
         put?: never;
-        post?: never;
+        /** Create Action Type */
+        post: operations["create_action_type"];
         delete?: never;
         options?: never;
         head?: never;
@@ -483,7 +484,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Action Type
+         * @description Дела с этим типом получают тип по умолчанию (настройки), из лимитов тип выходит.
+         */
+        delete: operations["delete_action_type"];
         options?: never;
         head?: never;
         /** Update Action Type */
@@ -501,10 +506,112 @@ export interface paths {
         put?: never;
         /**
          * Reset Action Type
-         * @description Вернуть окна, название и категорию по умолчанию (ТЗ §4.8).
+         * @description Вернуть окна, название и категорию по умолчанию (ТЗ §4.8). Только у засеянных.
          */
         post: operations["reset_action_type"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Types */
+        get: operations["list_task_types"];
+        put?: never;
+        /** Create Task Type */
+        post: operations["create_task_type"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-types/{task_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task Type
+         * @description Задачи этого типа остаются — без типа.
+         */
+        delete: operations["delete_task_type"];
+        options?: never;
+        head?: never;
+        /** Update Task Type */
+        patch: operations["update_task_type"];
+        trace?: never;
+    };
+    "/api/v1/load-budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Budgets
+         * @description Лимиты нагрузки с составом и разовыми лимитами на сегодня и дальше.
+         */
+        get: operations["list_budgets"];
+        put?: never;
+        /** Create Budget */
+        post: operations["create_budget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/load-budgets/{budget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Budget */
+        delete: operations["delete_budget"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Budget
+         * @description `action_type_ids` — состав целиком.
+         */
+        patch: operations["update_budget"];
+        trace?: never;
+    };
+    "/api/v1/load-budgets/{budget_id}/overrides/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Override
+         * @description «Расширить часы в этот день»: лимит на дату вместо обычного.
+         */
+        put: operations["put_override"];
+        post?: never;
+        /** Delete Override */
+        delete: operations["delete_override"];
         options?: never;
         head?: never;
         patch?: never;
@@ -524,29 +631,13 @@ export interface paths {
          */
         get: operations["list_tasks"];
         put?: never;
-        /** Create Task */
-        post: operations["create_task"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tasks/work": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         /**
-         * Create Work Task
-         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней,
-         *     проект — «по умолчанию для заданий с работы» (ВКР), если не указан другой.
+         * Create Task
+         * @description С `task_type_id` — умолчания типа в пустые поля: тип действия, категория,
+         *     оценка, шаги из шаблона, срок по правилу типа (выдача или сегодня + N дней,
+         *     23:59) и проект — если `project_id` не передан (явный null — «без проекта»).
          */
-        post: operations["create_work_task"];
+        post: operations["create_task"];
         delete?: never;
         options?: never;
         head?: never;
@@ -660,7 +751,7 @@ export interface paths {
         put?: never;
         /**
          * Parse Quick Add
-         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, тип.
+         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, типы.
          *
          *     Ничего не сохраняет — клиент создаёт задание / дело / событие обычными запросами.
          *     `needs_ai` — разбор неуверенный (длинный текст, задание без срока или предмета):
@@ -782,10 +873,7 @@ export interface paths {
         delete: operations["delete_project"];
         options?: never;
         head?: never;
-        /**
-         * Update Project
-         * @description is_work_default=true снимает флаг с остальных проектов.
-         */
+        /** Update Project */
         patch: operations["update_project"];
         trace?: never;
     };
@@ -1186,47 +1274,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/plan/day-limits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Day Limits
-         * @description Разовые лимиты учёбы на сегодня и дальше.
-         */
-        get: operations["list_day_limits"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/plan/day-limits/{day}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Put Day Limit
-         * @description «Расширить часы в этот день»: лимит учёбы на дату вместо общего.
-         */
-        put: operations["put_day_limit"];
-        post?: never;
-        /** Delete Day Limit */
-        delete: operations["delete_day_limit"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/calibration": {
         parameters: {
             query?: never;
@@ -1236,7 +1283,7 @@ export interface paths {
         };
         /**
          * List Calibration
-         * @description Коэффициенты оценок по (тип задания, тип действия) — только где есть отметки.
+         * @description Коэффициенты оценок по (тип задачи, тип действия) — только где есть отметки.
          */
         get: operations["list_calibration"];
         put?: never;
@@ -1870,6 +1917,20 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ActionTypeCreate */
+        ActionTypeCreate: {
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Input"][];
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+        };
         /**
          * ActionTypeKey
          * @description Тип действия — когда дело уместно делать. Набор фиксированный, окна правятся.
@@ -1883,20 +1944,23 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            key: components["schemas"]["ActionTypeKey"];
+            /** @description Ключ сида; у своих типов — null */
+            key: components["schemas"]["ActionTypeKey"] | null;
             /** Name */
             name: string;
             /** Default Category Id */
             default_category_id: string | null;
             /** Windows */
             windows: components["schemas"]["TimeWindow-Output"][];
+            /**
+             * Prefer Morning
+             * @description Лёгкое предпочтение утра в плане
+             */
+            prefer_morning: boolean;
             /** Position */
             position: number;
         };
-        /**
-         * ActionTypeUpdate
-         * @description Набор типов фиксирован; правятся название, окна и категория по умолчанию.
-         */
+        /** ActionTypeUpdate */
         ActionTypeUpdate: {
             /** Name */
             name?: string | null;
@@ -1904,6 +1968,10 @@ export interface components {
             windows?: components["schemas"]["TimeWindow-Input"][] | null;
             /** Default Category Id */
             default_category_id?: string | null;
+            /** Prefer Morning */
+            prefer_morning?: boolean | null;
+            /** Position */
+            position?: number | null;
         };
         /**
          * AttachmentOrder
@@ -1976,7 +2044,7 @@ export interface components {
          * @description Условия дела — фиксированный набор чипов, без свободного текста.
          * @enum {string}
          */
-        BacklogCondition: "weekday_daytime" | "on_class_days" | "needs_laptop" | "institution_hours";
+        BacklogCondition: "weekday_daytime" | "on_class_days" | "needs_laptop";
         /** BacklogCreate */
         BacklogCreate: {
             /** Title */
@@ -1999,6 +2067,11 @@ export interface components {
             desired_by?: string | null;
             /** Conditions */
             conditions?: components["schemas"]["BacklogCondition"][];
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id?: string | null;
             /** Time Window */
             time_window?: components["schemas"]["TimeWindow-Input"][] | null;
         };
@@ -2023,6 +2096,11 @@ export interface components {
             desired_by: string | null;
             /** Conditions */
             conditions: components["schemas"]["BacklogCondition"][];
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id: string | null;
             /** Time Window */
             time_window: components["schemas"]["TimeWindow-Output"][] | null;
             status: components["schemas"]["BacklogStatus"];
@@ -2062,6 +2140,11 @@ export interface components {
             desired_by?: string | null;
             /** Conditions */
             conditions?: components["schemas"]["BacklogCondition"][] | null;
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id?: string | null;
             /** Time Window */
             time_window?: components["schemas"]["TimeWindow-Input"][] | null;
             status?: components["schemas"]["BacklogStatus"] | null;
@@ -2167,7 +2250,8 @@ export interface components {
         BreakdownApply: {
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Category Id */
             category_id?: string | null;
             /**
@@ -2197,7 +2281,8 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Category Id */
             category_id: string | null;
             /** Steps */
@@ -2260,6 +2345,26 @@ export interface components {
              */
             note: string;
         };
+        /** BudgetOverridePut */
+        BudgetOverridePut: {
+            /** Minutes */
+            minutes: number;
+        };
+        /** BudgetOverrideRead */
+        BudgetOverrideRead: {
+            /**
+             * Budget Id
+             * Format: uuid
+             */
+            budget_id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Minutes */
+            minutes: number;
+        };
         /** CalendarDayOff */
         CalendarDayOff: {
             /**
@@ -2289,8 +2394,16 @@ export interface components {
         };
         /** CalibrationRead */
         CalibrationRead: {
-            task_type: components["schemas"]["TaskType"];
-            action_type: components["schemas"]["ActionTypeKey"];
+            /**
+             * Task Type Id
+             * @description null — задачи без типа
+             */
+            task_type_id: string | null;
+            /**
+             * Action Type Id
+             * @description null — шаги без типа действия
+             */
+            action_type_id: string | null;
             /**
              * Coef
              * @description Множитель оценок: 1.2 — делаешь на 20% дольше
@@ -2313,7 +2426,7 @@ export interface components {
          * @description Иконки категорий (имена lucide-react в kebab-case).
          * @enum {string}
          */
-        CategoryIcon: "graduation-cap" | "briefcase" | "house" | "heart" | "shopping-cart" | "stethoscope" | "file-text" | "dumbbell" | "users" | "plane" | "star" | "tag";
+        CategoryIcon: "graduation-cap" | "briefcase" | "house" | "heart" | "shopping-cart" | "stethoscope" | "file-text" | "dumbbell" | "users" | "plane" | "star" | "tag" | "pencil" | "presentation" | "flask-conical" | "book-open" | "clipboard-check";
         /**
          * CategoryKey
          * @description Системные категории (ТЗ §4.8). Пользовательские категории — без ключа.
@@ -2531,6 +2644,20 @@ export interface components {
             start?: string | null;
             /** End */
             end?: string | null;
+        };
+        /**
+         * DeadlineDays
+         * @description Срок = дата выдачи (или сегодня) + N дней, 23:59.
+         */
+        DeadlineDays: {
+            /**
+             * Kind
+             * @default days
+             * @constant
+             */
+            kind: "days";
+            /** Days */
+            days: number;
         };
         /**
          * DeadlineRule
@@ -3066,6 +3193,53 @@ export interface components {
          * @enum {string}
          */
         KindHint: "task" | "backlog" | "event";
+        /** LoadBudgetCreate */
+        LoadBudgetCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Minutes Per Day
+             * @description Минут в день
+             */
+            minutes_per_day: number;
+            /**
+             * Action Type Ids
+             * @description Типы действий, которые идут в лимит
+             */
+            action_type_ids?: string[];
+        };
+        /** LoadBudgetRead */
+        LoadBudgetRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Minutes Per Day */
+            minutes_per_day: number;
+            /** Position */
+            position: number;
+            /** Action Type Ids */
+            action_type_ids: string[];
+            /**
+             * Overrides
+             * @description Разовые лимиты на сегодня и дальше
+             */
+            overrides: components["schemas"]["BudgetOverrideRead"][];
+        };
+        /** LoadBudgetUpdate */
+        LoadBudgetUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Minutes Per Day */
+            minutes_per_day?: number | null;
+            /** Action Type Ids */
+            action_type_ids?: string[] | null;
+            /** Position */
+            position?: number | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -3445,7 +3619,8 @@ export interface components {
             title: string;
             /** Description */
             description: string;
-            task_type: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Subject Id */
             subject_id: string | null;
             /** Deadline */
@@ -3477,7 +3652,8 @@ export interface components {
             title: string;
             /** Text */
             text: string;
-            task_type: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Subject Id */
             subject_id: string | null;
             /** Deadline */
@@ -3663,12 +3839,6 @@ export interface components {
             links?: components["schemas"]["SubjectLink"][];
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
-            /**
-             * Is Work Default
-             * @description Сюда по умолчанию попадают задания с работы
-             * @default false
-             */
-            is_work_default: boolean;
         };
         /** ProjectDetail */
         ProjectDetail: {
@@ -3692,8 +3862,6 @@ export interface components {
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
-            /** Is Work Default */
-            is_work_default: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3762,8 +3930,6 @@ export interface components {
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
-            /** Is Work Default */
-            is_work_default: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3829,8 +3995,6 @@ export interface components {
             links?: components["schemas"]["SubjectLink"][] | null;
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
-            /** Is Work Default */
-            is_work_default?: boolean | null;
             status?: components["schemas"]["ProjectStatus"] | null;
         };
         /**
@@ -3907,8 +4071,16 @@ export interface components {
             is_deadline: boolean;
             /** Subject Id */
             subject_id: string | null;
-            task_type: components["schemas"]["TaskType"] | null;
-            action_type: components["schemas"]["ActionTypeKey"] | null;
+            /**
+             * Task Type Id
+             * @description Тип задачи из справочника по словам
+             */
+            task_type_id: string | null;
+            /**
+             * Action Type Id
+             * @description Тип действия по словам; похоже на задачу — тип по умолчанию
+             */
+            action_type_id: string | null;
             kind_hint: components["schemas"]["KindHint"];
             /**
              * Needs Ai
@@ -3923,7 +4095,7 @@ export interface components {
         };
         /**
          * ReadingTaskCreate
-         * @description Задание «прочитать» из источника: тип «чтение», предмет источника.
+         * @description Задание «прочитать» из источника: предмет источника, тип — по словам названия.
          */
         ReadingTaskCreate: {
             /**
@@ -3936,6 +4108,11 @@ export interface components {
             deadline?: string | null;
             /** Estimate Min */
             estimate_min?: number | null;
+            /**
+             * Task Type Id
+             * @description null — угадать по названию («прочитать» → тип с этим словом)
+             */
+            task_type_id?: string | null;
         };
         /** RecurringEventCreate */
         RecurringEventCreate: {
@@ -4427,21 +4604,6 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** StudyDayLimitPut */
-        StudyDayLimitPut: {
-            /** Minutes */
-            minutes: number;
-        };
-        /** StudyDayLimitRead */
-        StudyDayLimitRead: {
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            /** Minutes */
-            minutes: number;
-        };
         /** SubjectCreate */
         SubjectCreate: {
             /** Semester Id */
@@ -4660,12 +4822,18 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** TaskCreate */
+        /**
+         * TaskCreate
+         * @description Пустые поля заполняются умолчаниями типа задачи (если он задан).
+         */
         TaskCreate: {
             /** Title */
             title: string;
-            /** @default other */
-            task_type: components["schemas"]["TaskType"];
+            /**
+             * Task Type Id
+             * @description null — без типа
+             */
+            task_type_id?: string | null;
             /**
              * Description
              * @default
@@ -4675,12 +4843,12 @@ export interface components {
             subject_id?: string | null;
             /**
              * Category Id
-             * @description null — выводится: проект → тип действия → «Учёба»
+             * @description null — выводится: тип задачи → проект → тип действия
              */
             category_id?: string | null;
             /**
              * Action Type Id
-             * @description null — «Самостоятельная учёба»
+             * @description null — из типа задачи или тип по умолчанию (настройки)
              */
             action_type_id?: string | null;
             /** Time Window */
@@ -4722,7 +4890,8 @@ export interface components {
             id: string;
             /** Title */
             title: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Description */
             description: string;
             /** Subject Id */
@@ -4789,7 +4958,8 @@ export interface components {
             id: string;
             /** Title */
             title: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Description */
             description: string;
             /** Subject Id */
@@ -4850,16 +5020,80 @@ export interface components {
          * @enum {string}
          */
         TaskStatus: "active" | "done" | "cancelled";
-        /**
-         * TaskType
-         * @enum {string}
-         */
-        TaskType: "homework" | "report" | "essay" | "lab" | "coursework" | "reading" | "exam_prep" | "other";
+        /** TaskTypeCreate */
+        TaskTypeCreate: {
+            /** Name */
+            name: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /** Synonyms */
+            synonyms?: string[];
+            /** Default Action Type Id */
+            default_action_type_id?: string | null;
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            /** @description Как вывести срок; тип с правилом — «быстрый тип» в ＋ */
+            deadline_rule?: components["schemas"]["DeadlineDays"] | null;
+            /** Default Project Id */
+            default_project_id?: string | null;
+            /** Default Template Id */
+            default_template_id?: string | null;
+        };
+        /** TaskTypeRead */
+        TaskTypeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            icon: components["schemas"]["CategoryIcon"];
+            /** Synonyms */
+            synonyms: string[];
+            /** Default Action Type Id */
+            default_action_type_id: string | null;
+            /** Default Category Id */
+            default_category_id: string | null;
+            /** Default Estimate Min */
+            default_estimate_min: number | null;
+            deadline_rule: components["schemas"]["DeadlineDays"] | null;
+            /** Default Project Id */
+            default_project_id: string | null;
+            /** Default Template Id */
+            default_template_id: string | null;
+            /** Position */
+            position: number;
+        };
+        /** TaskTypeUpdate */
+        TaskTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            icon?: components["schemas"]["CategoryIcon"] | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /** Default Action Type Id */
+            default_action_type_id?: string | null;
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            deadline_rule?: components["schemas"]["DeadlineDays"] | null;
+            /** Default Project Id */
+            default_project_id?: string | null;
+            /** Default Template Id */
+            default_template_id?: string | null;
+            /** Position */
+            position?: number | null;
+        };
         /** TaskUpdate */
         TaskUpdate: {
             /** Title */
             title?: string | null;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Description */
             description?: string | null;
             /** Subject Id */
@@ -4927,7 +5161,8 @@ export interface components {
         TemplateCreate: {
             /** Name */
             name: string;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
         };
@@ -4940,7 +5175,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            task_type: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
             /** Total Estimate Min */
@@ -4961,7 +5197,8 @@ export interface components {
         TemplateUpdate: {
             /** Name */
             name?: string | null;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
         };
         /**
          * TimeRange
@@ -5058,10 +5295,10 @@ export interface components {
              */
             travel_buffer_min: number;
             /**
-             * Study Limit Min Per Day
-             * @default 360
+             * Default Action Type Id
+             * @description Тип действия задач и дел без своего типа; null — без типа
              */
-            study_limit_min_per_day: number;
+            default_action_type_id: string | null;
             /**
              * Deadline Buffer Days
              * @description Закончить за N дней до дедлайна
@@ -5167,8 +5404,11 @@ export interface components {
              * @description Дорога до университета и обратно, мин
              */
             travel_buffer_min?: number | null;
-            /** Study Limit Min Per Day */
-            study_limit_min_per_day?: number | null;
+            /**
+             * Default Action Type Id
+             * @description Тип действия задач и дел без своего типа; null — без типа
+             */
+            default_action_type_id?: string | null;
             /**
              * Deadline Buffer Days
              * @description Закончить за N дней до дедлайна
@@ -5264,40 +5504,6 @@ export interface components {
         WorkHoursPatch: {
             weekdays?: components["schemas"]["DayRangePatch"] | null;
             weekends?: components["schemas"]["DayRangePatch"] | null;
-        };
-        /**
-         * WorkTaskCreate
-         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней, проект ВКР.
-         */
-        WorkTaskCreate: {
-            /** Title */
-            title: string;
-            /**
-             * Description
-             * @default
-             */
-            description: string;
-            /**
-             * Issued At
-             * @description null — сегодня
-             */
-            issued_at?: string | null;
-            /**
-             * Deadline
-             * @description null — выдача + 14 дней, 23:59
-             */
-            deadline?: string | null;
-            /**
-             * Project Id
-             * @description null — проект «по умолчанию для заданий с работы»
-             */
-            project_id?: string | null;
-            /**
-             * No Project
-             * @description Не привязывать к проекту
-             * @default false
-             */
-            no_project: boolean;
         };
     };
     responses: never;
@@ -9359,6 +9565,194 @@ export interface operations {
             };
         };
     };
+    create_action_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_action_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     update_action_type: {
         parameters: {
             query?: never;
@@ -9551,6 +9945,954 @@ export interface operations {
             };
         };
     };
+    list_task_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_budgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoadBudgetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoadBudgetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetOverridePut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetOverrideRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_tasks: {
         parameters: {
             query?: {
@@ -9658,102 +11000,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskDetail"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    create_work_task: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkTaskCreate"];
             };
         };
         responses: {
@@ -14413,288 +15659,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PlanUndoResult"];
                 };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    list_day_limits: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyDayLimitRead"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    put_day_limit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                day: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StudyDayLimitPut"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyDayLimitRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_day_limit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                day: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Bad Request */
             400: {

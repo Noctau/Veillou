@@ -17,7 +17,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -42,7 +42,7 @@
    ],
    "depends_on": ["subtask:‹Реферат по климатологии / Подобрать литературу в библиотеке›"],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -67,7 +67,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": null,
    "buffer_days": null,
@@ -92,7 +92,7 @@
    ],
    "depends_on": ["subtask:‹Реферат по климатологии / Написать черновик›"],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -117,7 +117,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -142,7 +142,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -167,7 +167,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": 0,
@@ -192,7 +192,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -217,7 +217,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": null,
    "buffer_days": null,
@@ -242,7 +242,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2026-12-03 00:00",
    "buffer_days": 0,
@@ -267,7 +267,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2026-12-10 00:00",
    "buffer_days": 0,
@@ -292,7 +292,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2026-12-17 00:00",
    "buffer_days": 0,
@@ -317,7 +317,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2026-12-24 00:00",
    "buffer_days": 0,
@@ -342,7 +342,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2026-12-31 00:00",
    "buffer_days": 0,
@@ -367,7 +367,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2027-01-07 00:00",
    "buffer_days": 0,
@@ -392,7 +392,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2027-01-14 00:00",
    "buffer_days": 0,
@@ -417,7 +417,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2027-01-21 00:00",
    "buffer_days": 0,
@@ -442,7 +442,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": true,
    "earliest": "2027-01-28 00:00",
    "buffer_days": 0,
@@ -467,7 +467,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": false,
    "earliest": "2026-11-30 00:00",
    "buffer_days": 0,
@@ -492,7 +492,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": false,
+   "budgets": [],
    "prefer_morning": false,
    "earliest": "2026-11-30 00:00",
    "buffer_days": 0,
@@ -517,7 +517,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-05 00:00",
    "buffer_days": 0,
@@ -542,7 +542,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-06 00:00",
    "buffer_days": 0,
@@ -567,7 +567,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-06 00:00",
    "buffer_days": 0,
@@ -592,7 +592,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-07 00:00",
    "buffer_days": 0,
@@ -617,7 +617,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-07 00:00",
    "buffer_days": 0,
@@ -642,7 +642,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-08 00:00",
    "buffer_days": 0,
@@ -667,7 +667,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-08 00:00",
    "buffer_days": 0,
@@ -692,7 +692,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-09 00:00",
    "buffer_days": 0,
@@ -717,7 +717,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-09 00:00",
    "buffer_days": 0,
@@ -742,7 +742,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-10 00:00",
    "buffer_days": 0,
@@ -767,7 +767,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-10 00:00",
    "buffer_days": 0,
@@ -792,7 +792,7 @@
    ],
    "depends_on": [],
    "splittable": true,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2027-01-11 00:00",
    "buffer_days": 0,
@@ -817,7 +817,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-11-30 00:00",
    "buffer_days": 0,
@@ -842,7 +842,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-11-30 00:00",
    "buffer_days": 0,
@@ -867,7 +867,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-11-30 00:00",
    "buffer_days": 0,
@@ -892,7 +892,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-12-07 00:00",
    "buffer_days": 0,
@@ -917,7 +917,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-12-07 00:00",
    "buffer_days": 0,
@@ -942,7 +942,7 @@
    ],
    "depends_on": [],
    "splittable": false,
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "prefer_morning": false,
    "earliest": "2026-12-07 00:00",
    "buffer_days": 0,
@@ -957,302 +957,362 @@
   {
    "start": "2026-11-30 09:00",
    "end": "2026-11-30 10:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-11-30 10:45",
    "end": "2026-11-30 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-01 13:00",
    "end": "2026-12-01 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-01 14:45",
    "end": "2026-12-01 16:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-01 19:00",
    "end": "2026-12-01 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-02 13:00",
    "end": "2026-12-02 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-02 17:00",
    "end": "2026-12-02 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-03 09:00",
    "end": "2026-12-03 10:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-03 13:00",
    "end": "2026-12-03 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-03 19:00",
    "end": "2026-12-03 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-04 18:30",
    "end": "2026-12-04 20:00",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-05 10:00",
    "end": "2026-12-05 11:30",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-06 15:00",
    "end": "2026-12-06 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-07 10:45",
    "end": "2026-12-07 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-08 13:00",
    "end": "2026-12-08 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-08 14:45",
    "end": "2026-12-08 16:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-08 19:00",
    "end": "2026-12-08 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-09 10:45",
    "end": "2026-12-09 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-10 19:00",
    "end": "2026-12-10 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-11 18:30",
    "end": "2026-12-11 20:00",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-12 10:00",
    "end": "2026-12-12 11:30",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-13 15:00",
    "end": "2026-12-13 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-14 09:00",
    "end": "2026-12-14 10:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-14 10:45",
    "end": "2026-12-14 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-15 13:00",
    "end": "2026-12-15 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-15 14:45",
    "end": "2026-12-15 16:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-15 19:00",
    "end": "2026-12-15 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-16 10:45",
    "end": "2026-12-16 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-17 09:00",
    "end": "2026-12-17 10:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-17 13:00",
    "end": "2026-12-17 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-17 19:00",
    "end": "2026-12-17 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-18 18:30",
    "end": "2026-12-18 20:00",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-19 10:00",
    "end": "2026-12-19 11:30",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-20 15:00",
    "end": "2026-12-20 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-21 09:00",
    "end": "2026-12-21 10:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-21 10:45",
    "end": "2026-12-21 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-22 13:00",
    "end": "2026-12-22 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-22 14:45",
    "end": "2026-12-22 16:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-22 19:00",
    "end": "2026-12-22 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-23 10:45",
    "end": "2026-12-23 12:20",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-24 13:00",
    "end": "2026-12-24 14:35",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-24 19:00",
    "end": "2026-12-24 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-25 18:30",
    "end": "2026-12-25 20:00",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-26 10:00",
    "end": "2026-12-26 11:30",
-   "is_class": true
+   "is_class": true,
+   "budgets": []
   },
   {
    "start": "2026-12-27 15:00",
    "end": "2026-12-27 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-29 19:00",
    "end": "2026-12-29 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2026-12-31 19:00",
    "end": "2026-12-31 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-03 15:00",
    "end": "2027-01-03 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-05 19:00",
    "end": "2027-01-05 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-07 19:00",
    "end": "2027-01-07 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-10 15:00",
    "end": "2027-01-10 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-12 10:00",
    "end": "2027-01-12 13:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-12 19:00",
    "end": "2027-01-12 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-14 19:00",
    "end": "2027-01-14 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-17 15:00",
    "end": "2027-01-17 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-19 19:00",
    "end": "2027-01-19 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-21 19:00",
    "end": "2027-01-21 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-24 15:00",
    "end": "2027-01-24 18:00",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-26 19:00",
    "end": "2027-01-26 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   },
   {
    "start": "2027-01-28 19:00",
    "end": "2027-01-28 20:30",
-   "is_class": false
+   "is_class": false,
+   "budgets": []
   }
  ],
  "fixed": [
@@ -1261,7 +1321,7 @@
    "start": "2026-12-01 16:30",
    "end": "2026-12-01 18:00",
    "group_id": "‹Лабораторная №3›",
-   "counts_as_study": true,
+   "budgets": ["‹лимит Учёба›"],
    "quota": null
   }
  ],
@@ -1284,7 +1344,6 @@
    "end": "14:00"
   },
   "travel_buffer_min": 40,
-  "study_limit_min_per_day": 300,
   "deadline_buffer_days": 1,
   "max_subtasks_per_task_per_day": 2,
   "free_evenings_per_week": 2,
@@ -1295,8 +1354,14 @@
   "break_min": 10,
   "min_part_min": 30
  },
- "study_limits": [
-  ["2026-12-03", 480]
+ "budgets": [
+  {
+   "id": "‹лимит Учёба›",
+   "minutes_per_day": 300,
+   "overrides": [
+    ["2026-12-03", 480]
+   ]
+  }
  ],
  "quotas": [
   {

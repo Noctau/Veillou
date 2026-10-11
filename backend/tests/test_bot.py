@@ -18,6 +18,7 @@ from app.models import BacklogItem, Event, Reminder, Task, User
 from app.notify.notifier import reminder_callback
 
 from .test_reminders import add_reminder
+from .test_tasks import seed_task_type
 from .test_telegram import TG_ID, BotHarness
 
 TZ = get_tz("Europe/Moscow")
@@ -103,12 +104,13 @@ async def test_free_text_to_backlog(tg, session, linked):
 
 async def test_add_task_with_deadline(tg, session, linked):
     """/add — всегда быстрый разбор, без ИИ (свободный текст без предмета ушёл бы в ИИ)."""
+    essay_id = await seed_task_type(session, linked.id, "essay", "Реферат")
     [reply] = await tg.send("/add сдать реферат до 15 окт")
     assert "Задание" in reply
     assert "до " in reply
     [task] = await active_tasks(session)
     assert task.deadline is not None
-    assert task.task_type == "essay"
+    assert task.task_type_id == essay_id
 
 
 async def test_add_command(tg, session, linked):

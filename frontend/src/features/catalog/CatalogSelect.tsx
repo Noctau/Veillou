@@ -1,7 +1,9 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { WITHOUT_TYPE } from '@/lib/terms'
+
 import { CategoryIcon } from './CategoryIcon'
-import { useActionTypes, useCategories } from './useCatalog'
+import { useActionTypes, useCategories, useTaskTypes } from './useCatalog'
 
 const NONE = 'none'
 
@@ -44,6 +46,26 @@ export function ActionTypeSelect({ id, value, onChange, emptyLabel = 'Не за�
         <SelectItem value={NONE}>{emptyLabel}</SelectItem>
         {types?.map((t) => (
           <SelectItem key={t.id} value={t.id}>
+            {t.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+export function TaskTypeSelect({ id, value, onChange, emptyLabel = WITHOUT_TYPE }: Props) {
+  const { data: types } = useTaskTypes()
+  return (
+    <Select value={value ?? NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE}>{emptyLabel}</SelectItem>
+        {types?.map((t) => (
+          <SelectItem key={t.id} value={t.id}>
+            <CategoryIcon name={t.icon} className="size-4" />
             {t.name}
           </SelectItem>
         ))}

@@ -13,7 +13,7 @@
       "text": "Реферат по климатологии про муссоны, 10 страниц, сдать до 20 октября",
       "expect": {
         "kind": "task",
-        "task_type": "essay",
+        "task_type": "Реферат",
         "subject": "Климатология",
         "deadline_date": "2026-10-20"
       }
@@ -22,7 +22,7 @@
       "text": "к следующей пятнице решить задачи 3.1-3.8 по физике атмосферы",
       "expect": {
         "kind": "task",
-        "task_type": "homework",
+        "task_type": "ДЗ",
         "subject": "Физика атмосферы",
         "deadline_date": "2026-10-16"
       }
@@ -31,7 +31,7 @@
       "text": "Петров сказал подготовить доклад на 10 минут про циклоны умеренных широт, со слайдами, к семинару через неделю",
       "expect": {
         "kind": "task",
-        "task_type": "report",
+        "task_type": "Доклад",
         "subject": "Синоптическая метеорология",
         "deadline_date": "2026-10-15"
       }
@@ -40,7 +40,7 @@
       "text": "записаться к стоматологу",
       "expect": {
         "kind": "backlog",
-        "task_type": "other",
+        "task_type": null,
         "subject": null,
         "deadline_date": null
       }
@@ -49,7 +49,7 @@
       "text": "прочитать главу 3 учебника по гидрологии",
       "expect": {
         "kind": "task",
-        "task_type": "reading",
+        "task_type": "Чтение",
         "subject": "Гидрология",
         "deadline_date": null
       }
@@ -58,7 +58,7 @@
       "text": "Эссе по философии «Свобода и ответственность» 5 стр, дедлайн завтра в 23:59",
       "expect": {
         "kind": "task",
-        "task_type": "essay",
+        "task_type": "Реферат",
         "subject": "Философия",
         "deadline_date": "2026-10-09"
       }
@@ -67,7 +67,7 @@
       "text": "написать научруку про структуру первой главы",
       "expect": {
         "kind": "task",
-        "task_type": "other",
+        "task_type": null,
         "subject": null,
         "deadline_date": null,
         "action_type": "people"

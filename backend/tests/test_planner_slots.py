@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta
 from app.core.time import get_tz, wall_to_utc
 from app.domain.planner import (
     Block,
+    Budget,
     Busy,
     FixedBlock,
     PlanInput,
@@ -231,11 +232,15 @@ def test_rest_candidate_with_pinned_block_is_excluded():
 
 def test_fixed_blocks_count_in_daily_limits():
     fixed = (
-        FixedBlock("f1", at(MON, 9), at(MON, 11), group_id="t"),
-        FixedBlock("f2", at(MON, 14), at(MON, 15), group_id="t", counts_as_study=False),
+        FixedBlock("f1", at(MON, 9), at(MON, 11), group_id="t", budgets=frozenset({"a", "b"})),
+        FixedBlock("f2", at(MON, 14), at(MON, 15), group_id="t", budgets=frozenset({"x"})),
     )
-    prep = prepare(inp(Block("b", 30), fixed=fixed, now=at(MON, 16)))
-    assert prep.fixed_study == {0: 8}
+    budgets = (Budget("a", 240), Budget("b", 120))
+    prep = prepare(inp(Block("b", 30), fixed=fixed, now=at(MON, 16), budgets=budgets))
+    # «x» во входе нет — не считается
+    assert prep.fixed_budget == {("a", 0): 8, ("b", 0): 8}
+    assert prep.remaining("a", 0) == 8
+    assert prep.remaining("b", 0) == 0
     assert prep.fixed_per_group == {("t", 0): 2}
 
 

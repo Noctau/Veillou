@@ -22,10 +22,27 @@ from pydantic import (
 )
 
 from app.domain.breakdown import MAX_STEP_MIN, MIN_STEP_MIN, round_estimate
-from app.domain.enums import ActionTypeKey, CategoryKey, TaskType
+from app.domain.enums import ActionTypeKey, CategoryKey
 from app.domain.tasks import find_cycle
 
 MAX_STEPS = 15
+
+# «Нет значения» от модели — пустая строка (или «null», «нет»): Pydantic превращает в None
+_EMPTY = frozenset({"", "null", "none", "нет", "-"})
+
+
+def _blank(value: Any) -> Any:
+    if isinstance(value, str) and value.strip().lower() in _EMPTY:
+        return None
+    return value.strip() if isinstance(value, str) else value
+
+
+# Без справочника — свободная строка; with_choices сужает до названий типов пользователя
+TaskTypeName = Annotated[
+    str | None,
+    BeforeValidator(_blank),
+    WithJsonSchema({"type": "string", "description": "Тип задачи из списка или пустая строка"}),
+]
 
 
 class AIStep(BaseModel):
@@ -55,7 +72,7 @@ class AIStep(BaseModel):
 
 
 class AIBreakdown(BaseModel):
-    task_type: TaskType = Field(description="Тип самого задания")
+    task_type: TaskTypeName = Field(description="Тип задачи из списка или пустая строка")
     category: CategoryKey = Field(description="Категория задания")
     subtasks: list[AIStep] = Field(min_length=1, max_length=MAX_STEPS)
     total_estimate_min: int = Field(description="Сумма оценок шагов")
@@ -93,13 +110,6 @@ class AIBreakdown(BaseModel):
 # Pydantic превращает пустое в None; схема для модели — простые строки.
 
 _HHMM = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
-_EMPTY = frozenset({"", "null", "none", "нет", "-"})
-
-
-def _blank(value: Any) -> Any:
-    if isinstance(value, str) and value.strip().lower() in _EMPTY:
-        return None
-    return value.strip() if isinstance(value, str) else value
 
 
 def _hhmm(value: Any) -> str | None:
@@ -158,7 +168,7 @@ class AIParsed(_Deadline, BaseModel):
         "event — встреча с точным временем"
     )
     title: Title = Field(description="Короткое название, до 80 символов", max_length=200)
-    task_type: TaskType = Field(description="Тип задания; other — если не задание")
+    task_type: TaskTypeName = Field(description="Тип задачи из списка; пустая строка — не задача")
     subject: Subject
     deadline_date: DeadlineDate
     deadline_time: DeadlineTime
@@ -171,38 +181,51 @@ class AIParsed(_Deadline, BaseModel):
 class AIPhoto(_Deadline, BaseModel):
     text: str = Field(description="Весь текст задания с фото, как написан", max_length=10_000)
     title: Title = Field(description="Короткое название задания, до 80 символов", max_length=200)
-    task_type: TaskType
+    task_type: TaskTypeName
     subject: Subject
     deadline_date: DeadlineDate
     deadline_time: DeadlineTime
 
 
-def with_subjects[T: BaseModel](schema: type[T], names: list[str]) -> type[T]:
-    """Схема, где `subject` — одно из названий предметов пользователя или пустая строка."""
-    if not names:
-        return schema
-    subject: Any = Annotated[
+def _choice(names: list[str], what: str) -> Any:
+    """Строка из списка `names` или пустая строка (→ None). Пустой список — всегда None."""
+
+    def check(value: str | None) -> str | None:
+        if value is None or not names:
+            return None
+        if value not in names:
+            raise ValueError(f"{what} не из списка")
+        return value
+
+    return Annotated[
         str | None,
         BeforeValidator(_blank),
-        AfterValidator(lambda v: _one_of(v, names)),
+        AfterValidator(check),
         WithJsonSchema({"type": "string", "enum": [*names, ""]}),
     ]
-    fields = {name: (info.annotation, info) for name, info in schema.model_fields.items()}
-    fields["subject"] = (subject, Field(description="Предмет из списка или пустая строка"))
-    # Порядок полей сохраняем — модель заполняет их по порядку
-    # Модель строится в рантайме: mypy не выводит её тип из **fields
-    return create_model(schema.__name__, __base__=_base_of(schema), **fields)  # type: ignore[call-overload,no-any-return]
 
 
-def _one_of(value: str | None, names: list[str]) -> str | None:
-    if value is not None and value not in names:
-        raise ValueError("предмет не из списка")
-    return value
+CHOICES = {
+    "subject": ("предмет", "Предмет из списка или пустая строка"),
+    "task_type": ("тип задачи", "Тип задачи из списка или пустая строка"),
+}
 
 
-def _base_of(schema: type[BaseModel]) -> tuple[type, ...]:
-    """Без самого BaseModel-класса со старыми полями: только примеси (`_Deadline`)."""
-    return (*(b for b in schema.__bases__ if b is not BaseModel), BaseModel)
+def with_choices[T: BaseModel](schema: type[T], **choices: list[str]) -> type[T]:
+    """Схема, где строковые поля (`subject`, `task_type`) — одно из названий справочника
+    пользователя или пустая строка. Порядок полей и валидаторы схемы сохраняются."""
+    fields: dict[str, Any] = {}
+    for name, names in choices.items():
+        what, description = CHOICES[name]
+        fields[name] = (_choice(names, what), Field(description=description))
+    if not fields:
+        return schema
+    return create_model(schema.__name__, __base__=schema, **fields)
+
+
+def with_subjects[T: BaseModel](schema: type[T], names: list[str]) -> type[T]:
+    """Схема, где `subject` — одно из названий предметов пользователя или пустая строка."""
+    return with_choices(schema, subject=names) if names else schema
 
 
 # ---------- этапы проекта (M13.2) ----------

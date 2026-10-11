@@ -4,8 +4,8 @@
 - подзадачи `todo` активных заданий (оценка × коэффициент калибровки);
 - задание без подзадач, но с оценкой — одним блоком (`source_type=task`);
 - вхождение регулярного задания — только в свой день, без разрезания;
-- дела из ящика, взятые на неделю (M11.2): только в оставшееся после учёбы
-  время своей недели, в окна по условиям (`domain/backlog.py`);
+- дела из ящика, взятые на неделю (M11.2): только в оставшееся после основных
+  блоков время своей недели, в окна по условиям (`domain/backlog.py`);
 - дни подготовки к экзамену (M12.2): каждый — в свой день, до начала экзамена;
 - недельная норма проекта (M13.1) на текущую и следующую неделю: шаги заданий
   проекта засчитываются в норму, на недостающее — резервные блоки «работа над
@@ -14,6 +14,10 @@
 Что не трогаем: жёсткие события, закреплённые блоки, уже начавшиеся и
 сделанные сегодня (они занимают время, считаются в дневные лимиты и уменьшают
 остаток оценки: перетащили одну часть разрезанного блока — вторая остаётся).
+
+Справочники → поля контракта (M15): лимиты нагрузки блока — по его типу действия
+(свой, задачи или тип по умолчанию из настроек), утро — флаг `prefer_morning`
+типа. Подготовка к экзамену и резерв нормы проекта идут по типу по умолчанию.
 Незакреплённые будущие блоки — это «прошлый план»: планировщик старается
 их не двигать. Неотмеченные блоки прошлых дней в превью становятся `missed`.
 
@@ -45,7 +49,6 @@ from app.domain import projects as proj
 from app.domain.calibration import calibrated
 from app.domain.enums import (
     FIXED_KINDS,
-    ActionTypeKey,
     BacklogCondition,
     BacklogStatus,
     EventKind,
@@ -85,7 +88,6 @@ from app.models import (
     Job,
     PlanRevision,
     Project,
-    StudyDayLimit,
     Subject,
     Subtask,
     Task,
@@ -95,7 +97,8 @@ from app.models.base import UserOwnedMixin
 from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
 from app.services import exams
-from app.services.calibration import DEFAULT_ACTION, coefficients
+from app.services.budgets import budget_index
+from app.services.calibration import coefficients
 from app.services.settings import effective_settings
 
 log = logging.getLogger(__name__)
@@ -134,7 +137,6 @@ def plan_settings(s: UserSettings) -> PlanSettings:
         sleep=TimeRange(s.sleep.start, s.sleep.end),
         lunch=TimeRange(s.lunch.start, s.lunch.end),
         travel_buffer_min=s.travel_buffer_min,
-        study_limit_min_per_day=s.study_limit_min_per_day,
         deadline_buffer_days=s.deadline_buffer_days,
         free_evenings_per_week=s.rest.free_evenings_per_week,
         weekend_half_days=s.rest.weekend_half_days,
@@ -245,10 +247,12 @@ class _Builder:
     async def build(self) -> Snapshot:
         s = self.settings
         action_types = {a.id: a for a in await self._scalars(ActionType)}
-        types_by_key = {a.key: a for a in action_types.values() if a.key}
+        default_type = (
+            s.default_action_type_id if s.default_action_type_id in action_types else None
+        )
         colors = {c.id: c.color for c in await self._scalars(Category)}
         coefs = await coefficients(self.db, self.user_id)
-        limits = await self._scalars(StudyDayLimit, StudyDayLimit.date >= self.today)
+        budgets = await budget_index(self.db, self.user_id, self.today)
 
         hard = await self._scalars(
             Event,
@@ -326,16 +330,23 @@ class _Builder:
         def task_quota(task: Task) -> str | None:
             return project_tag(task.project_id) if task.project_id in projects else None
 
-        def type_key(type_id: uuid.UUID | None) -> str:
+        def own_action(task: Task, st: Subtask | None) -> uuid.UUID | None:
+            """Тип действия шага: свой или задачи (ключ калибровки)."""
+            return (st.action_type_id if st else None) or task.action_type_id
+
+        def effective(type_id: uuid.UUID | None) -> uuid.UUID | None:
+            """Без своего типа — тип по умолчанию (лимиты, утро)."""
+            return type_id if type_id in action_types else default_type
+
+        def prefers_morning(type_id: uuid.UUID | None) -> bool:
             at = action_types.get(type_id) if type_id else None
-            return at.key if at else DEFAULT_ACTION
+            return at.prefer_morning if at else False
 
-        def action_key(task: Task, st: Subtask | None) -> str:
-            return type_key((st.action_type_id if st else None) or task.action_type_id)
-
-        def type_windows(key: str) -> tuple[Window, ...]:
-            at = types_by_key.get(key)
+        def type_windows(type_id: uuid.UUID | None) -> tuple[Window, ...]:
+            at = action_types.get(type_id) if type_id else None
             return windows_from_json(at.windows) if at else ()
+
+        default_budgets = budgets.of(default_type)
 
         def windows(task: Task, st: Subtask | None) -> tuple[Window, ...]:
             if st is not None and st.time_window:
@@ -346,11 +357,13 @@ class _Builder:
             at = action_types.get(type_id) if type_id else None
             return windows_from_json(at.windows) if at else ()
 
-        def owner_of(e: Event) -> tuple[str | None, bool, str | None]:
-            """(группа для «≤ N в день», считается ли учёбой, метка нормы) — для
-            занятого времени."""
+        no_budgets: frozenset[uuid.UUID] = frozenset()
+
+        def owner_of(e: Event) -> tuple[str | None, frozenset[uuid.UUID], str | None]:
+            """(группа для «≤ N в день», лимиты нагрузки, метка нормы) — для занятого
+            времени."""
             if e.source_id is None:
-                return None, False, None
+                return None, no_budgets, None
             st: Subtask | None
             if e.source_type == SourceType.subtask:
                 st = subtask_by_id.get(e.source_id)
@@ -359,18 +372,20 @@ class _Builder:
                 task, st = task_by_id.get(e.source_id), None
             elif e.source_type == SourceType.exam_session:
                 sess = session_by_id.get(e.source_id)
-                return (f"exam:{sess.exam_id}" if sess else None), True, None
+                return (f"exam:{sess.exam_id}" if sess else None), default_budgets, None
             elif e.source_type == SourceType.backlog_item:
                 item = item_by_id.get(e.source_id)
-                return None, item is not None and type_key(item.action_type_id) == "study", None
+                if item is None:
+                    return None, no_budgets, None
+                return None, budgets.of(effective(item.action_type_id)), None
             elif e.source_type == SourceType.project and e.source_id is not None:
                 tag = project_tag(e.source_id)
-                return tag, True, (tag if e.source_id in projects else None)
+                return tag, default_budgets, (tag if e.source_id in projects else None)
             else:
-                return None, False, None
+                return None, no_budgets, None
             if task is None:
-                return None, False, None
-            return str(task.id), action_key(task, st) == ActionTypeKey.study, task_quota(task)
+                return None, no_budgets, None
+            return str(task.id), budgets.of(effective(own_action(task, st))), task_quota(task)
 
         # ---------- гибкие события: что занято, что можно двигать ----------
         fixed: list[FixedBlock] = []
@@ -395,14 +410,14 @@ class _Builder:
             minutes = round((e.end - e.start).total_seconds() / 60)
             is_fixed = not ours or e.status == EventStatus.done or e.is_pinned or e.start < self.now
             if is_fixed:
-                group, study, quota = owner_of(e)
+                group, limits, quota = owner_of(e)
                 fixed.append(
                     FixedBlock(
                         fixed_id(e.id),
                         e.start,
                         e.end,
                         group_id=group,
-                        counts_as_study=study,
+                        budgets=limits,
                         quota=quota,
                     )
                 )
@@ -475,8 +490,8 @@ class _Builder:
                 occurrence = st.occurrence_date if st else None
                 if occurrence is not None and occurrence < self.today:
                     continue
-                act = action_key(task, st)
-                coef = coefs.get((task.task_type, act), 1.0)
+                act = own_action(task, st)
+                coef = coefs.get((task.task_type_id, act), 1.0)
                 remaining = calibrated(estimate, coef) - consumed.get(key, 0)
                 if remaining < MIN_BLOCK_MIN:
                     continue
@@ -506,8 +521,8 @@ class _Builder:
                         windows=windows(task, st),
                         depends_on=tuple(deps),
                         splittable=occurrence is None,
-                        counts_as_study=act == ActionTypeKey.study,
-                        prefer_morning=act == ActionTypeKey.people,
+                        budgets=budgets.of(effective(act)),
+                        prefer_morning=prefers_morning(effective(act)),
                         earliest=earliest,
                         buffer_days=buffer,
                         sequence=st.position if st else None,
@@ -527,7 +542,7 @@ class _Builder:
                     ),
                 )
 
-        # Дела из ящика, взятые на неделю: только в своей неделе, после учёбы
+        # Дела из ящика, взятые на неделю: только в своей неделе, после основных блоков
         work = (
             Window(
                 frozenset({1, 2, 3, 4, 5}), s.work_hours.weekdays.start, s.work_hours.weekdays.end
@@ -539,11 +554,11 @@ class _Builder:
             remaining = (item.estimate_min or box.DEFAULT_ESTIMATE_MIN) - consumed.get(key, 0)
             if remaining < MIN_BLOCK_MIN:
                 continue
-            act = type_key(item.action_type_id)
+            act = effective(item.action_type_id)
             base = (
                 windows_from_json(item.time_window)
                 if item.time_window
-                else (type_windows(act) if item.action_type_id else ()) or work
+                else type_windows(item.action_type_id) or work
             )
             planned_week = item.planned_week
             if planned_week is None:  # в выборке только взятые на неделю
@@ -559,11 +574,11 @@ class _Builder:
                         local_date(item.created_at, self.tz), item.desired_by, self.today
                     ),
                     windows=box.condition_windows(
-                        base, item.conditions, type_windows(ActionTypeKey.institutions)
+                        base, item.conditions, type_windows(item.hours_action_type_id)
                     ),
                     days=class_days if BacklogCondition.on_class_days in item.conditions else None,
-                    counts_as_study=act == ActionTypeKey.study,
-                    prefer_morning=act == ActionTypeKey.people,
+                    budgets=budgets.of(act),
+                    prefer_morning=prefers_morning(act),
                     filler=True,
                 ),
                 Source(
@@ -578,8 +593,9 @@ class _Builder:
                 ),
             )
 
-        # Подготовка к экзаменам: каждый день плана — в свой день, до экзамена
-        study_windows = type_windows(ActionTypeKey.study)
+        # Подготовка к экзаменам: каждый день плана — в свой день, до экзамена;
+        # окна и лимиты — типа действия по умолчанию (до планов подготовки, M20)
+        default_windows = type_windows(default_type)
         for sess in sessions:
             exam = exam_by_id[sess.exam_id]
             key = block_id(SourceType.exam_session, sess.id)
@@ -598,8 +614,9 @@ class _Builder:
                     earliest=wall_to_utc(sess.date, time(0), self.tz),
                     buffer_days=0,
                     priority=EXAM_PRIORITY,
-                    windows=study_windows,
+                    windows=default_windows,
                     splittable=True,
+                    budgets=default_budgets,
                     # Сквозной порядок по дням: в день — сначала выучить, потом повторить
                     sequence=sess.date.toordinal() * 3
                     + SESSION_ORDER.get(ExamSessionKind(sess.kind), 0),
@@ -675,7 +692,8 @@ class _Builder:
                             deadline=week_end,
                             earliest=wall_to_utc(week, time(0), self.tz),
                             buffer_days=0,
-                            windows=study_windows,
+                            windows=default_windows,
+                            budgets=default_budgets,
                             quota=tag,
                             reserve=True,
                         ),
@@ -715,7 +733,7 @@ class _Builder:
             fixed=tuple(fixed),
             previous=previous,
             settings=plan_settings(s),
-            study_limits=tuple((lim.date, lim.minutes) for lim in limits),
+            budgets=budgets.budgets,
             quotas=tuple(quotas),
             max_horizon_days=MAX_HORIZON_DAYS,
         )
@@ -726,7 +744,7 @@ class _Builder:
                 repr(inp.fixed),
                 repr(inp.previous),
                 repr(inp.settings),
-                repr(inp.study_limits),
+                repr(inp.budgets),
                 repr(inp.quotas),
                 sorted(str(e.id) for e in orphans),
                 sorted(str(e.id) for e in stale),

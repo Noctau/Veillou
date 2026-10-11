@@ -231,10 +231,14 @@ async def test_parallel_day_limit_puts_do_not_fail(client: AsyncClient, user: Us
             f"{API}/auth/login", json={"email": "student@example.com", "password": PASSWORD}
         )
         clients.append(c)
+    budget = await clients[0].post(
+        f"{API}/load-budgets", json={"name": "Учёба", "minutes_per_day": 300}
+    )
+    url = f"{API}/load-budgets/{budget.json()['id']}/overrides"
     codes: list[int] = []
     for d in range(10, 20):
         resps = await asyncio.gather(
-            *(c.put(f"{API}/plan/day-limits/2030-01-{d}", json={"minutes": 480}) for c in clients)
+            *(c.put(f"{url}/2030-01-{d}", json={"minutes": 480}) for c in clients)
         )
         codes += [r.status_code for r in resps]
     for c in clients:

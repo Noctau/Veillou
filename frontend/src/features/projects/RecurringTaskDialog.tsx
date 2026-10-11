@@ -40,7 +40,6 @@ function RecurringForm({ projectId, onDone }: { projectId: string; onDone: () =>
     create.mutate(
       {
         title: title.trim(),
-        task_type: 'other',
         description: '',
         priority: 'normal',
         project_id: projectId,

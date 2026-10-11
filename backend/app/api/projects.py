@@ -50,7 +50,6 @@ async def read_project(project_id: uuid.UUID, svc: Service) -> ProjectDetail:
 async def update_project(
     project_id: uuid.UUID, patch: ProjectUpdate, svc: Service
 ) -> ProjectDetail:
-    """is_work_default=true снимает флаг с остальных проектов."""
     return await svc.update(project_id, patch)
 
 

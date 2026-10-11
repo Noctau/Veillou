@@ -1,7 +1,7 @@
-"""Категории, типы действий и окна времени (ТЗ §4.8)."""
+"""Категории, типы действий, типы задач и окна времени (ТЗ §4.8, M15)."""
 
 import uuid
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
@@ -61,19 +61,99 @@ class CategoryRead(ReadModel):
 
 # ---------- типы действий ----------
 
+TypeWindows = Annotated[list[TimeWindow], Field(min_length=1, max_length=14)]
+
+
+class ActionTypeCreate(InputModel):
+    name: CatalogName
+    windows: TypeWindows
+    default_category_id: uuid.UUID | None = None
+    prefer_morning: bool = False
+
 
 class ActionTypeUpdate(InputModel):
-    """Набор типов фиксирован; правятся название, окна и категория по умолчанию."""
-
     name: CatalogName | None = None
-    windows: Annotated[list[TimeWindow], Field(min_length=1, max_length=14)] | None = None
+    windows: TypeWindows | None = None
     default_category_id: uuid.UUID | None = None
+    prefer_morning: bool | None = None
+    position: int | None = Field(default=None, ge=0, le=1000)
 
 
 class ActionTypeRead(ReadModel):
     id: uuid.UUID
-    key: ActionTypeKey
+    key: ActionTypeKey | None = Field(description="Ключ сида; у своих типов — null")
     name: str
     default_category_id: uuid.UUID | None
     windows: list[TimeWindow]
+    prefer_morning: bool = Field(description="Лёгкое предпочтение утра в плане")
+    position: int
+
+
+# ---------- типы задач ----------
+
+Synonym = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class DeadlineDays(InputModel):
+    """Срок = дата выдачи (или сегодня) + N дней, 23:59."""
+
+    kind: Literal["days"] = "days"
+    days: int = Field(ge=1, le=365)
+
+
+# Расширится в M19 ({"kind": "next_occurrence"})
+DeadlineRule = DeadlineDays
+
+
+def _unique_words(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    seen: dict[str, str] = {}
+    for word in value:
+        seen.setdefault(word.lower(), word)
+    return list(seen.values())
+
+
+class TaskTypeCreate(InputModel):
+    name: CatalogName
+    icon: CategoryIcon = CategoryIcon.tag
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30)
+    default_action_type_id: uuid.UUID | None = None
+    default_category_id: uuid.UUID | None = None
+    default_estimate_min: int | None = Field(default=None, ge=5, le=10_000)
+    deadline_rule: DeadlineRule | None = Field(
+        default=None, description="Как вывести срок; тип с правилом — «быстрый тип» в ＋"
+    )
+    default_project_id: uuid.UUID | None = None
+    default_template_id: uuid.UUID | None = None
+
+    _synonyms = field_validator("synonyms")(_unique_words)
+
+
+class TaskTypeUpdate(InputModel):
+    name: CatalogName | None = None
+    icon: CategoryIcon | None = None
+    synonyms: list[Synonym] | None = Field(default=None, max_length=30)
+    default_action_type_id: uuid.UUID | None = None
+    default_category_id: uuid.UUID | None = None
+    default_estimate_min: int | None = Field(default=None, ge=5, le=10_000)
+    deadline_rule: DeadlineRule | None = None
+    default_project_id: uuid.UUID | None = None
+    default_template_id: uuid.UUID | None = None
+    position: int | None = Field(default=None, ge=0, le=1000)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
+
+
+class TaskTypeRead(ReadModel):
+    id: uuid.UUID
+    name: str
+    icon: CategoryIcon
+    synonyms: list[str]
+    default_action_type_id: uuid.UUID | None
+    default_category_id: uuid.UUID | None
+    default_estimate_min: int | None
+    deadline_rule: DeadlineRule | None
+    default_project_id: uuid.UUID | None
+    default_template_id: uuid.UUID | None
     position: int

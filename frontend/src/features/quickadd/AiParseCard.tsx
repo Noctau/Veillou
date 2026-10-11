@@ -9,20 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { jobResult, type ParseDraft, useJob } from '@/features/ai/useJob'
+import { TaskTypeSelect } from '@/features/catalog/CatalogSelect'
 import { useSubjects } from '@/features/subjects/useSubjects'
-import type { TaskType } from '@/features/tasks/useTasks'
-import { TASK_TYPE_LABEL } from '@/lib/terms'
 import { wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 
 const NONE = 'none'
-const TASK_TYPES = Object.keys(TASK_TYPE_LABEL) as TaskType[]
 
 export type AiCardResult = {
   kind: 'task' | 'backlog'
   title: string
   description: string
-  task_type: TaskType
+  task_type_id: string | null
   subject_id: string | null
   deadline: string | null
   action_type_id: string | null
@@ -43,7 +41,7 @@ function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['o
   const { data: subjects } = useSubjects()
   const [kind, setKind] = useState<'task' | 'backlog'>(draft.kind === 'backlog' ? 'backlog' : 'task')
   const [title, setTitle] = useState(draft.title)
-  const [taskType, setTaskType] = useState<TaskType>(draft.task_type ?? 'other')
+  const [taskTypeId, setTaskTypeId] = useState(draft.task_type_id ?? null)
   const [subjectId, setSubjectId] = useState(draft.subject_id)
   const [day, setDay] = useState(draft.deadline ? wallDate(draft.deadline, tz) : '')
   const [description, setDescription] = useState(draft.description)
@@ -53,7 +51,7 @@ function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['o
     kind,
     title: title.trim(),
     description,
-    task_type: taskType,
+    task_type_id: taskTypeId,
     subject_id: subjectId,
     deadline: day ? wallToUtc(day, time, tz) : null,
     action_type_id: draft.action_type_id,
@@ -97,18 +95,7 @@ function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['o
           </Field>
           <Field>
             <FieldLabel htmlFor="ai-type">Тип</FieldLabel>
-            <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
-              <SelectTrigger id="ai-type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TASK_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {TASK_TYPE_LABEL[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TaskTypeSelect id="ai-type" value={taskTypeId} onChange={setTaskTypeId} />
           </Field>
         </div>
       )}

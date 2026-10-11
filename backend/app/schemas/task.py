@@ -6,7 +6,7 @@ from typing import Annotated, Self
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
-from app.domain.enums import EventStatus, Feel, Priority, SubtaskStatus, TaskStatus, TaskType
+from app.domain.enums import EventStatus, Feel, Priority, SubtaskStatus, TaskStatus
 from app.domain.recurrence import parse_rrule
 from app.schemas.catalog import TimeWindow, Windows
 from app.schemas.common import (
@@ -113,15 +113,17 @@ class SubtaskRead(ReadModel):
 
 
 class TaskCreate(InputModel):
+    """Пустые поля заполняются умолчаниями типа задачи (если он задан)."""
+
     title: Title
-    task_type: TaskType = TaskType.other
+    task_type_id: uuid.UUID | None = Field(default=None, description="null — без типа")
     description: Description = ""
     subject_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = Field(
-        default=None, description="null — выводится: проект → тип действия → «Учёба»"
+        default=None, description="null — выводится: тип задачи → проект → тип действия"
     )
     action_type_id: uuid.UUID | None = Field(
-        default=None, description="null — «Самостоятельная учёба»"
+        default=None, description="null — из типа задачи или тип по умолчанию (настройки)"
     )
     time_window: Windows | None = None
     deadline: Moment | None = None
@@ -141,7 +143,7 @@ class TaskCreate(InputModel):
 
 class TaskUpdate(InputModel):
     title: Title | None = None
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
     description: Description | None = None
     subject_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
@@ -161,23 +163,10 @@ class TaskUpdate(InputModel):
     _rrule = field_validator("recurrence")(_check_rrule)
 
 
-class WorkTaskCreate(InputModel):
-    """«Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней, проект ВКР."""
-
-    title: Title
-    description: Description = ""
-    issued_at: SaneDate | None = Field(default=None, description="null — сегодня")
-    deadline: Moment | None = Field(default=None, description="null — выдача + 14 дней, 23:59")
-    project_id: uuid.UUID | None = Field(
-        default=None, description="null — проект «по умолчанию для заданий с работы»"
-    )
-    no_project: bool = Field(default=False, description="Не привязывать к проекту")
-
-
 class TaskRead(ReadModel):
     id: uuid.UUID
     title: str
-    task_type: TaskType
+    task_type_id: uuid.UUID | None
     description: str
     subject_id: uuid.UUID | None
     category_id: uuid.UUID | None

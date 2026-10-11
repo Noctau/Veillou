@@ -67,10 +67,12 @@ def test_conditions_weekday_daytime():
     )
 
 
-def test_conditions_institution_hours():
+def test_conditions_hours_of_action_type():
+    """«Только в часы типа действия» (бывшие «часы учреждений») — окна этого типа."""
     home = [w(ALL, "08:00", "22:00")]
     inst = [w(WEEKDAYS, "10:00", "18:00")]
-    assert condition_windows(home, [BacklogCondition.institution_hours], inst) == (
+    assert condition_windows(home, [], inst) == (w(WEEKDAYS, "10:00", "18:00"),)
+    assert condition_windows(home, [BacklogCondition.weekday_daytime], inst) == (
         w(WEEKDAYS, "10:00", "18:00"),
     )
 

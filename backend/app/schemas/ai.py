@@ -6,7 +6,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app.domain.enums import JobStatus, TaskType
+from app.domain.enums import JobStatus
 from app.domain.quickparse import KindHint
 from app.domain.tasks import find_cycle
 from app.schemas.common import InputModel, ReadModel, UTCMoment
@@ -50,7 +50,8 @@ class BreakdownDraft(BaseModel):
 
     type: Literal["breakdown"] = "breakdown"
     task_id: uuid.UUID
-    task_type: TaskType
+    # Результаты джоб Part 1 хранили ключ `task_type` — читаются без типа
+    task_type_id: uuid.UUID | None = None
     category_id: uuid.UUID | None
     steps: list[BreakdownStep]
     total_estimate_min: int
@@ -67,7 +68,7 @@ class ParseDraft(BaseModel):
     kind: KindHint
     title: str
     description: str
-    task_type: TaskType | None
+    task_type_id: uuid.UUID | None = None
     subject_id: uuid.UUID | None
     deadline: UTCMoment | None
     action_type_id: uuid.UUID | None
@@ -81,7 +82,7 @@ class PhotoDraft(BaseModel):
     task_id: uuid.UUID
     title: str
     text: str
-    task_type: TaskType | None
+    task_type_id: uuid.UUID | None = None
     subject_id: uuid.UUID | None
     deadline: UTCMoment | None
     updated: list[str] = Field(description="Какие поля задания заполнены с фото")
@@ -138,7 +139,7 @@ class BreakdownApply(InputModel):
     """«Запланировать»: несделанные шаги задания заменяются этими, считается превью плана."""
 
     steps: list[BreakdownStep] = Field(min_length=1, max_length=MAX_STEPS)
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
     plan: bool = Field(default=True, description="Сразу посчитать превью плана")
     job_id: uuid.UUID | None = Field(
@@ -161,7 +162,7 @@ class BreakdownApplied(BaseModel):
 
 class TemplateCreate(InputModel):
     name: Name
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
     steps: list[BreakdownStep] = Field(min_length=1, max_length=MAX_STEPS)
 
     @model_validator(mode="after")
@@ -172,13 +173,13 @@ class TemplateCreate(InputModel):
 
 class TemplateUpdate(InputModel):
     name: Name | None = None
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
 
 
 class TemplateRead(ReadModel):
     id: uuid.UUID
     name: str
-    task_type: TaskType | None
+    task_type_id: uuid.UUID | None
     steps: list[BreakdownStep]
     total_estimate_min: int
     created_at: UTCMoment

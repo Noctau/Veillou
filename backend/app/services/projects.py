@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import time, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, true, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
@@ -52,7 +52,7 @@ class _CategoryRepo(UserScopedRepository[Category]):
     not_found_message = "Категория не найдена"
 
 
-_PROJECT_REQUIRED = {"title", "description", "contacts", "links", "is_work_default", "status"}
+_PROJECT_REQUIRED = {"title", "description", "contacts", "links", "status"}
 _MILESTONE_ORDER = [Milestone.date.asc().nulls_last(), Milestone.position, Milestone.created_at]
 
 
@@ -212,18 +212,6 @@ class ProjectService:
 
     # ---------- проекты ----------
 
-    async def _unset_work_default(self, keep: uuid.UUID | None) -> None:
-        await self.db.execute(
-            update(Project)
-            .where(
-                Project.user_id == self.user_id,
-                Project.is_work_default.is_(True),
-                Project.id != keep if keep else true(),
-            )
-            .values(is_work_default=False)
-        )
-        await self.db.flush()
-
     async def create(self, data: ProjectCreate) -> ProjectDetail:
         fields = data.model_dump(mode="json")
         fields["category_id"] = data.category_id
@@ -237,8 +225,6 @@ class ProjectService:
                 self.categories.select().where(Category.key == CategoryKey.study)
             )
             fields["category_id"] = study.id if study else None
-        if data.is_work_default:
-            await self._unset_work_default(None)
         project = Project(status=ProjectStatus.active, **fields)
         self.projects.add(project)
         await self.db.commit()
@@ -256,8 +242,6 @@ class ProjectService:
                 await self.categories.get_or_404(patch.category_id)
         if "deadline" in changes:
             changes["deadline"] = patch.deadline
-        if changes.get("is_work_default"):
-            await self._unset_work_default(id)
         for name, value in changes.items():
             setattr(project, name, value)
         await self.db.commit()

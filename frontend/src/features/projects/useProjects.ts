@@ -15,7 +15,6 @@ export type ProjectStatus = components['schemas']['ProjectStatus']
 export type Milestone = components['schemas']['MilestoneRead']
 export type MilestoneCreate = components['schemas']['MilestoneCreate']
 export type MilestoneUpdate = components['schemas']['MilestoneUpdate']
-export type WorkTaskCreate = components['schemas']['WorkTaskCreate']
 
 export function useProjects(status: ProjectStatus[] = ['active']) {
   return useQuery({
@@ -169,23 +168,6 @@ export function useDeleteMilestone() {
         params: { path: { milestone_id: id } },
       })
       if (error) throw error
-    },
-    onSuccess: () => {
-      invalidate()
-      invalidateTasks()
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-}
-
-export function useCreateWorkTask() {
-  const invalidate = useInvalidateProjects()
-  const invalidateTasks = useInvalidateTasks()
-  return useMutation({
-    mutationFn: async (body: WorkTaskCreate) => {
-      const { data, error } = await api.POST('/api/v1/tasks/work', { body })
-      if (error) throw error
-      return data
     },
     onSuccess: () => {
       invalidate()

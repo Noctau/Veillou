@@ -39,7 +39,9 @@ async def test_defaults(auth_client: AsyncClient):
     resp = await auth_client.get(URL)
     assert resp.status_code == 200
     data = resp.json()
-    assert data == UserSettings().model_dump(mode="json")
+    # Справочник засеян при создании пользователя: тип по умолчанию — «Самостоятельная учёба»
+    assert data["default_action_type_id"] is not None
+    assert {**data, "default_action_type_id": None} == UserSettings().model_dump(mode="json")
     assert data["sleep"] == {"start": "23:30", "end": "07:30"}
     assert data["schedule"]["morning_digest"] == "08:00"
     assert data["reminders"]["before_class"]["minutes_before"] == 15
@@ -66,17 +68,18 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
     assert data["reminders"]["deadlines"]["enabled"] is True
 
     # Второй PATCH не затирает первый
-    resp = await auth_client.patch(URL, json={"study_limit_min_per_day": 300})
+    resp = await auth_client.patch(URL, json={"deadline_buffer_days": 2})
     data = resp.json()
-    assert data["study_limit_min_per_day"] == 300
+    assert data["deadline_buffer_days"] == 2
     assert data["work_hours"]["weekdays"]["end"] == "19:00"
 
     # В БД — только переопределения
-    stored = await session.scalar(select(User.settings))
+    stored = dict(await session.scalar(select(User.settings)))
+    assert stored.pop("default_action_type_id")
     assert stored == {
         "work_hours": {"weekdays": {"end": "19:00"}},
         "reminders": {"before_class": {"minutes_before": 20, "channels": ["telegram"]}},
-        "study_limit_min_per_day": 300,
+        "deadline_buffer_days": 2,
     }
     assert (await auth_client.get(URL)).json() == data
 
@@ -106,7 +109,8 @@ async def test_patch_validation(auth_client: AsyncClient):
     for body in [
         {"unknown_field": 1},
         {"work_hours": {"weekdays": {"bogus": "10:00"}}},
-        {"study_limit_min_per_day": 5},
+        {"deadline_buffer_days": 30},
+        {"default_action_type_id": "nope"},
         {"reminders": {"deadlines": {"channels": ["sms"]}}},
         {"sleep": {"start": "25:00"}},
         {"schedule": {"weekly_review_weekday": 8}},

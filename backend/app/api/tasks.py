@@ -16,7 +16,6 @@ from app.schemas.task import (
     TaskDetail,
     TaskRead,
     TaskUpdate,
-    WorkTaskCreate,
 )
 from app.services.tasks import TaskService
 
@@ -51,14 +50,10 @@ async def list_tasks(
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
 async def create_task(data: TaskCreate, svc: Service) -> TaskDetail:
+    """С `task_type_id` — умолчания типа в пустые поля: тип действия, категория,
+    оценка, шаги из шаблона, срок по правилу типа (выдача или сегодня + N дней,
+    23:59) и проект — если `project_id` не передан (явный null — «без проекта»)."""
     return await svc.create(data)
-
-
-@router.post("/tasks/work", status_code=status.HTTP_201_CREATED)
-async def create_work_task(data: WorkTaskCreate, svc: Service) -> TaskDetail:
-    """«Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней,
-    проект — «по умолчанию для заданий с работы» (ВКР), если не указан другой."""
-    return await svc.create_work_task(data)
 
 
 @router.get("/tasks/{task_id}")

@@ -51,10 +51,13 @@ class SourceRead(ReadModel):
 
 
 class ReadingTaskCreate(InputModel):
-    """Задание «прочитать» из источника: тип «чтение», предмет источника."""
+    """Задание «прочитать» из источника: предмет источника, тип — по словам названия."""
 
     chapters: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         default="", description="«главы 3–5», «с. 40–75»; пусто — весь источник"
     )
     deadline: Moment | None = None
     estimate_min: TaskEstimate | None = None
+    task_type_id: uuid.UUID | None = Field(
+        default=None, description="null — угадать по названию («прочитать» → тип с этим словом)"
+    )

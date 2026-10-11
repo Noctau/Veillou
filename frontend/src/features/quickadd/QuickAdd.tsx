@@ -1,6 +1,5 @@
 import {
   BookOpenIcon,
-  BriefcaseIcon,
   CalendarIcon,
   CheckIcon,
   ClockIcon,
@@ -25,16 +24,15 @@ import { type AttachmentOwner, uploadAttachment } from '@/features/attachments/u
 import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
 import { useCreateNote } from '@/features/notes/useNotes'
-import { type ActionTypeKey, useActionTypes } from '@/features/catalog/useCatalog'
-import { WorkTaskDialog } from '@/features/projects/WorkTaskDialog'
+import { byId, useActionTypes, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useSubjects } from '@/features/subjects/useSubjects'
+import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
 import { useCreateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
 import { compressImage } from '@/lib/image'
 import { SHARE_PARAM } from '@/lib/pwa-shared'
 import { queryKeys } from '@/lib/queryKeys'
-import { TASK_TYPE_LABEL } from '@/lib/terms'
 import { formatDay, wallDate, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
@@ -100,7 +98,6 @@ export function QuickAdd() {
   const [dropSubject, setDropSubject] = useState(false)
   const [dropDate, setDropDate] = useState(false)
   const [saved, setSaved] = useState<Saved[]>([])
-  const [workTask, setWorkTask] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [skipAi, setSkipAi] = useState(false)
   const [ai, setAi] = useState<AiPending | null>(null)
@@ -113,7 +110,8 @@ export function QuickAdd() {
   const { data: parsed } = useQuickParse(text)
   const parseNow = useParseNow()
   const { data: subjects } = useSubjects()
-  const { data: actionTypes } = useActionTypes()
+  const actionTypes = byId(useActionTypes().data)
+  const taskTypes = byId(useTaskTypes().data)
   const createTask = useCreateTask()
   const createBacklog = useCreateBacklog()
   const createEvent = useCreateEvent()
@@ -125,9 +123,6 @@ export function QuickAdd() {
   const subject = !dropSubject && live?.subject_id ? subjects?.find((s) => s.id === live.subject_id) : undefined
   const date = dropDate ? null : (live?.date ?? null)
   const needsTime = kind === 'event' && (!date || !live?.time)
-
-  const actionTypeId = (key: ActionTypeKey | null) =>
-    (key && actionTypes?.find((a) => a.key === key)?.id) || null
 
   const reset = () => {
     setText('')
@@ -156,10 +151,10 @@ export function QuickAdd() {
       if (kind === 'task') {
         const t = await createTask.mutateAsync({
           title: p?.title || raw || PHOTO_TITLE,
-          task_type: p?.task_type ?? 'other',
+          task_type_id: p?.task_type_id ?? null,
           description: '',
           subject_id: subjectId,
-          action_type_id: actionTypeId(p?.action_type ?? null),
+          action_type_id: p?.action_type_id ?? null,
           deadline: day ? (p?.deadline ?? null) : null,
           priority: 'normal',
           subtasks: [],
@@ -240,7 +235,7 @@ export function QuickAdd() {
     if (kind === 'backlog') {
       reset()
       createBacklog.mutate(
-        { title, note: '', desired_by: day, action_type_id: actionTypeId(p.action_type) },
+        { title, note: '', desired_by: day, action_type_id: p.action_type_id },
         { onError: restore },
       )
       remember({ id: crypto.randomUUID(), kind, title, link: '/inbox' })
@@ -266,10 +261,10 @@ export function QuickAdd() {
     createTask.mutate(
       {
         title,
-        task_type: p.task_type ?? 'other',
+        task_type_id: p.task_type_id,
         description: '',
         subject_id: subjectId,
-        action_type_id: actionTypeId(p.action_type),
+        action_type_id: p.action_type_id,
         deadline: day ? (p.deadline ?? null) : null,
         priority: 'normal',
         subtasks: [],
@@ -302,7 +297,7 @@ export function QuickAdd() {
     try {
       const t = await createTask.mutateAsync({
         title: card.title,
-        task_type: card.task_type,
+        task_type_id: card.task_type_id,
         description: card.description,
         subject_id: card.subject_id,
         action_type_id: card.action_type_id,
@@ -425,11 +420,11 @@ export function QuickAdd() {
                 {kind === 'event' && live.duration_min && !live.end_time && (
                   <Chip icon={<ClockIcon className="size-3" />}>{live.duration_min} мин</Chip>
                 )}
-                {kind === 'task' && live.task_type && (
-                  <Chip icon={<BookOpenIcon className="size-3" />}>{TASK_TYPE_LABEL[live.task_type]}</Chip>
+                {kind === 'task' && live.task_type_id && taskTypes.has(live.task_type_id) && (
+                  <Chip icon={<BookOpenIcon className="size-3" />}>{taskTypes.get(live.task_type_id)?.name}</Chip>
                 )}
-                {live.action_type && kind !== 'event' && (
-                  <Chip>{actionTypes?.find((a) => a.key === live.action_type)?.name}</Chip>
+                {live.action_type_id && actionTypes.has(live.action_type_id) && kind !== 'event' && (
+                  <Chip>{actionTypes.get(live.action_type_id)?.name}</Chip>
                 )}
               </div>
               {needsTime && <p className="text-xs text-destructive">Для события напишите время: «завтра в 14».</p>}
@@ -464,10 +459,9 @@ export function QuickAdd() {
         />
       )}
 
-      <Button variant="outline" size="sm" className="self-start" onClick={() => setWorkTask(true)}>
-        <BriefcaseIcon /> Задание с работы
-      </Button>
-      <WorkTaskDialog open={workTask} onOpenChange={setWorkTask} />
+      <div className="flex flex-wrap gap-2">
+        <QuickTypeButtons />
+      </div>
 
       {saved.length > 0 && (
         <div className="flex flex-col gap-1">

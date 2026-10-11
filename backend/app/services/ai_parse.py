@@ -21,11 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import Image
 from app.ai.prompts import ParseContext, parse_messages, photo_messages
-from app.ai.schemas import AIParsed, AIPhoto, with_subjects
+from app.ai.schemas import AIParsed, AIPhoto, with_choices
 from app.core.exceptions import InvalidDataError
 from app.core.storage import Storage, get_storage
 from app.core.time import get_tz, now_utc, wall_to_utc
-from app.domain.enums import AIOrigin, AIPurpose, AttachmentOwner, JobKind, TaskType
+from app.domain.enums import AIOrigin, AIPurpose, AttachmentOwner, JobKind
 from app.domain.quickparse import AI_TEXT_LEN, END_OF_DAY, KindHint, SubjectRef, has_date_cue
 from app.models import Attachment, Job, Subject, Task, User
 from app.schemas.ai import ParseDraft, PhotoDraft
@@ -35,6 +35,7 @@ from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
 from app.services.backlog import BacklogService
 from app.services.breakdown import load_catalog
+from app.services.catalog import load_task_types
 from app.services.quickadd import Created, create_from_text, parse_text, subject_refs
 from app.services.tasks import TaskRepo, TaskService
 
@@ -52,10 +53,6 @@ def _subject_names(refs: list[SubjectRef]) -> dict[str, uuid.UUID]:
         if ref.names and isinstance(ref.id, uuid.UUID):
             result.setdefault(ref.names[0], ref.id)
     return result
-
-
-def _task_type(value: TaskType) -> TaskType | None:
-    return None if value == TaskType.other else value
 
 
 def _said(at: time | None, text: str) -> time | None:
@@ -104,13 +101,17 @@ class AIParseService:
         now = now_utc().astimezone(self.tz)
         refs = await subject_refs(self.db, self.user, now.date())
         names = _subject_names(refs)
-        quick = await parse_text(self.db, self.user, text)
+        task_types = await load_task_types(self.db, self.user_id)
+        parsed = await parse_text(self.db, self.user, text)
+        quick = parsed.result
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.parse,
-            parse_messages(ParseContext(text, now.replace(tzinfo=None), list(names))),
-            with_subjects(AIParsed, list(names)),
+            parse_messages(
+                ParseContext(text, now.replace(tzinfo=None), list(names), task_types.hints())
+            ),
+            with_choices(AIParsed, subject=list(names), task_type=task_types.names()),
             job_id=job_id,
         )
         catalog = await load_catalog(self.db, self.user_id)
@@ -128,15 +129,18 @@ class AIParseService:
             # Событию нужно точное время — без него это задание или дело
             kind = KindHint.task if deadline or answer.task_type else KindHint.backlog
         # Правила quickparse по ключевым словам надёжнее догадки ИИ
-        action = quick.action_type or answer.action_type
+        if quick.action_type is not None or parsed.action_type_id is not None:
+            action_type_id = parsed.action_type_id
+        else:
+            action_type_id = catalog.action_id(answer.action_type)
         return ParseDraft(
             kind=kind,
             title=answer.title[:300],
             description=_description(answer.description, text),
-            task_type=_task_type(answer.task_type) or quick.task_type,
+            task_type_id=task_types.id_of(answer.task_type) or parsed.task_type_id,
             subject_id=subject_id,
             deadline=deadline,
-            action_type_id=catalog.action_id(action),
+            action_type_id=action_type_id,
             text=text,
         )
 
@@ -199,13 +203,16 @@ class AIParseService:
             raise jobs.JobFailedError("У задания нет фото")
         now = now_utc().astimezone(self.tz)
         names = _subject_names(await subject_refs(self.db, self.user, now.date()))
+        task_types = await load_task_types(self.db, self.user_id)
         caption = "" if task.title == PHOTO_TITLE else task.title
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.photo,
-            photo_messages(ParseContext(caption, now.replace(tzinfo=None), list(names))),
-            with_subjects(AIPhoto, list(names)),
+            photo_messages(
+                ParseContext(caption, now.replace(tzinfo=None), list(names), task_types.hints())
+            ),
+            with_choices(AIPhoto, subject=list(names), task_type=task_types.names()),
             images=images,
             job_id=job_id,
         )
@@ -229,14 +236,15 @@ class AIParseService:
         if task.subject_id is None and subject_id is not None:
             task.subject_id = subject_id
             updated.append("subject_id")
-        if task.task_type == TaskType.other and _task_type(answer.task_type):
-            task.task_type = answer.task_type
-            updated.append("task_type")
+        task_type_id = task_types.id_of(answer.task_type)
+        if task.task_type_id is None and task_type_id is not None:
+            task.task_type_id = task_type_id
+            updated.append("task_type_id")
         return PhotoDraft(
             task_id=task.id,
             title=task.title,
             text=text,
-            task_type=_task_type(answer.task_type),
+            task_type_id=task_type_id,
             subject_id=subject_id,
             deadline=deadline,
             updated=updated,
@@ -276,7 +284,7 @@ async def create_from_draft(
     task = await TaskService(db, user).create(
         TaskCreate(
             title=draft.title,
-            task_type=draft.task_type or TaskType.other,
+            task_type_id=draft.task_type_id,
             description=draft.description,
             subject_id=draft.subject_id,
             action_type_id=draft.action_type_id,

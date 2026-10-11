@@ -2,6 +2,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
+import { BudgetsSection } from '@/features/catalog/BudgetsSection'
+import { TaskTypesSection } from '@/features/catalog/TaskTypesSection'
 import { NotificationsSection } from '@/features/notifications/NotificationsSection'
 import { CalibrationSection } from '@/features/plan/CalibrationSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
@@ -39,9 +41,11 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           <DayModeSection settings={settings} />
           <StudySection settings={settings} />
+          <BudgetsSection />
           <CalibrationSection />
           <RestSection settings={settings} />
           <ActionTypesSection />
+          <TaskTypesSection />
           <CategoriesSection />
           <ScheduleSection settings={settings} />
           <RemindersSection settings={settings} />

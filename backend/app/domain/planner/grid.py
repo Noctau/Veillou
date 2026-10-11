@@ -220,10 +220,11 @@ class Prepared:
     evenings_required: dict[tuple[int, int], int]
     halves_required: dict[tuple[int, int], int]
     min_part: int
-    study_limit: int  # слотов в день
-    study_limit_by_day: dict[int, int]  # разовые лимиты: день → слотов
+    budget_limit: dict[BlockId, int]  # лимит → слотов в день
+    budget_limit_by_day: dict[tuple[BlockId, int], int]  # разовые: (лимит, день) → слотов
     max_per_group: int
-    fixed_study: dict[int, int] = field(default_factory=dict)  # день → слотов
+    # (лимит, день) → слотов уже занято закреплённым, сделанным сегодня и жёстким
+    fixed_budget: dict[tuple[BlockId, int], int] = field(default_factory=dict)
     fixed_per_group: dict[tuple[BlockId, int], int] = field(default_factory=dict)
     quotas: list[PreparedQuota] = field(default_factory=list)
     _day_starts: list[int] = field(default_factory=list)
@@ -237,9 +238,17 @@ class Prepared:
         """Индекс дня, к которому относится слот (-1 — до первого дня)."""
         return bisect.bisect_right(self._day_starts, slot) - 1
 
-    def limit(self, day: int) -> int:
-        """Лимит учёбы дня в слотах."""
-        return self.study_limit_by_day.get(day, self.study_limit)
+    def budgets_of(self, ids: frozenset[BlockId]) -> list[BlockId]:
+        """Лимиты блока, которые есть во входе (неизвестный id не ограничивает)."""
+        return sorted((b for b in ids if b in self.budget_limit), key=repr)
+
+    def limit(self, budget: BlockId, day: int) -> int:
+        """Лимит дня в слотах."""
+        return self.budget_limit_by_day.get((budget, day), self.budget_limit[budget])
+
+    def remaining(self, budget: BlockId, day: int) -> int:
+        """Сколько слотов лимита дня осталось гибким блокам."""
+        return max(0, self.limit(budget, day) - self.fixed_budget.get((budget, day), 0))
 
     def pad_for(self, length: int) -> int:
         s = self.inp.settings
@@ -372,9 +381,14 @@ def _required(windows: Iterable[RestWindow], per_week: int) -> dict[tuple[int, i
     return {week: min(per_week, c) for week, c in count.items()}
 
 
-def _day_limits(inp: PlanInput, days: Sequence[Day]) -> dict[int, int]:
-    by_date = dict(inp.study_limits)
-    return {d.index: by_date[d.date] // inp.grid_min for d in days if d.date in by_date}
+def _day_limits(inp: PlanInput, days: Sequence[Day]) -> dict[tuple[BlockId, int], int]:
+    result: dict[tuple[BlockId, int], int] = {}
+    for b in inp.budgets:
+        by_date = dict(b.overrides)
+        for d in days:
+            if d.date in by_date:
+                result[(b.id, d.index)] = by_date[d.date] // inp.grid_min
+    return result
 
 
 def prepare(inp: PlanInput) -> Prepared:
@@ -443,8 +457,8 @@ def prepare(inp: PlanInput) -> Prepared:
         evenings_required=_required(evenings, s.free_evenings_per_week),
         halves_required=_required(halves, s.weekend_half_days),
         min_part=min_part,
-        study_limit=s.study_limit_min_per_day // grid.step_min,
-        study_limit_by_day=_day_limits(inp, days),
+        budget_limit={b.id: b.minutes_per_day // grid.step_min for b in inp.budgets},
+        budget_limit_by_day=_day_limits(inp, days),
         max_per_group=s.max_subtasks_per_task_per_day,
     )
     # Закреплённое и сделанное сегодня до `now` тоже считается в лимиты сегодняшнего дня
@@ -454,13 +468,26 @@ def prepare(inp: PlanInput) -> Prepared:
         if lo >= grid.n or lo < day0_start or hi <= lo:
             continue
         day = max(prepared.day_of(lo), 0)
-        if f.counts_as_study:
-            prepared.fixed_study[day] = prepared.fixed_study.get(day, 0) + hi - lo
+        _count_budgets(prepared, f.budgets, day, hi - lo)
         if f.group_id is not None:
             key = (f.group_id, day)
             prepared.fixed_per_group[key] = prepared.fixed_per_group.get(key, 0) + 1
+    # Жёсткое — в лимиты по своему типу занятости (`Busy.budgets`)
+    for hard in inp.busy:
+        if not hard.budgets:
+            continue
+        lo, hi = grid.floor(hard.start), grid.ceil(hard.end)
+        if lo >= grid.n or lo < day0_start or hi <= lo:
+            continue
+        _count_budgets(prepared, hard.budgets, max(prepared.day_of(lo), 0), hi - lo)
     prepared.quotas = _quotas(inp, grid, prepared)
     return prepared
+
+
+def _count_budgets(prep: Prepared, budgets: frozenset[BlockId], day: int, slots: int) -> None:
+    for budget in prep.budgets_of(budgets):
+        key = (budget, day)
+        prep.fixed_budget[key] = prep.fixed_budget.get(key, 0) + slots
 
 
 def _quotas(inp: PlanInput, grid: Grid, prep: Prepared) -> list[PreparedQuota]:

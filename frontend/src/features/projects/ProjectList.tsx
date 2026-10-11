@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, BriefcaseIcon, ClockIcon, FlagIcon, PlusIcon } from 'lucide-react'
+import { AlertTriangleIcon, ClockIcon, FlagIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -11,12 +11,11 @@ import { formatDay } from '@/lib/time'
 
 import { ProjectDialog } from './ProjectDialog'
 import { useProjects } from './useProjects'
-import { WorkTaskDialog } from './WorkTaskDialog'
+import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
 
 export function ProjectList() {
   const { data: projects, isPending, isError, error } = useProjects()
   const [creating, setCreating] = useState(false)
-  const [workTask, setWorkTask] = useState(false)
 
   return (
     <div className="flex flex-col gap-3">
@@ -24,9 +23,7 @@ export function ProjectList() {
         <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
           <PlusIcon /> Проект
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setWorkTask(true)}>
-          <BriefcaseIcon /> Задание с работы
-        </Button>
+        <QuickTypeButtons />
       </div>
       {isPending && <Skeleton className="h-28" />}
       {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
@@ -73,11 +70,6 @@ export function ProjectList() {
                       <AlertTriangleIcon className="size-3" /> отставание {p.behind_days} дн.
                     </span>
                   )}
-                  {p.is_work_default && (
-                    <span className="flex items-center gap-1">
-                      <BriefcaseIcon className="size-3" /> работа
-                    </span>
-                  )}
                 </div>
                 {p.next_milestone && (
                   <div className="flex items-center gap-1.5 text-sm">
@@ -94,7 +86,6 @@ export function ProjectList() {
         })}
       </ul>
       <ProjectDialog open={creating} onOpenChange={setCreating} />
-      <WorkTaskDialog open={workTask} onOpenChange={setWorkTask} />
     </div>
   )
 }

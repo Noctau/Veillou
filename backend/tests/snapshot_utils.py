@@ -35,6 +35,7 @@ from app.models import (
     Exam,
     ExamQuestion,
     ExamSession,
+    LoadBudget,
     Milestone,
     Note,
     Project,
@@ -44,6 +45,7 @@ from app.models import (
     Subject,
     Subtask,
     Task,
+    TaskType,
 )
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -123,6 +125,7 @@ class Labels:
             (await rows(RecurringEvent), "title"),
             (await rows(Category), "name"),
             (await rows(ActionType), "name"),
+            (await rows(TaskType), "name"),
             (await rows(Task), "title"),
             (await rows(Project), "title"),
             (await rows(Milestone), "title"),
@@ -135,6 +138,8 @@ class Labels:
                 self._add(item.id, getattr(item, attr))
         for exam_id, label in exams.items():
             self._add(exam_id, label)
+        for budget in await rows(LoadBudget):
+            self._add(budget.id, f"лимит {budget.name}")
         for r in await rows(ClassRule):
             when = f"пара {r.pair_number}" if r.pair_number else f"{r.start_time:%H:%M}"
             parity = f" {r.parity}" if r.parity != "all" else ""

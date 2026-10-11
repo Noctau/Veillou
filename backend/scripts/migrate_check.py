@@ -85,6 +85,14 @@ INVARIANTS = (
         "SELECT count(*) FROM events WHERE template_id IS NOT NULL AND occurrence_date IS NULL",
     ),
     Invariant(
+        "тип действия по умолчанию (настройки) — живой тип того же пользователя",
+        frozenset({"users", "action_types"}),
+        "SELECT count(*) FROM users u WHERE u.settings ? 'default_action_type_id' "
+        "AND u.settings->>'default_action_type_id' IS NOT NULL AND NOT EXISTS ("
+        "SELECT 1 FROM action_types a WHERE a.id::text = u.settings->>'default_action_type_id' "
+        "AND a.user_id = u.id AND a.deleted_at IS NULL)",
+    ),
+    Invariant(
         "подзадача — в задании того же пользователя",
         frozenset({"subtasks", "tasks"}),
         "SELECT count(*) FROM subtasks s JOIN tasks t ON t.id = s.task_id "

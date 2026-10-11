@@ -3,12 +3,13 @@
 from app.models.ai import AILog, BreakdownTemplate
 from app.models.attachment import Attachment
 from app.models.backlog import BacklogItem
-from app.models.catalog import ActionType, Category
+from app.models.budget import BudgetDayOverride, LoadBudget, LoadBudgetMember
+from app.models.catalog import ActionType, Category, TaskType
 from app.models.event import Event, RecurringEvent
 from app.models.exam import Exam, ExamQuestion, ExamSession
 from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
-from app.models.plan import Calibration, PlanRevision, StudyDayLimit
+from app.models.plan import Calibration, PlanRevision
 from app.models.project import Milestone, Project
 from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
 from app.models.session import LoginFailure, UserSession
@@ -24,6 +25,7 @@ __all__ = [
     "BacklogItem",
     "BellSchedule",
     "BreakdownTemplate",
+    "BudgetDayOverride",
     "Calibration",
     "Category",
     "ClassRule",
@@ -33,6 +35,8 @@ __all__ = [
     "ExamQuestion",
     "ExamSession",
     "Job",
+    "LoadBudget",
+    "LoadBudgetMember",
     "LoginFailure",
     "Milestone",
     "Note",
@@ -43,10 +47,10 @@ __all__ = [
     "Reminder",
     "Semester",
     "Source",
-    "StudyDayLimit",
     "Subject",
     "Subtask",
     "Task",
+    "TaskType",
     "TelegramLinkCode",
     "User",
     "UserSession",

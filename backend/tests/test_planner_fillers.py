@@ -4,7 +4,7 @@ from datetime import time, timedelta
 
 import pytest
 
-from app.domain.planner import Block, Busy, PlanSettings, RiskReason, TimeRange, Window
+from app.domain.planner import Block, Budget, Busy, PlanSettings, RiskReason, TimeRange, Window
 
 from .test_planner import (
     MON,
@@ -63,15 +63,11 @@ def test_greedy_puts_filler_after_study_even_with_earlier_deadline():
     assert risks(result) == {"box": RiskReason.no_time}
 
 
-def test_filler_does_not_count_as_study():
-    settings = PlanSettings(
-        study_limit_min_per_day=60, free_evenings_per_week=0, weekend_half_days=0
-    )
-    study = Block("study", 60, deadline=at(MON, 23), buffer_days=0)
-    filler = Block(
-        "box", 60, filler=True, counts_as_study=False, deadline=at(MON, 23), buffer_days=0
-    )
-    result = plan(study, filler, settings=settings)
+def test_filler_outside_budget_ignores_limit():
+    settings = PlanSettings(free_evenings_per_week=0, weekend_half_days=0)
+    study = Block("study", 60, deadline=at(MON, 23), buffer_days=0, budgets=frozenset({"study"}))
+    filler = Block("box", 60, filler=True, deadline=at(MON, 23), buffer_days=0)
+    result = plan(study, filler, settings=settings, budgets=(Budget("study", 60),))
     assert parts(result, "study")
     assert parts(result, "box")
 
@@ -134,7 +130,5 @@ def test_rest_reason_not_used_without_rest_minimum():
 def test_weekly_rest_still_kept_when_week_is_full():
     """Минимум отдыха жёсткий: даже при угрозе вечер остаётся свободным."""
     blocks = [Block(f"b{i}", 120, windows=STUDY, deadline=at(SUN, 23)) for i in range(40)]
-    result = plan(
-        *blocks, settings=PlanSettings(deadline_buffer_days=0, study_limit_min_per_day=960)
-    )
+    result = plan(*blocks, settings=PlanSettings(deadline_buffer_days=0))
     assert any(r == RiskReason.rest for r in risks(result).values())

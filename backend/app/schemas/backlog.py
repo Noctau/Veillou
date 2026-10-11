@@ -12,6 +12,7 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 Note = Annotated[str, StringConstraints(max_length=5000)]
 Estimate = Annotated[int, Field(ge=5, le=720, description="Минуты: 15 / 60 / 240 в UI")]
 Conditions = Annotated[list[BacklogCondition], Field(max_length=4)]
+HOURS_DESCRIPTION = "Только в часы этого типа действия (окна типа), например «Учреждения»"
 
 
 def _unique(value: list[BacklogCondition] | None) -> list[BacklogCondition] | None:
@@ -28,6 +29,7 @@ class BacklogCreate(InputModel):
     estimate_min: Estimate | None = None
     desired_by: SaneDate | None = None
     conditions: Conditions = Field(default_factory=list)
+    hours_action_type_id: uuid.UUID | None = Field(default=None, description=HOURS_DESCRIPTION)
     time_window: Windows | None = None
 
     _conditions = field_validator("conditions")(_unique)
@@ -41,6 +43,7 @@ class BacklogUpdate(InputModel):
     estimate_min: Estimate | None = None
     desired_by: SaneDate | None = None
     conditions: Conditions | None = None
+    hours_action_type_id: uuid.UUID | None = Field(default=None, description=HOURS_DESCRIPTION)
     time_window: Windows | None = None
     status: BacklogStatus | None = None
 
@@ -56,6 +59,7 @@ class BacklogRead(ReadModel):
     estimate_min: int | None
     desired_by: date | None
     conditions: list[BacklogCondition]
+    hours_action_type_id: uuid.UUID | None = Field(description=HOURS_DESCRIPTION)
     time_window: list[TimeWindow] | None
     status: BacklogStatus
     planned_week: date | None = Field(description="Взято на неделю (понедельник) — в плане")

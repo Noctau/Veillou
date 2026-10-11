@@ -12,7 +12,7 @@ import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSele
 
 import { CONDITIONS, ESTIMATES } from './labels'
 import { usePreviewPlan } from '@/features/plan/usePlan'
-import { CONDITION_LABEL } from '@/lib/terms'
+import { BACKLOG_HOURS, CONDITION_LABEL } from '@/lib/terms'
 
 import {
   type BacklogCondition,
@@ -49,6 +49,7 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
   const [estimate, setEstimate] = useState(item.estimate_min)
   const [desiredBy, setDesiredBy] = useState(item.desired_by ?? '')
   const [conditions, setConditions] = useState<BacklogCondition[]>(item.conditions)
+  const [hoursTypeId, setHoursTypeId] = useState(item.hours_action_type_id)
   const pending = item.id.startsWith('tmp-')
 
   const save = () =>
@@ -63,6 +64,7 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
           estimate_min: estimate,
           desired_by: desiredBy || null,
           conditions,
+          hours_action_type_id: hoursTypeId,
         },
       },
       { onSuccess: onDone },
@@ -121,6 +123,10 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="bl-hours">{BACKLOG_HOURS.label}</FieldLabel>
+        <ActionTypeSelect id="bl-hours" value={hoursTypeId} onChange={setHoursTypeId} emptyLabel={BACKLOG_HOURS.any} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field>

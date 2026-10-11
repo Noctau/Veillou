@@ -1,14 +1,13 @@
-"""Перепланирование: превью, применение, откат, разовые лимиты дня, калибровка."""
+"""Перепланирование: превью, применение, откат, калибровка."""
 
 import uuid
-from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.domain.enums import ActionTypeKey, EventKind, PlanReason, PlanRevisionStatus, TaskType
+from app.domain.enums import EventKind, PlanReason, PlanRevisionStatus
 from app.domain.planner import RiskReason
-from app.schemas.common import InputModel, ReadModel, UTCMoment
+from app.schemas.common import ReadModel, UTCMoment
 
 
 class PlanSlot(BaseModel):
@@ -91,23 +90,11 @@ class PlanUndoResult(BaseModel):
     skipped: int = Field(description="Блоки, которые после применения правили руками")
 
 
-# ---------- разовый лимит учёбы ----------
-
-
-class StudyDayLimitPut(InputModel):
-    minutes: int = Field(ge=0, le=960)
-
-
-class StudyDayLimitRead(ReadModel):
-    date: date
-    minutes: int
-
-
 # ---------- калибровка ----------
 
 
 class CalibrationRead(ReadModel):
-    task_type: TaskType
-    action_type: ActionTypeKey
+    task_type_id: uuid.UUID | None = Field(description="null — задачи без типа")
+    action_type_id: uuid.UUID | None = Field(description="null — шаги без типа действия")
     coef: float = Field(description="Множитель оценок: 1.2 — делаешь на 20% дольше")
     samples: int

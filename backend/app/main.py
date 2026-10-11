@@ -9,6 +9,7 @@ from app.api import (
     attachments,
     auth,
     backlog,
+    budgets,
     catalog,
     events,
     exams,
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     api.include_router(events.calendar_router)
     api.include_router(events.recurring_router)
     api.include_router(catalog.router)
+    api.include_router(budgets.router)
     api.include_router(tasks.router)
     api.include_router(quickadd.router)
     api.include_router(backlog.router)

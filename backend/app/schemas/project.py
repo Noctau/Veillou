@@ -60,9 +60,6 @@ class ProjectCreate(InputModel):
     contacts: list[Contact] = Field(default_factory=list, max_length=20)
     links: list[SubjectLink] = Field(default_factory=list, max_length=50)
     weekly_norm_min: WeeklyNorm | None = None
-    is_work_default: bool = Field(
-        default=False, description="Сюда по умолчанию попадают задания с работы"
-    )
 
 
 class ProjectUpdate(InputModel):
@@ -73,7 +70,6 @@ class ProjectUpdate(InputModel):
     contacts: list[Contact] | None = Field(default=None, max_length=20)
     links: list[SubjectLink] | None = Field(default=None, max_length=50)
     weekly_norm_min: WeeklyNorm | None = None
-    is_work_default: bool | None = None
     status: ProjectStatus | None = None
 
 
@@ -87,7 +83,6 @@ class ProjectRead(ReadModel):
     links: list[SubjectLink]
     weekly_norm_min: int | None
     status: ProjectStatus
-    is_work_default: bool
     created_at: UTCMoment
     tasks_total: int = 0
     tasks_done: int = 0

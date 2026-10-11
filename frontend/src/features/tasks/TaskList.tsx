@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useSubjects } from '@/features/subjects/useSubjects'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
-import { TASK_TYPE_LABEL } from '@/lib/terms'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +32,7 @@ export function TaskList({ subjectId, projectId, actions }: Props) {
   const tasks = query.data?.filter((t) => !t.recurrence)
   const { data: subjects } = useSubjects()
   const subjectById = new Map(subjects?.map((s) => [s.id, s]))
+  const taskTypes = byId(useTaskTypes().data)
 
   return (
     <div className="flex flex-col gap-3">
@@ -71,8 +72,15 @@ export function TaskList({ subjectId, projectId, actions }: Props) {
                     {t.title}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{TASK_TYPE_LABEL[t.task_type]}</span>
-                    {subject && <span className="truncate">· {subject.short_name || subject.name}</span>}
+                    {t.task_type_id && taskTypes.has(t.task_type_id) && (
+                      <span>{taskTypes.get(t.task_type_id)?.name}</span>
+                    )}
+                    {subject && (
+                      <span className="truncate">
+                        {t.task_type_id && taskTypes.has(t.task_type_id) && '· '}
+                        {subject.short_name || subject.name}
+                      </span>
+                    )}
                     {t.subtasks_total > 0 && (
                       <>
                         <Progress value={t.progress * 100} className="h-1 w-12" aria-label="Прогресс" />

@@ -101,12 +101,20 @@ class CategoryIcon(StrEnum):
     plane = "plane"
     star = "star"
     tag = "tag"
+    pencil = "pencil"
+    presentation = "presentation"
+    flask_conical = "flask-conical"
+    book_open = "book-open"
+    clipboard_check = "clipboard-check"
 
 
 # ---------- задания (M4.2) ----------
 
 
-class TaskType(StrEnum):
+class TaskTypeKey(StrEnum):
+    """Ключи типов задач из Part 1: только для сида справочника `task_types` (миграция)
+    и словаря быстрого ввода (`quickparse`, до M21.1). Логику по ним не ветвить."""
+
     homework = "homework"  # ДЗ
     report = "report"  # доклад
     essay = "essay"  # реферат
@@ -167,7 +175,7 @@ class BacklogCondition(StrEnum):
     weekday_daytime = "weekday_daytime"  # только в будни днём
     on_class_days = "on_class_days"  # в дни пар (в городе)
     needs_laptop = "needs_laptop"  # нужен ноутбук
-    institution_hours = "institution_hours"  # в часы работы учреждений
+    # «В часы работы учреждений» — теперь `BacklogItem.hours_action_type_id` (M15.2)
 
 
 # ---------- файлы (M5.1) ----------

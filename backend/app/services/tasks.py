@@ -16,9 +16,7 @@ from sqlalchemy.sql import ColumnElement
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, now_utc, wall_to_utc
 from app.domain.enums import (
-    ActionTypeKey,
     AttachmentOwner,
-    CategoryKey,
     EventKind,
     EventStatus,
     SourceType,
@@ -28,6 +26,7 @@ from app.domain.enums import (
 from app.domain.tasks import find_cycle, progress
 from app.models import (
     ActionType,
+    BreakdownTemplate,
     Category,
     Event,
     Milestone,
@@ -35,6 +34,7 @@ from app.models import (
     Subject,
     Subtask,
     Task,
+    TaskType,
     User,
 )
 from app.schemas.task import (
@@ -47,12 +47,11 @@ from app.schemas.task import (
     TaskDetail,
     TaskRead,
     TaskUpdate,
-    WorkTaskCreate,
 )
 from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
 from app.services.calibration import recalibrate
-from app.services.catalog import ensure_defaults
+from app.services.catalog import default_action_type
 from app.services.recurring_tasks import ensure_has_occurrences, sync_recurring_task
 
 
@@ -85,6 +84,15 @@ class _ActionTypeRepo(UserScopedRepository[ActionType]):
     not_found_message = "Тип действия не найден"
 
 
+class _TaskTypeRepo(UserScopedRepository[TaskType]):
+    model = TaskType
+    not_found_message = "Тип задачи не найден"
+
+
+class _TemplateRepo(UserScopedRepository[BreakdownTemplate]):
+    model = BreakdownTemplate
+
+
 class _ProjectRepo(UserScopedRepository[Project]):
     model = Project
     not_found_message = "Проект не найден"
@@ -95,13 +103,12 @@ class _MilestoneRepo(UserScopedRepository[Milestone]):
     not_found_message = "Этап не найден"
 
 
-WORK_TASK_DAYS = 14
 END_OF_DAY = time(23, 59)
 # Правка этих полей пересобирает вхождения регулярного задания
 RECURRENCE_FIELDS = {"recurrence", "recurrence_start", "title", "estimate_min", "status"}
 
 # Поля, которые нельзя обнулить через PATCH
-_TASK_REQUIRED = {"title", "task_type", "description", "priority", "status"}
+_TASK_REQUIRED = {"title", "description", "priority", "status"}
 _SUBTASK_REQUIRED = {"title", "estimate_min", "depends_on", "status", "note"}
 
 
@@ -114,6 +121,7 @@ def _reject_nulls(changes: dict[str, Any], required: set[str]) -> None:
 class TaskService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
+        self.user = user
         self.user_id = user.id
         self.tasks = TaskRepo(db, user.id)
         self.subtasks = SubtaskRepo(db, user.id)
@@ -121,6 +129,8 @@ class TaskService:
         self.subjects = _SubjectRepo(db, user.id)
         self.categories = _CategoryRepo(db, user.id)
         self.action_types = _ActionTypeRepo(db, user.id)
+        self.task_types = _TaskTypeRepo(db, user.id)
+        self.templates = _TemplateRepo(db, user.id)
         self.projects = _ProjectRepo(db, user.id)
         self.milestones = _MilestoneRepo(db, user.id)
         self.tz = get_tz(user.timezone)
@@ -226,6 +236,8 @@ class TaskService:
     # ---------- ссылки ----------
 
     async def _check_refs(self, data: dict[str, Any]) -> None:
+        if data.get("task_type_id"):
+            await self.task_types.get_or_404(data["task_type_id"])
         if data.get("subject_id"):
             await self.subjects.get_or_404(data["subject_id"])
         if data.get("category_id"):
@@ -256,12 +268,55 @@ class TaskService:
     def _today(self) -> date:
         return now_utc().astimezone(self.tz).date()
 
-    async def _default_action_type(self) -> ActionType | None:
-        if await ensure_defaults(self.db, self.user_id):
-            await self.db.flush()
-        return await self.db.scalar(
-            self.action_types.select().where(ActionType.key == ActionTypeKey.study)
-        )
+    async def _type_defaults(
+        self, data: TaskCreate, fields: dict[str, Any]
+    ) -> tuple[list[SubtaskCreate], list[list[int]]]:
+        """Умолчания типа задачи — в пустые поля (проект — только если `project_id` не
+        передан: явный null — «без проекта»).
+
+        Возвращает шаги и их зависимости (индексы): переданные шаги или шаги из
+        шаблона типа, если шагов нет.
+        """
+        steps = list(data.subtasks)
+        if data.task_type_id is None:
+            return steps, []
+        task_type = await self.task_types.get_or_404(data.task_type_id)
+        # Удалённое (мягко) умолчание типа не подставляем
+        defaults: list[tuple[str, uuid.UUID | None, UserScopedRepository[Any]]] = [
+            ("action_type_id", task_type.default_action_type_id, self.action_types),
+            ("category_id", task_type.default_category_id, self.categories),
+        ]
+        if "project_id" not in data.model_fields_set:
+            defaults.append(("project_id", task_type.default_project_id, self.projects))
+        for name, value, repo in defaults:
+            if fields[name] is None and value is not None and await repo.get(value):
+                fields[name] = value
+        if fields["deadline"] is None and (rule := task_type.deadline_rule):
+            issued = data.issued_at or self._today()
+            fields["issued_at"] = issued
+            fields["deadline"] = wall_to_utc(
+                issued + timedelta(days=int(rule["days"])), END_OF_DAY, self.tz
+            )
+        template = None
+        if not steps and task_type.default_template_id:
+            template = await self.templates.get(task_type.default_template_id)
+        if template is None:
+            if fields["estimate_min"] is None and not steps:
+                fields["estimate_min"] = task_type.default_estimate_min
+            return steps, []
+        known = {a.id for a in await self.action_types.find_all()}
+        for step in template.steps:
+            raw = step.get("action_type_id")
+            type_id = uuid.UUID(raw) if raw else None
+            steps.append(
+                SubtaskCreate(
+                    title=step["title"],
+                    estimate_min=step["estimate_min"],
+                    action_type_id=type_id if type_id in known else None,
+                    note=step.get("note", ""),
+                )
+            )
+        return steps, [list(step.get("depends_on", [])) for step in template.steps]
 
     async def _color(self, subtask: Subtask, task: Task) -> str | None:
         category_id = subtask.category_id or task.category_id
@@ -278,6 +333,7 @@ class TaskService:
         if data.recurrence:
             await ensure_has_occurrences(data.recurrence)
         await self._check_refs(fields)
+        subtasks, steps_deps = await self._type_defaults(data, fields)
         await self._resolve_milestone(fields, None)
 
         if fields["category_id"] is None and fields["project_id"]:
@@ -287,7 +343,7 @@ class TaskService:
             fields["recurrence_start"] = self._today()
 
         if fields["action_type_id"] is None:
-            default = await self._default_action_type()
+            default = await default_action_type(self.db, self.user)
             fields["action_type_id"] = default.id if default else None
             if fields["category_id"] is None and default:
                 fields["category_id"] = default.default_category_id
@@ -298,48 +354,20 @@ class TaskService:
         task = Task(**fields)
         self.tasks.add(task)
         await self.db.flush()
-        for i, item in enumerate(data.subtasks):
+        created: list[Subtask] = []
+        for i, item in enumerate(subtasks):
             if item.depends_on:
                 raise InvalidDataError("Зависимости задаются после создания подзадач")
             await self._check_refs(item.model_dump())
-            self.subtasks.add(self._new_subtask(task, item, position=i))
+            created.append(self.subtasks.add(self._new_subtask(task, item, position=i)))
+        if steps_deps:
+            await self.db.flush()
+            for sub, deps in zip(created, steps_deps, strict=True):
+                sub.depends_on = [str(created[d].id) for d in deps if 0 <= d < len(created)]
         if task.recurrence:
             await sync_recurring_task(self.db, task, self._today())
         await self.db.commit()
         return await self.get_detail(task.id)
-
-    async def create_work_task(self, data: WorkTaskCreate) -> TaskDetail:
-        """«Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней (23:59),
-        проект — указанный или проект «по умолчанию для заданий с работы»."""
-        today = self._today()
-        issued = data.issued_at or today
-        deadline = data.deadline or wall_to_utc(
-            issued + timedelta(days=WORK_TASK_DAYS), END_OF_DAY, self.tz
-        )
-        project_id = data.project_id
-        if project_id is None and not data.no_project:
-            project_id = await self.db.scalar(
-                select(Project.id).where(
-                    Project.user_id == self.user_id,
-                    Project.deleted_at.is_(None),
-                    Project.is_work_default.is_(True),
-                )
-            )
-        if await ensure_defaults(self.db, self.user_id):
-            await self.db.flush()
-        work = await self.db.scalar(
-            self.categories.select().where(Category.key == CategoryKey.work)
-        )
-        return await self.create(
-            TaskCreate(
-                title=data.title,
-                description=data.description,
-                issued_at=issued,
-                deadline=deadline,
-                project_id=project_id,
-                category_id=work.id if work else None,
-            )
-        )
 
     def _new_subtask(self, task: Task, data: SubtaskCreate, *, position: int) -> Subtask:
         fields = data.model_dump(mode="json")

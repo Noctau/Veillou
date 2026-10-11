@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -33,7 +32,6 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
   const [deadline, setDeadline] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [description, setDescription] = useState('')
-  const [workDefault, setWorkDefault] = useState(false)
   const [hours, setHours] = useState('')
   const norm = hours ? Math.round(Number(hours) * 60) : null
   const normValid = norm === null || (norm >= 0 && norm <= 60 * 60)
@@ -47,7 +45,6 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         description,
         contacts: [],
         links: [],
-        is_work_default: workDefault,
         weekly_norm_min: norm || null,
       },
       {
@@ -98,10 +95,6 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         <FieldLabel htmlFor="pr-desc">Описание</FieldLabel>
         <Textarea id="pr-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={workDefault} onCheckedChange={(v) => setWorkDefault(v === true)} />
-        Сюда по умолчанию идут задания с работы
-      </label>
       <DialogFooter>
         <Button type="submit" disabled={!title.trim() || !normValid || create.isPending}>
           Создать

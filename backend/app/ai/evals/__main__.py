@@ -27,16 +27,29 @@ from app.ai.prompts import (
     ExistingMilestone,
     MilestonesContext,
     ParseContext,
+    TaskTypeHint,
     breakdown_messages,
     milestones_messages,
     parse_messages,
 )
 from app.ai.provider import ChatProvider, FallbackProvider, LLMProvider
-from app.ai.schemas import AIBreakdown, AIMilestones, AIParsed, with_subjects
+from app.ai.schemas import AIBreakdown, AIMilestones, AIParsed, with_choices
 from app.domain.breakdown import RawStep, fmt_minutes, normalize_steps, time_warning
 from app.domain.projects import RawMilestone, normalize_milestones
 
 HERE = Path(__file__).parent
+# Типы задач студентки — как после миграции M15.1
+TASK_TYPES = [
+    TaskTypeHint("ДЗ", ("дз", "домашка", "домашнее задание", "упражнение")),
+    TaskTypeHint("Доклад", ("доклад", "презентация", "выступление")),
+    TaskTypeHint("Реферат", ("реферат", "эссе")),
+    TaskTypeHint("Лабораторная", ("лаба", "лабораторная", "практикум")),
+    TaskTypeHint("Курсовая", ("курсовая", "курсач")),
+    TaskTypeHint("Чтение", ("прочитать", "дочитать", "чтение", "глава")),
+    TaskTypeHint("Подготовка к экзамену", ("экзамен", "зачёт", "коллоквиум", "контрольная")),
+    TaskTypeHint("Задание с работы"),
+]
+TASK_TYPE_NAMES = [t.name for t in TASK_TYPES]
 
 
 @dataclass
@@ -58,16 +71,19 @@ async def breakdown_case(provider: LLMProvider, raw: dict[str, Any]) -> Case:
     ctx = BreakdownContext(
         title=raw["title"],
         today=today,
-        task_type=raw.get("task_type") if raw.get("task_type") != "other" else None,
+        task_type=raw.get("task_type"),
         description=raw.get("description", ""),
         subject=raw.get("subject"),
         project=raw.get("project"),
         deadline=deadline,
         free_minutes=raw.get("free_minutes"),
+        task_types=TASK_TYPES,
     )
     started = time.monotonic()
     try:
-        completion = await provider.complete_json(breakdown_messages(ctx), AIBreakdown)
+        completion = await provider.complete_json(
+            breakdown_messages(ctx), with_choices(AIBreakdown, task_type=TASK_TYPE_NAMES)
+        )
     except LLMError as exc:
         return Case(raw["id"], False, time.monotonic() - started, [], [exc.message])
     seconds = time.monotonic() - started
@@ -115,8 +131,8 @@ async def parse_case(
     started = time.monotonic()
     try:
         completion = await provider.complete_json(
-            parse_messages(ParseContext(raw["text"], now, subjects)),
-            with_subjects(AIParsed, subjects),
+            parse_messages(ParseContext(raw["text"], now, subjects, TASK_TYPES)),
+            with_choices(AIParsed, subject=subjects, task_type=TASK_TYPE_NAMES),
         )
     except LLMError as exc:
         return Case(raw["text"][:40], False, time.monotonic() - started, [], [exc.message])

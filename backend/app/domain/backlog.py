@@ -1,9 +1,10 @@
 """Долгий ящик в плане (M11.2–M11.3): неделя, окна по условиям, приоритет, выбор дел.
 
 В план попадают только дела, «взятые на неделю» (`planned_week` — понедельник).
-Условия-чипы превращаются в окна: «в будни днём» — Пн–Пт 9–18, «часы
-учреждений» — окна типа «учреждения»; «в дни пар» — ограничение по датам (его
-считает сервис по расписанию), «нужен ноутбук» время не ограничивает.
+Условия-чипы превращаются в окна: «в будни днём» — Пн–Пт 9–18, «в часы типа
+действия» (`hours_action_type_id`) — окна выбранного типа; «в дни пар» —
+ограничение по датам (его считает сервис по расписанию), «нужен ноутбук» время
+не ограничивает.
 """
 
 import uuid
@@ -107,16 +108,16 @@ def intersect_windows(a: Sequence[Window], b: Sequence[Window]) -> tuple[Window,
 def condition_windows(
     base: Sequence[Window],
     conditions: Iterable[str],
-    institution: Sequence[Window] = (),
+    hours: Sequence[Window] = (),
 ) -> tuple[Window, ...]:
     """Окна дела с учётом чипов. `base` — своё окно дела, окно его типа действия
-    или рабочие часы; `institution` — окна типа «учреждения»."""
+    или рабочие часы; `hours` — окна типа «только в часы…» (пусто — без условия)."""
     result: Sequence[Window] = base
     conditions = set(conditions)
     if BacklogCondition.weekday_daytime in conditions:
         result = intersect_windows(result, WEEKDAY_DAYTIME)
-    if BacklogCondition.institution_hours in conditions and institution:
-        result = intersect_windows(result, institution)
+    if hours:
+        result = intersect_windows(result, hours)
     return tuple(result)
 
 

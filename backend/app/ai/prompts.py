@@ -41,10 +41,25 @@ ACTION_TYPES = """Типы действий (action_type):
 - home — домашние дела;
 - personal — личное."""
 
-TASK_TYPES = """Типы заданий (task_type): homework — ДЗ, задачи; report — доклад, презентация;
-essay — реферат, эссе; lab — лабораторная, практикум; coursework — курсовая, ВКР, большая работа;
-reading — прочитать, законспектировать; exam_prep — подготовка к экзамену или зачёту;
-other — всё остальное."""
+
+@dataclass(frozen=True)
+class TaskTypeHint:
+    """Тип задачи пользователя для промпта: название (значение task_type) и синонимы."""
+
+    name: str
+    synonyms: Sequence[str] = ()
+
+
+def task_types_text(types: Sequence[TaskTypeHint]) -> str:
+    """Типы задач из справочника пользователя (M15.1): task_type — название из списка."""
+    if not types:
+        return "Типов задач в списке нет — task_type всегда пустая строка."
+    lines = [f"- {t.name}" + (f" ({', '.join(t.synonyms)})" if t.synonyms else "") for t in types]
+    return (
+        "Типы задач (task_type — одно название из списка, точно как написано; "
+        "ни один не подходит — пустая строка):\n" + "\n".join(lines)
+    )
+
 
 CATEGORIES = (
     "Категории (category): study — учёба; work — работа (в т. ч. задания с работы для ВКР); "
@@ -83,7 +98,7 @@ class PrevStep:
 class BreakdownContext:
     title: str
     today: date
-    task_type: str | None = None
+    task_type: str | None = None  # название типа задачи, если задан
     description: str = ""
     subject: str | None = None
     project: str | None = None
@@ -95,6 +110,7 @@ class BreakdownContext:
     # Перегенерация: прошлый вариант и комментарий
     previous: Sequence[PrevStep] = ()
     comment: str | None = None
+    task_types: Sequence[TaskTypeHint] = ()
 
 
 BREAKDOWN_RULES = f"""Задача: разбить задание на конкретные шаги для планировщика.
@@ -117,7 +133,7 @@ BREAKDOWN_RULES = f"""Задача: разбить задание на конк�
 
 {ACTION_TYPES}
 
-{TASK_TYPES}
+{{task_types}}
 
 {CATEGORIES}
 
@@ -147,7 +163,8 @@ def breakdown_messages(ctx: BreakdownContext) -> list[Message]:
         lines.append(f"Описание задания:\n{_block(ctx.description[:6000])}")
     if ctx.done_steps:
         lines.append("Уже сделано:\n" + "\n".join(f"- {s}" for s in ctx.done_steps))
-    messages = [Message("system", f"{WHO}\n\n{BREAKDOWN_RULES}"), Message("user", "\n".join(lines))]
+    rules = BREAKDOWN_RULES.replace("{task_types}", task_types_text(ctx.task_types))
+    messages = [Message("system", f"{WHO}\n\n{rules}"), Message("user", "\n".join(lines))]
     if ctx.previous or ctx.comment:
         prev = "\n".join(
             f"{i}. {s.title} — {s.estimate_min} мин" for i, s in enumerate(ctx.previous, 1)
@@ -168,6 +185,7 @@ class ParseContext:
     text: str
     now: datetime  # настенное время пользователя
     subjects: Sequence[str] = field(default_factory=tuple)
+    task_types: Sequence[TaskTypeHint] = ()
 
 
 DATE_RULES = """Даты (смотри календарь ниже):
@@ -211,7 +229,7 @@ kind:
 
 title — короткое название, до 80 символов, без даты и лишних слов: «Реферат о муссонах»,
 а не «надо до пятницы сдать реферат по климатологии про муссоны».
-task_type — тип задания; для дел и событий — other.
+task_type — тип задачи из списка; для дел и событий — пустая строка.
 subject — если в сообщении упомянут предмет из списка (в любом падеже, сокращённо или по теме,
 например «по гидрологии» → «Гидрология»), иначе пустая строка.
 description — только требования, которые есть в самом сообщении (объём, тема, оформление),
@@ -220,7 +238,7 @@ action_type — когда это уместно делать: people / institut
 
 {DATE_RULES}
 
-{TASK_TYPES}
+{task_types_text(ctx.task_types)}
 
 {ACTION_TYPES}
 
@@ -251,7 +269,7 @@ title — короткое название задания, до 80 символ
 
 {DATE_RULES}
 
-{TASK_TYPES}
+{task_types_text(ctx.task_types)}
 
 Ответ — только JSON по схеме."""
     lines = [

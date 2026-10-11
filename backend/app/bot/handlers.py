@@ -112,7 +112,7 @@ async def free_text(message: Message, db: AsyncSession, user: User) -> None:
     if not text or not text.strip():
         await message.answer(HELP)
         return
-    if needs_ai(text, await quickadd.parse_text(db, user, text[:500])):
+    if needs_ai(text, (await quickadd.parse_text(db, user, text[:500])).result):
         await ai.start_text(message, db, user, text)
         return
     await _create(message, db, user, text)
@@ -135,7 +135,7 @@ async def photo(message: Message, db: AsyncSession, user: User, bot: Bot) -> Non
     else:  # фильтр пропускает только фото и картинки-документы
         return
     caption = (message.caption or "").strip()
-    parsed = await quickadd.parse_text(db, user, caption[:500]) if caption else None
+    parsed = (await quickadd.parse_text(db, user, caption[:500])).result if caption else None
     data = await download(bot, file_id)
     task = await TaskService(db, user).create(
         TaskCreate(

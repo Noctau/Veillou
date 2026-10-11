@@ -23,7 +23,7 @@ from app.worker.__main__ import build_handlers
 
 from .test_attachments import upload
 from .test_schedule_api import API, other_client
-from .test_tasks import add_subtask, get_task, make_task
+from .test_tasks import add_subtask, get_task, make_task, make_task_type
 
 TZ = get_tz("Europe/Moscow")
 
@@ -66,7 +66,7 @@ async def job_result(client: AsyncClient, job_id: str) -> dict:
 
 def breakdown_answer(**over) -> str:
     data = {
-        "task_type": "essay",
+        "task_type": "Реферат",
         "category": "study",
         "subtasks": [
             {"order": 2, "title": "Написать текст", "estimate_min": 90, "action_type": "study",
@@ -87,7 +87,7 @@ def parsed_answer(**over) -> str:
     data = {
         "kind": "task",
         "title": "Задание",
-        "task_type": "other",
+        "task_type": "",
         "subject": "",
         "deadline_date": "",
         "deadline_time": "",
@@ -101,7 +101,7 @@ def photo_answer(**over) -> str:
     data = {
         "text": "",
         "title": "Задание",
-        "task_type": "other",
+        "task_type": "",
         "subject": "",
         "deadline_date": "",
         "deadline_time": "",
@@ -324,8 +324,9 @@ async def test_apply_replaces_open_steps_and_previews_plan(auth_client):
     assert resp.status_code == 200
 
     types = {a["key"]: a["id"] for a in (await auth_client.get(f"{API}/action-types")).json()}
+    report = await make_task_type(auth_client, name="Доклад")
     body = {
-        "task_type": "report",
+        "task_type_id": report["id"],
         "steps": [
             {"title": "Найти источники", "estimate_min": 45, "action_type_id": types["study"]},
             {"title": "Написать доклад", "estimate_min": 90, "depends_on": [0]},
@@ -337,7 +338,7 @@ async def test_apply_replaces_open_steps_and_previews_plan(auth_client):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     detail = data["task"]
-    assert detail["task_type"] == "report"
+    assert detail["task_type_id"] == report["id"]
     assert [s["title"] for s in detail["subtasks"]] == [
         "Уже сделано",
         "Найти источники",
@@ -398,9 +399,10 @@ async def test_apply_without_plan_and_validation(auth_client):
 
 async def test_templates(auth_client, session):
     types = {a["key"]: a["id"] for a in (await auth_client.get(f"{API}/action-types")).json()}
+    essay = await make_task_type(auth_client)
     body = {
         "name": "Реферат",
-        "task_type": "essay",
+        "task_type_id": essay["id"],
         "steps": [
             {"title": "Найти источники", "estimate_min": 60, "action_type_id": types["study"]},
             {"title": "Написать", "estimate_min": 120, "depends_on": [0]},
@@ -410,6 +412,7 @@ async def test_templates(auth_client, session):
     assert resp.status_code == 201, resp.text
     tpl = resp.json()
     assert tpl["total_estimate_min"] == 180
+    assert tpl["task_type_id"] == essay["id"]
     assert tpl["steps"][0]["action_type_id"] == types["study"]
     assert tpl["steps"][1]["depends_on"] == [0]
 
@@ -459,6 +462,7 @@ async def make_subject(client: AsyncClient, name: str, short: str) -> dict:
 
 async def test_ai_parse_card(auth_client, fake):
     subject = await make_subject(auth_client, "Климатология", "клим")
+    report = await make_task_type(auth_client, name="Доклад", synonyms=["доклад", "слайды"])
     text = "Нужно подготовить доклад про Эль-Ниньо на 10 минут, со слайдами, к семинару Петрова"
     job_id = (await auth_client.post(f"{API}/quick-add/ai-parse", json={"text": text})).json()[
         "job_id"
@@ -466,7 +470,7 @@ async def test_ai_parse_card(auth_client, fake):
     fake.push(
         parsed_answer(
             title="Доклад про Эль-Ниньо",
-            task_type="report",
+            task_type="Доклад",
             subject="Климатология",
             deadline_date="2030-01-09",
             # Такого времени в тексте нет — выдуманное время отбрасывается
@@ -479,13 +483,14 @@ async def test_ai_parse_card(auth_client, fake):
     assert draft["type"] == "parse"
     assert draft["kind"] == "task"
     assert draft["title"] == "Доклад про Эль-Ниньо"
-    assert draft["task_type"] == "report"
+    assert draft["task_type_id"] == report["id"]
     assert draft["subject_id"] == subject["id"]
     deadline = datetime.fromisoformat(draft["deadline"])
     assert deadline == wall_to_utc(date(2030, 1, 9), time(23, 59), TZ)
     assert draft["text"] == text
-    # Предметы ушли в схему ответа списком
+    # Предметы ушли в схему ответа списком, типы задач — с синонимами в промпт
     assert "Климатология" in fake.calls[0][0][1].content
+    assert "- Доклад (доклад, слайды)" in fake.calls[0][0][0].content
 
 
 async def test_ai_parse_prefers_explicit_date_from_quickparse(auth_client, fake):
@@ -506,7 +511,8 @@ async def test_ai_parse_prefers_explicit_date_from_quickparse(auth_client, fake)
 
 
 async def test_recognize_photo_fills_task(auth_client, fake):
-    task = await make_task(auth_client, title="Задание с фото", task_type="other")
+    homework = await make_task_type(auth_client, name="ДЗ")
+    task = await make_task(auth_client, title="Задание с фото")
     assert (await upload(auth_client, task["id"])).status_code == 201
     resp = await auth_client.post(f"{API}/tasks/{task['id']}/recognize")
     assert resp.status_code == 202, resp.text
@@ -514,7 +520,7 @@ async def test_recognize_photo_fills_task(auth_client, fake):
         photo_answer(
             title="Задачи 3.1–3.5",
             text="Решить задачи 3.1–3.5 из задачника",
-            task_type="homework",
+            task_type="ДЗ",
             deadline_date="2030-02-01",
             deadline_time="09:00",
         )
@@ -522,11 +528,11 @@ async def test_recognize_photo_fills_task(auth_client, fake):
     await run_jobs()
     draft = (await job_result(auth_client, resp.json()["job_id"]))["result"]
     assert draft["type"] == "photo"
-    assert set(draft["updated"]) == {"description", "title", "deadline", "task_type"}
+    assert set(draft["updated"]) == {"description", "title", "deadline", "task_type_id"}
     detail = await get_task(auth_client, task["id"])
     assert detail["title"] == "Задачи 3.1–3.5"
     assert "3.1–3.5 из задачника" in detail["description"]
-    assert detail["task_type"] == "homework"
+    assert detail["task_type_id"] == homework["id"]
     _, model = fake.calls[0]
     assert model == "fake-vision"
     assert fake.calls[0][0][-1].images

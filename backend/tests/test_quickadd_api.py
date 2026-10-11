@@ -1,8 +1,14 @@
+import uuid
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import update
 
+from app.models import TaskType
+
+from .test_catalog import action_types
 from .test_schedule_api import API, make_semester, make_subject
+from .test_tasks import make_task_type
 
 
 @pytest.fixture
@@ -13,7 +19,14 @@ def frozen(monkeypatch):
     )
 
 
-async def test_parse_with_user_subjects(auth_client, frozen):
+async def test_parse_with_user_subjects(auth_client, frozen, session):
+    types = await action_types(auth_client)
+    essay = await make_task_type(auth_client)
+    # Словарь быстрого ввода Part 1 отдаёт ключи сида: у мигрированных типов есть key
+    await session.execute(
+        update(TaskType).where(TaskType.id == uuid.UUID(essay["id"])).values(key="essay")
+    )
+    await session.commit()
     sem = await make_semester(auth_client)
     subj = await make_subject(auth_client, sem["id"], synonyms=["климатуха"])
     resp = await auth_client.post(
@@ -29,8 +42,9 @@ async def test_parse_with_user_subjects(auth_client, frozen):
         "deadline": "2026-10-15T20:59:00Z",
         "is_deadline": True,
         "subject_id": subj["id"],
-        "task_type": "essay",
-        "action_type": "study",
+        "task_type_id": essay["id"],
+        # Похоже на задачу — тип действия по умолчанию
+        "action_type_id": types["study"]["id"],
         "kind_hint": "task",
         # Есть и срок, и предмет — ИИ не нужен
         "needs_ai": False,

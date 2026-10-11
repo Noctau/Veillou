@@ -114,7 +114,7 @@ async def test_snapshot_blocks(auth_client, user):
     assert first.duration_min == 60
     assert first.priority == 3
     assert first.group_id == task["id"]
-    assert first.counts_as_study
+    assert first.budgets == frozenset()  # лимитов у нового пользователя нет
     assert first.splittable
     assert first.windows  # окно «самостоятельной учёбы»
     assert blocks[f"subtask:{b['id']}"].depends_on == (f"subtask:{a['id']}",)
@@ -127,18 +127,43 @@ async def test_snapshot_people_prefers_morning_and_own_buffer(auth_client, user)
     task, _ = await task_with_steps(auth_client, 30, action_type_id=people["id"])
     await auth_client.patch(f"{API}/tasks/{task['id']}", json={"deadline_buffer_days": 0})
     (block,) = (await snapshot(user)).inp.blocks
-    assert block.prefer_morning
-    assert not block.counts_as_study
+    assert block.prefer_morning  # флаг типа действия
     assert block.buffer_days == 0
     assert block.windows[0].end == time(19)
 
 
-async def test_snapshot_day_limit(auth_client, user):
-    resp = await auth_client.put(f"{API}/plan/day-limits/2030-01-08", json={"minutes": 480})
-    assert resp.status_code == 200
-    assert (await snapshot(user)).inp.study_limits == ((MON + timedelta(days=1), 480),)
-    await auth_client.delete(f"{API}/plan/day-limits/2030-01-08")
-    assert (await snapshot(user)).inp.study_limits == ()
+async def test_snapshot_budgets(auth_client, user):
+    types = {t["key"]: t["id"] for t in (await auth_client.get(f"{API}/action-types")).json()}
+    resp = await auth_client.post(
+        f"{API}/load-budgets",
+        json={"name": "Учёба", "minutes_per_day": 300, "action_type_ids": [types["study"]]},
+    )
+    assert resp.status_code == 201, resp.text
+    budget = uuid.UUID(resp.json()["id"])
+    _, (step,) = await task_with_steps(auth_client, 60)  # тип по умолчанию — учёба
+    people_task = await make_task(
+        auth_client, title="Позвонить", estimate_min=30, action_type_id=types["people"]
+    )
+    url = f"{API}/load-budgets/{budget}/overrides/2030-01-08"
+    assert (await auth_client.put(url, json={"minutes": 480})).status_code == 200
+    snap = await snapshot(user)
+    (limit,) = snap.inp.budgets
+    assert (limit.id, limit.minutes_per_day) == (budget, 300)
+    assert limit.overrides == ((MON + timedelta(days=1), 480),)
+    blocks = {b.id: b for b in snap.inp.blocks}
+    assert blocks[f"subtask:{step['id']}"].budgets == {budget}
+    assert blocks[f"task:{people_task['id']}"].budgets == frozenset()
+
+    assert (await auth_client.delete(url)).status_code == 204
+    assert (await snapshot(user)).inp.budgets[0].overrides == ()
+    # Тот же тип действия в двух лимитах — блок в обоих
+    resp = await auth_client.post(
+        f"{API}/load-budgets",
+        json={"name": "Экран", "minutes_per_day": 120, "action_type_ids": [types["study"]]},
+    )
+    screen = uuid.UUID(resp.json()["id"])
+    blocks = {b.id: b for b in (await snapshot(user)).inp.blocks}
+    assert blocks[f"subtask:{step['id']}"].budgets == {budget, screen}
 
 
 async def test_pinned_and_started_blocks_are_fixed(auth_client, user):
@@ -198,10 +223,13 @@ async def test_calibration_scales_estimates(auth_client, user):
     assert block.duration_min == round(60 * 1.075**3)
 
     rows = (await auth_client.get(f"{API}/calibration")).json()
+    study = next(
+        t for t in (await auth_client.get(f"{API}/action-types")).json() if t["key"] == "study"
+    )
     assert rows == [
         {
-            "task_type": "essay",
-            "action_type": "study",
+            "task_type_id": None,  # задача без типа
+            "action_type_id": study["id"],
             "coef": pytest.approx(1.075**3),
             "samples": 3,
         }
@@ -366,8 +394,9 @@ async def test_at_risk_in_preview(auth_client, user):
     task, _ = await task_with_steps(auth_client, 600, 600, deadline=at(MON, 20))
     rev = await call(user, "preview")
     assert rev is not None
-    assert {r["reason"] for r in rev.at_risk} <= {"no_time", "no_slots"}
-    assert rev.at_risk
+    reasons = {r["reason"] for r in rev.at_risk}
+    assert reasons <= {"no_time", "no_slots", "late"}
+    assert "no_time" in reasons
     assert rev.at_risk[0]["task_id"] == task["id"]
     assert rev.at_risk[0]["group_title"] == "Реферат"
     assert rev.at_risk[0]["group_kind"] == "task"
@@ -510,7 +539,7 @@ async def test_apply_and_undo_do_not_trigger(auth_client, session, user):
 
 async def test_settings_change_triggers(auth_client, session, user):
     await drop_jobs(session)
-    await auth_client.patch(f"{API}/me/settings", json={"study_limit_min_per_day": 300})
+    await auth_client.patch(f"{API}/me/settings", json={"deadline_buffer_days": 2})
     assert len(await plan_jobs(session, user)) == 1
 
 

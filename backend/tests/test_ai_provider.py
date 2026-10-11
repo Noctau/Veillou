@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from app.ai import Image, LLMInvalidError, LLMUnavailableError, Message
 from app.ai.fake import FakeProvider
 from app.ai.provider import OllamaProvider, OpenAICompatProvider, extract_json
-from app.ai.schemas import AIBreakdown, AIParsed, with_subjects
+from app.ai.schemas import AIBreakdown, AIParsed, with_choices, with_subjects
 from app.core.config import settings
 
 
@@ -140,8 +140,9 @@ def test_schema_for_model_has_no_string_lengths():
     text = json.dumps(model_schema(AIParsed))
     for key in ("maxLength", "minLength", "$ref", "$defs", '"format"'):
         assert key not in text
-    # Перечисление — без null: «нет» — это other
-    assert "homework" in model_schema(AIParsed)["properties"]["task_type"]["enum"]
+    # Перечисление — без null: «нет» — это пустая строка
+    schema = model_schema(with_choices(AIParsed, task_type=["ДЗ", "Реферат"]))
+    assert schema["properties"]["task_type"]["enum"] == ["ДЗ", "Реферат", ""]
     assert "maxItems" in json.dumps(model_schema(AIBreakdown))
     assert "title" in model_schema(AIParsed)["properties"]
     assert "title" in model_schema(AIBreakdown)["properties"]["subtasks"]["items"]["properties"]

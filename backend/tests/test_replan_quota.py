@@ -65,7 +65,7 @@ async def test_snapshot_quotas_and_reserve(auth_client, user):
     reserve = [b for b in snap.inp.blocks if b.reserve]
     assert len(reserve) == 8
     assert {b.duration_min for b in reserve} == {90}
-    assert all(b.quota == tag and b.group_id == tag and b.counts_as_study for b in reserve)
+    assert all(b.quota == tag and b.group_id == tag for b in reserve)
     assert reserve[0].earliest == at(MON, 0)
     assert reserve[0].deadline == at(NEXT_MON, 0)
 

@@ -95,18 +95,6 @@ async def test_milestone_sets_project_and_must_match(auth_client):
     assert resp.json()["milestone_id"] is None
 
 
-async def test_single_work_default(auth_client):
-    a = await make_project(auth_client, is_work_default=True)
-    b = await make_project(auth_client, title="Другой", is_work_default=True)
-    projects = {p["id"]: p for p in (await auth_client.get(f"{API}/projects")).json()}
-    assert not projects[a["id"]]["is_work_default"]
-    assert projects[b["id"]]["is_work_default"]
-    resp = await auth_client.patch(f"{API}/projects/{a['id']}", json={"is_work_default": True})
-    assert resp.json()["is_work_default"]
-    projects = {p["id"]: p for p in (await auth_client.get(f"{API}/projects")).json()}
-    assert not projects[b["id"]]["is_work_default"]
-
-
 async def test_delete_project_keeps_tasks(auth_client):
     project = await make_project(auth_client)
     stage = await add_milestone(auth_client, project["id"])
@@ -144,34 +132,6 @@ async def test_projects_are_per_user(auth_client, session):
         assert resp.status_code == 404
 
 
-# ---------- задания с работы ----------
-
-
-async def test_work_task_defaults(auth_client):
-    cats = await categories(auth_client)
-    vkr = await make_project(auth_client, is_work_default=True)
-    resp = await auth_client.post(f"{API}/tasks/work", json={"title": "Обработать данные ERA5"})
-    assert resp.status_code == 201, resp.text
-    task = resp.json()
-    assert task["category_id"] == cats["work"]["id"]
-    assert task["project_id"] == vkr["id"]
-    assert task["issued_at"] == "2026-10-06"
-    assert task["deadline"] == "2026-10-20T20:59:00Z"  # 20.10 23:59 МСК
-
-    resp = await auth_client.post(
-        f"{API}/tasks/work",
-        json={"title": "Отчёт", "issued_at": "2026-10-01", "no_project": True},
-    )
-    task = resp.json()
-    assert task["project_id"] is None
-    assert task["deadline"] == "2026-10-15T20:59:00Z"
-
-
-async def test_work_task_without_default_project(auth_client):
-    resp = await auth_client.post(f"{API}/tasks/work", json={"title": "x"})
-    assert resp.json()["project_id"] is None
-
-
 # ---------- регулярные задания ----------
 
 
@@ -181,7 +141,6 @@ async def test_recurring_meetings_materialize(auth_client, session: AsyncSession
     task = await make_task(
         auth_client,
         title="Встреча с научруком",
-        task_type="other",
         project_id=project["id"],
         action_type_id=types["people"]["id"],
         recurrence="FREQ=WEEKLY;BYDAY=TH",

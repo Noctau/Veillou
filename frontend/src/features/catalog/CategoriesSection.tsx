@@ -13,7 +13,7 @@ import { paletteColor } from '@/lib/colors'
 import { cn } from '@/lib/utils'
 
 import { CategoryIcon } from './CategoryIcon'
-import { CATEGORY_ICONS } from './icons'
+import { IconPicker } from './IconPicker'
 import {
   type Category,
   type CategoryIconName,
@@ -104,24 +104,7 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
       </Field>
       <Field>
         <FieldLabel>Иконка</FieldLabel>
-        <div role="radiogroup" className="flex flex-wrap gap-2">
-          {(Object.keys(CATEGORY_ICONS) as CategoryIconName[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={icon === key}
-              aria-label={key}
-              onClick={() => setIcon(key)}
-              className={cn(
-                'flex size-9 items-center justify-center rounded-lg border',
-                icon === key && 'border-foreground bg-muted',
-              )}
-            >
-              <CategoryIcon name={key} className="size-4" />
-            </button>
-          ))}
-        </div>
+        <IconPicker value={icon} onChange={setIcon} />
       </Field>
       <DialogFooter className="flex-row items-center">
         {category && !category.key && (

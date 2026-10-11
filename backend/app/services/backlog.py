@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InvalidDataError
 from app.core.time import now_utc
 from app.domain.enums import BacklogStatus, EventStatus
-from app.domain.quickparse import guess_action_type
+from app.domain.quickparse import guess
 from app.models import ActionType, BacklogItem, Category, User
 from app.schemas.backlog import BacklogCreate, BacklogUpdate
 from app.services.base import UserScopedRepository
-from app.services.catalog import ensure_defaults
+from app.services.catalog import ensure_defaults, parse_words
 
 
 class BacklogRepo(UserScopedRepository[BacklogItem]):
@@ -65,22 +65,25 @@ class BacklogService:
             await self.categories.get_or_404(data["category_id"])
         if data.get("action_type_id"):
             await self.action_types.get_or_404(data["action_type_id"])
+        if data.get("hours_action_type_id"):
+            await self.action_types.get_or_404(data["hours_action_type_id"])
 
     async def create(self, data: BacklogCreate) -> BacklogItem:
         fields = data.model_dump(mode="json")
         fields["category_id"] = data.category_id
         fields["action_type_id"] = data.action_type_id
+        fields["hours_action_type_id"] = data.hours_action_type_id
         fields["desired_by"] = data.desired_by
         await self._check_refs(fields)
 
         action_type: ActionType | None = None
-        if fields["action_type_id"] is None and (key := guess_action_type(data.title)):
+        if fields["action_type_id"] is None:
             if await ensure_defaults(self.db, self.user_id):
                 await self.db.flush()
-            action_type = await self.db.scalar(
-                self.action_types.select().where(ActionType.key == key)
-            )
-            fields["action_type_id"] = action_type.id if action_type else None
+            words = await parse_words(self.db, self.user_id)
+            if isinstance(type_id := guess(data.title, words.action), uuid.UUID):
+                action_type = await self.action_types.get(type_id)
+                fields["action_type_id"] = type_id
         elif fields["action_type_id"] is not None:
             action_type = await self.action_types.get_or_404(fields["action_type_id"])
         if fields["category_id"] is None and action_type is not None:

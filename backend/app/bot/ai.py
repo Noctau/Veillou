@@ -31,7 +31,7 @@ from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.time import get_tz, now_utc
 from app.domain.breakdown import fmt_minutes
-from app.domain.enums import AIOrigin, JobKind, JobStatus, TaskType
+from app.domain.enums import AIOrigin, JobKind, JobStatus
 from app.domain.quickparse import KindHint
 from app.models import Job, Subject, User
 from app.notify.message import fmt_moment
@@ -46,6 +46,7 @@ from app.schemas.plan import PlanState
 from app.services import jobs
 from app.services.ai_parse import AIParseService, create_from_draft
 from app.services.breakdown import BreakdownService
+from app.services.catalog import load_task_types
 from app.services.quickadd import create_from_text
 from app.services.replan import ReplanService, plan_state
 from app.services.tasks import TaskService
@@ -54,16 +55,6 @@ log = logging.getLogger(__name__)
 
 AI_PREFIX = "ai:"
 THINKING = "🤖 Разбираю…"
-TASK_TYPE_TITLE = {
-    TaskType.homework: "ДЗ",
-    TaskType.report: "Доклад",
-    TaskType.essay: "Реферат",
-    TaskType.lab: "Лабораторная",
-    TaskType.coursework: "Курсовая",
-    TaskType.reading: "Чтение",
-    TaskType.exam_prep: "Подготовка к экзамену",
-    TaskType.other: "Другое",
-}
 # Сколько названий «под угрозой» перечислять (остальное — «и ещё N»): лимит Telegram
 PLAN_RISK_TITLES = 10
 KIND_TITLE = {KindHint.task: "Задание", KindHint.backlog: "В ящик", KindHint.event: "Событие"}
@@ -108,7 +99,7 @@ def parse_callback(data: str) -> AIData | None:
 
 
 def _details(
-    deadline: datetime | None, subject: str | None, task_type: TaskType | None, user: User
+    deadline: datetime | None, subject: str | None, task_type: str | None, user: User
 ) -> str:
     tz = get_tz(user.timezone)
     today = now_utc().astimezone(tz).date()
@@ -117,8 +108,8 @@ def _details(
         parts.append(f"до {fmt_moment(deadline, tz, today)}")
     if subject:
         parts.append(subject)
-    if task_type and task_type != TaskType.other:
-        parts.append(TASK_TYPE_TITLE[task_type])
+    if task_type:
+        parts.append(task_type)
     return html.escape(" · ".join(parts))
 
 
@@ -132,10 +123,15 @@ async def _subject_name(db: AsyncSession, subject_id: uuid.UUID | None) -> str |
     return subject.name if subject else None
 
 
+async def _task_type_name(db: AsyncSession, user: User, type_id: uuid.UUID | None) -> str | None:
+    return (await load_task_types(db, user.id)).name_of(type_id) if type_id else None
+
+
 async def parse_card(db: AsyncSession, user: User, draft: ParseDraft) -> str:
     subject = await _subject_name(db, draft.subject_id)
     lines = [f"🤖 <b>{KIND_TITLE[draft.kind]}:</b> {html.escape(draft.title)}"]
-    if details := _details(draft.deadline, subject, draft.task_type, user):
+    task_type = await _task_type_name(db, user, draft.task_type_id)
+    if details := _details(draft.deadline, subject, task_type, user):
         lines.append(details)
     if draft.description:
         lines.append(f"<i>{_snippet(draft.description)}</i>")
@@ -167,7 +163,8 @@ async def photo_card(db: AsyncSession, user: User, draft: PhotoDraft) -> str:
     subject = await _subject_name(db, draft.subject_id)
     task = await TaskService(db, user).get_detail(draft.task_id)
     lines = [f"📷 <b>Задание:</b> {html.escape(task.title)}"]
-    if details := _details(task.deadline, subject, task.task_type, user):
+    task_type = await _task_type_name(db, user, task.task_type_id)
+    if details := _details(task.deadline, subject, task_type, user):
         lines.append(details)
     if draft.text:
         lines.append(f"<i>{_snippet(draft.text)}</i>")
@@ -453,7 +450,7 @@ async def _apply_breakdown(
         draft.task_id,
         BreakdownApply(
             steps=draft.steps,
-            task_type=draft.task_type,
+            task_type_id=draft.task_type_id,
             category_id=draft.category_id,
             job_id=job_id,
         ),

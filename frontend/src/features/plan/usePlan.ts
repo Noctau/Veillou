@@ -128,23 +128,6 @@ export function useDismissPlan() {
   })
 }
 
-/** Разовый лимит учёбы на день (вариант «больше учёбы в этот день»). */
-export function usePutDayLimit() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ day, minutes }: { day: string; minutes: number }) => {
-      const { data, error } = await api.PUT('/api/v1/plan/day-limits/{day}', {
-        params: { path: { day } },
-        body: { minutes },
-      })
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dayLimits }),
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-}
-
 // ---------- калибровка ----------
 
 export function useCalibration() {

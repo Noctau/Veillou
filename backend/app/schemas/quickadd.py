@@ -4,7 +4,6 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.domain.enums import ActionTypeKey, TaskType
 from app.domain.quickparse import KindHint
 from app.schemas.common import InputModel, UTCMoment, WallTime
 
@@ -24,7 +23,9 @@ class QuickParseRead(BaseModel):
     deadline: UTCMoment | None
     is_deadline: bool
     subject_id: uuid.UUID | None
-    task_type: TaskType | None
-    action_type: ActionTypeKey | None
+    task_type_id: uuid.UUID | None = Field(description="Тип задачи из справочника по словам")
+    action_type_id: uuid.UUID | None = Field(
+        description="Тип действия по словам; похоже на задачу — тип по умолчанию"
+    )
     kind_hint: KindHint
     needs_ai: bool = Field(description="Разбор неуверенный — стоит спросить ИИ")

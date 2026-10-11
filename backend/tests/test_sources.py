@@ -7,6 +7,7 @@ from app.core.storage import LocalStorage, get_storage
 from app.main import app
 
 from .test_schedule_api import API, make_semester, make_subject, other_client
+from .test_tasks import seed_task_type
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +72,9 @@ async def test_source_file(auth_client: AsyncClient, subject):
     assert (await auth_client.get(f"{API}/sources/{source['id']}")).json()["files_count"] == 1
 
 
-async def test_reading_task(auth_client: AsyncClient, subject):
+async def test_reading_task(auth_client: AsyncClient, subject, session, user):
+    reading_id = await seed_task_type(session, user.id, "reading", "Чтение")
+    await seed_task_type(session, user.id, "lab", "Лабораторная")
     source = await make_source(
         auth_client, subject["id"], author="Матвеев Л. Т.", url="https://example.com/book"
     )
@@ -82,7 +85,8 @@ async def test_reading_task(auth_client: AsyncClient, subject):
     assert resp.status_code == 201, resp.text
     task = resp.json()
     assert task["title"] == "Прочитать главы 3–5 — Курс общей метеорологии"
-    assert task["task_type"] == "reading"
+    # Тип — по глаголу «Прочитать», а не по словам из названия источника
+    assert task["task_type_id"] == str(reading_id)
     assert task["subject_id"] == subject["id"]
     assert (
         task["description"] == "Матвеев Л. Т. — Курс общей метеорологии\nhttps://example.com/book"

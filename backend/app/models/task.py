@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
-from app.domain.enums import Priority, SubtaskStatus, TaskStatus, TaskType
+from app.domain.enums import Priority, SubtaskStatus, TaskStatus
 from app.models.base import UserOwnedMixin, UTCDateTime
 
 
@@ -26,7 +26,10 @@ class Task(UserOwnedMixin, Base):
     __table_args__ = (Index("ix_tasks_user_status_deadline", "user_id", "status", "deadline"),)
 
     title: Mapped[str] = mapped_column(String(300))
-    task_type: Mapped[str] = mapped_column(String(20), default=TaskType.other)
+    # NULL — без типа
+    task_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task_types.id", ondelete="SET NULL"), index=True
+    )
     description: Mapped[str] = mapped_column(Text, default="")
     subject_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("subjects.id", ondelete="SET NULL"), index=True
@@ -48,7 +51,7 @@ class Task(UserOwnedMixin, Base):
     estimate_min: Mapped[int | None] = mapped_column(Integer)
     # Свой «закончить за N дней до дедлайна» (сдвинутый внутренний срок); NULL — из настроек
     deadline_buffer_days: Mapped[int | None] = mapped_column(Integer)
-    # Дата выдачи (задания с работы: дедлайн = выдача + 14 дней)
+    # Дата выдачи (тип с правилом срока: дедлайн = выдача + N дней)
     issued_at: Mapped[date | None] = mapped_column(Date)
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), index=True

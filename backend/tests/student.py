@@ -9,13 +9,15 @@
 - 6 предметов и 10 правил пар (в т. ч. «по числителю», «по знаменателю», «своё
   время», правило с `valid_from`), отменённая и перенесённая пара, пара с заметкой;
 - личный повтор (бассейн) и отдых, разовое личное событие;
+- типы задач, как их создала миграция M15.1 (с ключами сида и синонимами), в т. ч.
+  «Задание с работы» (срок + 14 дней, проект «Работа в лаборатории»);
 - задания с шагами разных типов действий, зависимостями, закреплённым шагом и
   калибровкой; задание без шагов; «задание с работы»; регулярное задание;
-- ящик: дела с чипами «в дни пар» и «часы учреждений», взятые на неделю, и старое;
+- ящик: дела с чипом «в дни пар» и «в часы учреждений», взятые на неделю, и старое;
 - экзамен с билетами и планом подготовки;
-- проект с недельной нормой (ВКР) и проект «по умолчанию для заданий с работы»;
-- разовый лимит дня; переопределённые настройки (сон, дорога, лимит учёбы, напоминание
-  перед парой).
+- проект с недельной нормой (ВКР) и проект для заданий с работы;
+- лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); переопределённые настройки
+  (сон, дорога, напоминание перед парой).
 """
 
 import sys
@@ -32,6 +34,22 @@ from app.core.time import get_tz, wall_to_utc
 API = "/api/v1"
 TZ = get_tz("Europe/Moscow")
 EMAIL = "student@example.com"
+
+# Типы задач студентки — как их создаёт миграция M15.1 из enum TaskType Part 1
+TASK_TYPES: list[tuple[str, str, str, list[str]]] = [
+    ("homework", "ДЗ", "pencil", ["дз", "домашка", "домашнее задание", "упражнение"]),
+    ("report", "Доклад", "presentation", ["доклад", "презентация", "выступление"]),
+    ("essay", "Реферат", "file-text", ["реферат", "эссе"]),
+    ("lab", "Лабораторная", "flask-conical", ["лаба", "лабораторная", "практикум"]),
+    ("coursework", "Курсовая", "graduation-cap", ["курсовая", "курсач"]),
+    ("reading", "Чтение", "book-open", ["прочитать", "дочитать", "чтение", "глава"]),
+    (
+        "exam_prep",
+        "Подготовка к экзамену",
+        "clipboard-check",
+        ["экзамен", "зачёт", "коллоквиум", "контрольная"],
+    ),
+]
 
 # «Сейчас» фикстуры — понедельник 30.11.2026, 07:00 МСК (до утренней сводки)
 TODAY = date(2026, 11, 30)
@@ -110,13 +128,26 @@ async def build_student(client: AsyncClient) -> Student:
             "sleep": {"start": "00:00", "end": "08:00"},
             "work_hours": {"weekdays": {"start": "09:00", "end": "22:00"}},
             "travel_buffer_min": 40,
-            "study_limit_min_per_day": 300,
             "reminders": {"before_class": {"minutes_before": 20}},
             "onboarding_done": True,
         },
     )
     types = {t["key"]: t["id"] for t in await _ok(await c.get(f"{API}/action-types"))}
     cats = {x["key"]: x["id"] for x in await _ok(await c.get(f"{API}/categories")) if x["key"]}
+    # Лимит «Учёба» — бывший study_limit_min_per_day: 300
+    budget = await post(
+        "/load-budgets",
+        {"name": "Учёба", "minutes_per_day": 300, "action_type_ids": [types["study"]]},
+        "budget",
+    )
+
+    # ---------- типы задач (как после миграции M15.1) ----------
+    task_types: dict[str, str] = {}
+    for key, name, icon, synonyms in TASK_TYPES:
+        data = await post(
+            "/task-types", {"name": name, "icon": icon, "synonyms": synonyms}, f"tt_{key}"
+        )
+        task_types[key] = data["id"]
 
     # ---------- семестр, звонки, выходные ----------
     sem = await post(
@@ -387,7 +418,7 @@ async def build_student(client: AsyncClient) -> Student:
         "/tasks",
         {
             "title": "Реферат по климатологии",
-            "task_type": "essay",
+            "task_type_id": task_types["essay"],
             "subject_id": clim,
             "deadline": at(day(11), 23, 59),
             "priority": "high",
@@ -425,7 +456,7 @@ async def build_student(client: AsyncClient) -> Student:
         "/tasks",
         {
             "title": "ДЗ по матану: ряды",
-            "task_type": "homework",
+            "task_type_id": task_types["homework"],
             "subject_id": matan,
             "deadline": at(day(2), 23, 59),
             "estimate_min": 90,
@@ -437,7 +468,7 @@ async def build_student(client: AsyncClient) -> Student:
         "/tasks",
         {
             "title": "Лабораторная №3",
-            "task_type": "lab",
+            "task_type_id": task_types["lab"],
             "subject_id": fiz,
             "deadline": at(day(17), 18),
             "description": "Обработка радиозондовых данных",
@@ -458,7 +489,7 @@ async def build_student(client: AsyncClient) -> Student:
         "/tasks",
         {
             "title": "Прочитать главу 4 «Климат и циркуляция»",
-            "task_type": "reading",
+            "task_type_id": task_types["reading"],
             "subject_id": clim,
             "deadline": at(day(6), 23, 59),
             "estimate_min": 60,
@@ -496,14 +527,29 @@ async def build_student(client: AsyncClient) -> Student:
         },
         "chapter",
     )
-    await post(
+    labwork = await post(
         "/projects",
-        {"title": "Работа в лаборатории", "is_work_default": True, "category_id": cats["work"]},
+        {"title": "Работа в лаборатории", "category_id": cats["work"]},
         "labwork",
     )
+    work = await post(
+        "/task-types",
+        {
+            "name": "Задание с работы",
+            "icon": "briefcase",
+            "deadline_rule": {"kind": "days", "days": 14},
+            "default_project_id": labwork["id"],
+            "default_category_id": cats["work"],
+        },
+        "tt_work",
+    )
     await post(
-        "/tasks/work",
-        {"title": "Обработать данные за ноябрь", "issued_at": "2026-11-25"},
+        "/tasks",
+        {
+            "title": "Обработать данные за ноябрь",
+            "task_type_id": work["id"],
+            "issued_at": "2026-11-25",
+        },
         "work_task",
     )
     await post(
@@ -531,7 +577,8 @@ async def build_student(client: AsyncClient) -> Student:
             "title": "Продлить студенческий",
             "action_type_id": types["institutions"],
             "estimate_min": 60,
-            "conditions": ["institution_hours", "weekday_daytime"],
+            "conditions": ["weekday_daytime"],
+            "hours_action_type_id": types["institutions"],
             "desired_by": "2026-12-15",
         },
         "mfc",
@@ -572,7 +619,7 @@ async def build_student(client: AsyncClient) -> Student:
     await _ok(await c.post(f"{API}/exams/{exam['id']}/plan"))
 
     # ---------- разовый лимит дня ----------
-    await put(f"/plan/day-limits/{day(3).isoformat()}", {"minutes": 480})
+    await put(f"/load-budgets/{budget['id']}/overrides/{day(3).isoformat()}", {"minutes": 480})
 
     # ---------- конспект и литература (для счётчиков migrate-check) ----------
     await post(
@@ -590,8 +637,15 @@ async def build_student(client: AsyncClient) -> Student:
         "source",
     )
 
-    # created_at ставит БД (now()) — фиксируем, иначе возраст дел в ящике плывёт
+    # created_at ставит БД (now()) — фиксируем, иначе возраст дел в ящике плывёт.
+    # Ключи сида у типов задач — как после миграции M15.1 (по ним словарь быстрого
+    # ввода находит тип до M21.1); через API ключ не задаётся.
     async with session_factory() as db:
+        for key in (*(t[0] for t in TASK_TYPES), "work"):
+            await db.execute(
+                text("UPDATE task_types SET key = :key WHERE id = :id"),
+                {"key": key, "id": st[f"tt_{key}"]},
+            )
         for key, created in (
             ("closet", date(2026, 9, 10)),
             ("books", date(2026, 10, 20)),

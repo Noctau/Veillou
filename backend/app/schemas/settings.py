@@ -7,6 +7,7 @@
 Время везде — «настенное» в TZ пользователя, формат "HH:MM".
 """
 
+import uuid
 from datetime import time
 from enum import StrEnum
 from typing import Annotated, Any, Self
@@ -121,7 +122,9 @@ class UserSettings(_Model):
     travel_buffer_min: int = Field(
         default=60, ge=0, le=240, description="Дорога до университета и обратно, мин"
     )
-    study_limit_min_per_day: int = Field(default=360, ge=30, le=960)
+    default_action_type_id: uuid.UUID | None = Field(
+        default=None, description="Тип действия задач и дел без своего типа; null — без типа"
+    )
     deadline_buffer_days: int = Field(
         default=1, ge=0, le=14, description="Закончить за N дней до дедлайна"
     )

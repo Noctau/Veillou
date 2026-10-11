@@ -6,9 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
 import { formatMinutes } from '@/features/tasks/labels'
-import type { TaskType } from '@/features/tasks/useTasks'
-import { TASK_TYPE_LABEL } from '@/lib/terms'
 
 import { type Template, useCreateTemplate, useDeleteTemplate, useTemplates } from './useBreakdown'
 import type { BreakdownStep } from './useBreakdown'
@@ -18,21 +17,21 @@ type Props = {
   onOpenChange: (open: boolean) => void
   /** Текущие шаги — для «Сохранить как шаблон»; пусто — сохранять нечего. */
   steps: BreakdownStep[]
-  taskType: TaskType
+  taskTypeId: string | null
   defaultName: string
   onApply: (template: Template) => void
 }
 
 /** Шаблоны разбивки: применить без ИИ, сохранить текущую, удалить. */
-export function TemplatesDialog({ open, onOpenChange, steps, taskType, defaultName, onApply }: Props) {
+export function TemplatesDialog({ open, onOpenChange, steps, taskTypeId, defaultName, onApply }: Props) {
   const { data: templates } = useTemplates()
+  const taskTypes = byId(useTaskTypes().data)
   const create = useCreateTemplate()
   const remove = useDeleteTemplate()
   const [name, setName] = useState(defaultName)
-  // Подходящие по типу задания — сверху
-  const sorted = [...(templates ?? [])].sort(
-    (a, b) => Number(b.task_type === taskType) - Number(a.task_type === taskType),
-  )
+  // Подходящие по типу задачи — сверху
+  const match = (t: Template) => !!taskTypeId && t.task_type_id === taskTypeId
+  const sorted = [...(templates ?? [])].sort((a, b) => Number(match(b)) - Number(match(a)))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,7 +55,7 @@ export function TemplatesDialog({ open, onOpenChange, steps, taskType, defaultNa
               >
                 <span className="block truncate text-sm font-medium">{t.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {t.task_type ? `${TASK_TYPE_LABEL[t.task_type]} · ` : ''}
+                  {t.task_type_id && taskTypes.has(t.task_type_id) ? `${taskTypes.get(t.task_type_id)?.name} · ` : ''}
                   {t.steps.length} шаг. · ~{formatMinutes(t.total_estimate_min)}
                 </span>
               </button>
@@ -76,7 +75,7 @@ export function TemplatesDialog({ open, onOpenChange, steps, taskType, defaultNa
               className="flex items-center gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
-                if (name.trim()) create.mutate({ name: name.trim(), task_type: taskType, steps })
+                if (name.trim()) create.mutate({ name: name.trim(), task_type_id: taskTypeId, steps })
               }}
             >
               <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Название шаблона" />

@@ -8,13 +8,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
-from app.domain.enums import AttachmentOwner, SourceStatus, TaskType
+from app.domain.enums import AttachmentOwner, SourceStatus
+from app.domain.quickparse import guess
 from app.domain.sources import reading_description, reading_title
 from app.models import Attachment, Source, Subject, User
 from app.schemas.source import ReadingTaskCreate, SourceCreate, SourceRead, SourceUpdate
 from app.schemas.task import TaskCreate, TaskDetail
 from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
+from app.services.catalog import parse_words
 from app.services.tasks import TaskService
 
 
@@ -110,11 +112,18 @@ class SourceService:
         await self.db.commit()
 
     async def create_reading_task(self, id: uuid.UUID, data: ReadingTaskCreate) -> TaskDetail:
-        """«Прочитать главы 3–5»: задание типа «чтение» по предмету источника."""
+        """«Прочитать главы 3–5»: задание по предмету источника (тип — из запроса)."""
         source = await self.sources.get_or_404(id)
+        title = reading_title(source.title, data.chapters)
+        task_type_id = data.task_type_id
+        if task_type_id is None:
+            # Тип — по глаголу названия («Прочитать»), а не по словам из названия источника
+            words = await parse_words(self.db, self.user.id)
+            guessed = guess(title.split(maxsplit=1)[0], words.task)
+            task_type_id = guessed if isinstance(guessed, uuid.UUID) else None
         task = TaskCreate(
-            title=reading_title(source.title, data.chapters),
-            task_type=TaskType.reading,
+            title=title,
+            task_type_id=task_type_id,
             description=reading_description(source.title, source.author, source.url),
             subject_id=source.subject_id,
             deadline=data.deadline,

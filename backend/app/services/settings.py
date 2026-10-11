@@ -1,10 +1,11 @@
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
-from app.models import User
+from app.models import ActionType, User
 from app.schemas.settings import UserSettings, deep_merge
 
 
@@ -35,6 +36,16 @@ async def update_settings(db: AsyncSession, user: User, patch: BaseModel) -> Use
             f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in exc.errors()
         )
         raise InvalidSettingsError(details) from exc
+    if (type_id := result.default_action_type_id) is not None:
+        found = await db.scalar(
+            select(ActionType.id).where(
+                ActionType.id == type_id,
+                ActionType.user_id == user.id,
+                ActionType.deleted_at.is_(None),
+            )
+        )
+        if found is None:
+            raise InvalidSettingsError("default_action_type_id: тип действия не найден")
 
     user.settings = overrides  # новый dict -> SQLAlchemy видит изменение JSONB
     await db.commit()

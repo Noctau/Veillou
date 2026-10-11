@@ -2,7 +2,7 @@
 
 Порядок — EDF (резерв нормы проекта — после основного, дела из ящика — после
 всего остального; резерв ставится, только пока норма недобрана): просроченные, затем
-ближе внутренний срок, затем узкие окна («связь с людьми» раньше учёбы), затем
+ближе внутренний срок, затем узкие окна (дела «в рабочие часы» раньше «в любое время»), затем
 приоритет, затем порядок шагов задания.
 Блок ставится в самое раннее допустимое место: сначала целиком до внутреннего
 срока, потом разрезанным, потом то же самое до настоящего дедлайна. Отдых
@@ -35,7 +35,7 @@ class _State:
         size = n + 64
         self.padded = bytearray(size)  # гибкие и закреплённые блоки с перерывом после
         self.rest = bytearray(size)  # выбранные окна отдыха
-        self.study: dict[int, int] = dict(prep.fixed_study)
+        self.load: dict[tuple[BlockId, int], int] = dict(prep.fixed_budget)
         self.per_group: dict[tuple[BlockId, int], int] = dict(prep.fixed_per_group)
         self.tagged: dict[tuple[BlockId, int], int] = defaultdict(int)  # (метка, день) → слотов
         for (lo, hi), _ in prep.fixed:
@@ -69,8 +69,9 @@ class _State:
             return hit + 1
         day = prep.day_of(s)
         next_day = prep.days[day + 1].lo if day + 1 < len(prep.days) else prep.grid.n
-        if pb.block.counts_as_study and self.study.get(day, 0) + length > prep.limit(day):
-            return next_day
+        for budget in prep.budgets_of(pb.block.budgets):
+            if self.load.get((budget, day), 0) + length > prep.limit(budget, day):
+                return next_day
         group = pb.block.group_id
         if (
             group is not None
@@ -131,8 +132,8 @@ class _State:
             self.padded[lo:end] = (b"\x01" if sign > 0 else b"\x00") * (end - lo)
             day = prep.day_of(lo)
             days.add(day)
-            if pb.block.counts_as_study:
-                self.study[day] = self.study.get(day, 0) + sign * (hi - lo)
+            for budget in prep.budgets_of(pb.block.budgets):
+                self.load[(budget, day)] = self.load.get((budget, day), 0) + sign * (hi - lo)
             if pb.block.quota is not None:
                 self.tagged[(pb.block.quota, day)] += sign * (hi - lo)
         if pb.block.group_id is not None:

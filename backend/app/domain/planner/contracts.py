@@ -43,7 +43,6 @@ class PlanSettings:
     lunch: TimeRange | None = TimeRange(time(13, 0), time(14, 0))
     # Вычитается целиком до первой и после последней пары дня
     travel_buffer_min: int = 60
-    study_limit_min_per_day: int = 360
     deadline_buffer_days: int = 1
     max_subtasks_per_task_per_day: int = 2
     # Минимум отдыха в неделю: свободные вечера (evening_start → сон, любой день)
@@ -60,6 +59,20 @@ class PlanSettings:
 
 
 @dataclass(frozen=True)
+class Budget:
+    """Лимит нагрузки: блоков с этим лимитом — не больше `minutes_per_day` в день.
+
+    `overrides` — разовый лимит на день (дата дня планировщика → минут). Блок
+    в двух лимитах учитывается в обоих; id, которого нет в `PlanInput.budgets`,
+    ничего не ограничивает.
+    """
+
+    id: BlockId
+    minutes_per_day: int
+    overrides: tuple[tuple[date, int], ...] = ()
+
+
+@dataclass(frozen=True)
 class Busy:
     """Жёсткий интервал (пара, личное, отдых): планировщик туда ничего не ставит."""
 
@@ -67,6 +80,8 @@ class Busy:
     end: datetime
     # Пара: в её день вычитается буфер дороги до первой и после последней пары
     is_class: bool = False
+    # Лимиты, в которые засчитывается (по типу занятости, M17)
+    budgets: frozenset[BlockId] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -80,7 +95,7 @@ class FixedBlock:
     start: datetime
     end: datetime
     group_id: BlockId | None = None  # задание
-    counts_as_study: bool = True
+    budgets: frozenset[BlockId] = frozenset()
     # Метка нормы (проект): засчитывается в `Quota` с этой меткой
     quota: BlockId | None = None
 
@@ -100,8 +115,9 @@ class Block:
     # id блоков (или FixedBlock), которые должны закончиться раньше начала этого
     depends_on: tuple[BlockId, ...] = ()
     splittable: bool = False
-    counts_as_study: bool = True
-    # Лёгкое предпочтение утра («связь с людьми»)
+    # Лимиты нагрузки, в которые засчитывается время блока (по типу действия)
+    budgets: frozenset[BlockId] = frozenset()
+    # Лёгкое предпочтение утра (флаг типа действия)
     prefer_morning: bool = False
     # Не раньше этого момента
     earliest: datetime | None = None
@@ -156,8 +172,7 @@ class PlanInput:
     fixed: tuple[FixedBlock, ...] = ()
     previous: tuple[Placement, ...] = ()
     settings: PlanSettings = PlanSettings()
-    # Разовый лимит учёбы на день (дата дня планировщика → минут) вместо общего
-    study_limits: tuple[tuple[date, int], ...] = ()
+    budgets: tuple[Budget, ...] = ()
     quotas: tuple[Quota, ...] = ()
     # Горизонт: от now до самого дальнего дедлайна, но не меньше min и не больше max
     max_horizon_days: int = 60
