@@ -12,11 +12,12 @@ import {
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
+import { REASON_LABEL, RISK_LABEL } from '@/lib/terms'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
 import { AtRiskDialog } from './AtRiskDialog'
-import { REASON_LABEL, RISK_LABEL, slotText, summarize } from './labels'
+import { slotText, summarize } from './labels'
 import { type PlanChange, type PlanRisk, useApplyPlan, useDismissPlan, usePlanState } from './usePlan'
 
 const OP_ICON = { move: ArrowRightIcon, add: PlusIcon, remove: MinusIcon, miss: XIcon } as const

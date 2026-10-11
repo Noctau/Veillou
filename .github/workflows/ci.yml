@@ -60,6 +60,8 @@ jobs:
           uv run alembic check
       - name: pytest + coverage (порог — pyproject.toml)
         run: uv run pytest --cov --cov-report=term
+      - name: migrations on data (make migrate-check)
+        run: uv run python -m scripts.migrate_check
 
   frontend:
     runs-on: ubuntu-latest

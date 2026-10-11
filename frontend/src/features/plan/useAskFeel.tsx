@@ -2,11 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { FEEL_LABEL } from '@/features/tasks/labels'
 import type { Feel } from '@/features/tasks/useTasks'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
+import { FEEL_LABEL } from '@/lib/terms'
 
 const FEELS: Feel[] = ['faster', 'ok', 'slower']
 

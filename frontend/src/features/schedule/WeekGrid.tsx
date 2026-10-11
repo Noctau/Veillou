@@ -2,10 +2,10 @@ import { PlusIcon } from 'lucide-react'
 
 import type { Subject } from '@/features/subjects/useSubjects'
 import { paletteColor } from '@/lib/colors'
+import { CLASS_TYPE_LABEL } from '@/lib/terms'
 import { WEEKDAYS_SHORT } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-import { CLASS_TYPE_LABEL } from './parity'
 import type { BellSlot, ClassRule, Parity } from './useSchedule'
 
 type Props = {

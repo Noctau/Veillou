@@ -8,10 +8,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
+import { CONTROL_FORM_LABEL } from '@/lib/terms'
 import { cn } from '@/lib/utils'
 
 import { SubjectDialog } from './SubjectDialog'
-import { CONTROL_FORM_LABEL, type Subject, useSubjects } from './useSubjects'
+import { type Subject, useSubjects } from './useSubjects'
 
 function SubjectCard({ subject }: { subject: Subject }) {
   const color = paletteColor(subject.color)

@@ -108,6 +108,8 @@ make create-user email=me@example.com   # регистрации в прилож
 | `make lint` | ruff, `mypy --strict`, oxlint, tsc |
 | `make audit` | pip-audit, npm audit, bandit, gitleaks |
 | `make migrate` / `make migration m="..."` | применить / создать миграцию |
+| `make test-snapshots` / `make snapshots-update` | характеризационные снимки на данных студентки / перезаписать (только осознанно) |
+| `make migrate-check [dump=…]` | миграции на данных: фикстура студентки или дамп `pg_dump -Fc` → upgrade → проверки → downgrade/upgrade |
 | `make gen-api` | OpenAPI бэкенда → `frontend/src/api/schema.d.ts` |
 | `make worker` / `make bot` | фоновый процесс (напоминания, ИИ, ночные задачи) / Telegram-бот |
 | `make vapid-keys` | ключи Web Push → вписать в `.env` |

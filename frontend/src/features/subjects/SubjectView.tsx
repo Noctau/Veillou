@@ -13,12 +13,13 @@ import { SourceList } from '@/features/sources/SourceList'
 import { TaskList } from '@/features/tasks/TaskList'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
+import { CONTROL_FORM_LABEL } from '@/lib/terms'
 import { formatDay } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import { SubjectClasses } from './SubjectClasses'
 import { SubjectDialog } from './SubjectDialog'
-import { CONTROL_FORM_LABEL, type Subject, useSubjects } from './useSubjects'
+import { type Subject, useSubjects } from './useSubjects'
 
 const TABS = ['classes', 'notes', 'sources', 'tasks', 'exam'] as const
 type Tab = (typeof TABS)[number]

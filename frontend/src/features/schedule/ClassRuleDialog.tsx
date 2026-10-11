@@ -23,10 +23,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { type Subject, useCreateSubject } from '@/features/subjects/useSubjects'
 import { PALETTE, paletteColor } from '@/lib/colors'
+import { CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
 import { cn } from '@/lib/utils'
 import { WEEKDAYS_FULL, WEEKDAYS_SHORT } from '@/lib/time'
 
-import { CLASS_TYPE_LABEL, oppositeParity, RULE_PARITY_LABEL } from './parity'
+import { oppositeParity } from './parity'
 import {
   type BellSlot,
   type ClassRule,

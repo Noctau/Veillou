@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useActionTypes } from '@/features/catalog/useCatalog'
-import { TASK_TYPE_LABEL } from '@/features/tasks/labels'
+import { TASK_TYPE_LABEL } from '@/lib/terms'
 
 import { plural } from './labels'
 import { useCalibration, useResetCalibration } from './usePlan'

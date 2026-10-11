@@ -9,14 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBacklog, useTakeForWeek } from '@/features/backlog/useBacklog'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSettings } from '@/features/settings/useSettings'
 import { formatMinutes } from '@/features/tasks/labels'
 import { useUpdateSubtask } from '@/features/tasks/useSubtasks'
 import { type TaskDetail, useTask, useUpdateTask } from '@/features/tasks/useTasks'
+import { RISK_LABEL } from '@/lib/terms'
 import { addDaysIso, todayIn, wallDate } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
-import { RISK_LABEL } from './labels'
 import { type PlanRisk, usePreviewPlan, usePutDayLimit } from './usePlan'
 
 type Props = {

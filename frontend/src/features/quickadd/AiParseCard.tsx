@@ -9,11 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { jobResult, type ParseDraft, useJob } from '@/features/ai/useJob'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSubjects } from '@/features/subjects/useSubjects'
-import { TASK_TYPE_LABEL } from '@/features/tasks/labels'
 import type { TaskType } from '@/features/tasks/useTasks'
+import { TASK_TYPE_LABEL } from '@/lib/terms'
 import { wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 const NONE = 'none'
 const TASK_TYPES = Object.keys(TASK_TYPE_LABEL) as TaskType[]

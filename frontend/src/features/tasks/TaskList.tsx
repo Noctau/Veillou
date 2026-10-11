@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useSubjects } from '@/features/subjects/useSubjects'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
+import { TASK_TYPE_LABEL } from '@/lib/terms'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
-import { describeDeadline, TASK_TYPE_LABEL } from './labels'
+import { describeDeadline } from './labels'
 import { type TaskStatus, useTasks } from './useTasks'
 
 type Props = {

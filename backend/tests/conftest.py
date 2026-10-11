@@ -88,3 +88,18 @@ async def auth_client(client: AsyncClient, user) -> AsyncClient:
     )
     assert resp.status_code == 200, resp.text
     return client
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """Замороженное «сейчас» фикстуры студентки (tests/student.py) во всех модулях app.*.
+
+    Объявлять раньше `auth_client`: сессия входа живёт от «сейчас».
+    """
+    from app.services.replan import ReplanService
+
+    from .student import NOW, Clock
+
+    # Решения планировщика — только жадный движок: детерминирован и не зависит от машины
+    monkeypatch.setattr(ReplanService, "time_limit_s", 0)
+    return Clock(monkeypatch, NOW)

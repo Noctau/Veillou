@@ -20,8 +20,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { jobResult, useJob } from '@/features/ai/useJob'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { todayIn } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import {
   type MilestoneSuggestion,

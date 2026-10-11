@@ -8,8 +8,8 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { addDaysIso, todayIn, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { useCreateWorkTask, useProjects } from './useProjects'
 

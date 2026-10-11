@@ -10,12 +10,13 @@ import { useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { useNow } from '@/features/today/useNow'
+import { KIND_LABEL } from '@/lib/terms'
 import { addDaysIso, toWallIso } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { EventDetailsDialog } from './EventDetailsDialog'
-import { classDetails, eventColor, KIND_LABEL } from './eventUtils'
+import { classDetails, eventColor } from './eventUtils'
 import { type PersonalDraft, PersonalEventDialog } from './PersonalEventDialog'
 import { type CalendarEvent, type EventKind, useCalendar, useUpdateEvent } from './useCalendar'
 

@@ -25,13 +25,14 @@ import { Input } from '@/components/ui/input'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useAskFeel } from '@/features/plan/useAskFeel'
 import { usePreviewPlan } from '@/features/plan/usePlan'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { paletteColor } from '@/lib/colors'
+import { KIND_SINGLE } from '@/lib/terms'
 import { addDaysIso, formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
-import { classDetails, eventColor, isDoable, KIND_SINGLE } from './eventUtils'
+import { classDetails, eventColor, isDoable } from './eventUtils'
 import { PersonalEventDialog } from './PersonalEventDialog'
 import {
   type CalendarEvent,

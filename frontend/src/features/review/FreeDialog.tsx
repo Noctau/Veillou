@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { formatMinutes } from '@/features/tasks/labels'
 import { errorMessage } from '@/lib/errors'
 import { wallTime } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { useFree, useStartFree } from './useReview'
 

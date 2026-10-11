@@ -1,16 +1,16 @@
 import { FileTextIcon, ImageIcon, LinkIcon, NotebookPenIcon } from 'lucide-react'
 
 import type { Attachment } from '@/features/attachments/useAttachments'
-import { CLASS_TYPE_LABEL } from '@/features/schedule/parity'
+import { CLASS_TYPE_LABEL, NOTE_KIND_LABEL } from '@/lib/terms'
 import { wallTime } from '@/lib/time'
 
 import type { Note, NoteKind } from './useNotes'
 
 export const NOTE_KIND: Record<NoteKind, { label: string; icon: typeof ImageIcon }> = {
-  text: { label: 'Текст', icon: NotebookPenIcon },
-  photo: { label: 'Фото', icon: ImageIcon },
-  file: { label: 'Файл', icon: FileTextIcon },
-  link: { label: 'Ссылка', icon: LinkIcon },
+  text: { label: NOTE_KIND_LABEL.text, icon: NotebookPenIcon },
+  photo: { label: NOTE_KIND_LABEL.photo, icon: ImageIcon },
+  file: { label: NOTE_KIND_LABEL.file, icon: FileTextIcon },
+  link: { label: NOTE_KIND_LABEL.link, icon: LinkIcon },
 }
 
 export const NOTE_KINDS = Object.keys(NOTE_KIND) as NoteKind[]

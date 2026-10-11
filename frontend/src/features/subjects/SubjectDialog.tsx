@@ -18,9 +18,9 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { PALETTE } from '@/lib/colors'
+import { CONTROL_FORM_LABEL } from '@/lib/terms'
 
 import {
-  CONTROL_FORM_LABEL,
   type ControlForm,
   type Subject,
   useCreateSubject,

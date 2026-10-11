@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { intIn, wallTime as wallTimeSchema } from '@/features/settings/zod'
 import { addDaysIso, todayIn, wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { type Exam, useCreateExam, useDeleteExam, useUpdateExam } from './useExams'
 

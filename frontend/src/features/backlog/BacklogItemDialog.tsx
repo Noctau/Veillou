@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
 
-import { CONDITION_LABEL, CONDITIONS, ESTIMATES } from './labels'
+import { CONDITIONS, ESTIMATES } from './labels'
 import { usePreviewPlan } from '@/features/plan/usePlan'
+import { CONDITION_LABEL } from '@/lib/terms'
 
 import {
   type BacklogCondition,

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/field'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { REMINDER_LABEL } from '@/lib/terms'
 
 import { NumberField } from '../fields'
 import { SettingsSection } from '../SettingsSection'
@@ -60,14 +61,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 type RuleKey = keyof FormValues['reminders']
 
-const RULES: { key: RuleKey; title: string; description: string }[] = [
-  { key: 'morning_digest', title: 'Утренняя сводка', description: 'Пары, дела и дедлайны на день.' },
-  { key: 'before_class', title: 'Перед парой', description: 'С аудиторией.' },
-  { key: 'deadlines', title: 'Дедлайны', description: 'Во время утренней сводки, одним сообщением с ней.' },
-  { key: 'evening_review', title: 'Вечерний разбор', description: 'Что сделано, что перенести.' },
-  { key: 'weekly_review', title: 'Недельный разбор', description: 'Итоги недели и дела из ящика.' },
-  { key: 'subtask_start', title: 'Начало подзадачи', description: 'Когда пора браться за дело.' },
-]
+const RULES = (Object.keys(REMINDER_LABEL) as RuleKey[]).map((key) => ({ key, ...REMINDER_LABEL[key] }))
 
 const DEADLINE_DAYS = [
   { value: 7, label: 'за неделю' },

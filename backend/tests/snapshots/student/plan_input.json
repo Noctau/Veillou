@@ -1,0 +1,1321 @@
+{
+ "now": "2026-11-30 07:00",
+ "tz": "Europe/Moscow",
+ "blocks": [
+  {
+   "id": "subtask:‹Реферат по климатологии / Подобрать литературу в библиотеке›",
+   "duration_min": 60,
+   "group_id": "‹Реферат по климатологии›",
+   "deadline": "2026-12-11 23:59",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "10:00",
+     "end": "18:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": false,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 1,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Реферат по климатологии / Написать черновик›",
+   "duration_min": 194,
+   "group_id": "‹Реферат по климатологии›",
+   "deadline": "2026-12-11 23:59",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": ["subtask:‹Реферат по климатологии / Подобрать литературу в библиотеке›"],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 2,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Реферат по климатологии / Согласовать план с преподавателем›",
+   "duration_min": 15,
+   "group_id": "‹Реферат по климатологии›",
+   "deadline": "2026-12-11 23:59",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 3,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Реферат по климатологии / Оформить и сдать›",
+   "duration_min": 64,
+   "group_id": "‹Реферат по климатологии›",
+   "deadline": "2026-12-11 23:59",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": ["subtask:‹Реферат по климатологии / Написать черновик›"],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 4,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "task:‹ДЗ по матану: ряды›",
+   "duration_min": 90,
+   "group_id": "‹ДЗ по матану: ряды›",
+   "deadline": "2026-12-02 23:59",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Лабораторная №3 / Обработать данные›",
+   "duration_min": 90,
+   "group_id": "‹Лабораторная №3›",
+   "deadline": "2026-12-17 18:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "task:‹Прочитать главу 4 «Климат и циркуляция»›",
+   "duration_min": 60,
+   "group_id": "‹Прочитать главу 4 «Климат и циркуляция»›",
+   "deadline": "2026-12-06 23:59",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Глава 1: обзор / Собрать статьи›",
+   "duration_min": 120,
+   "group_id": "‹Глава 1: обзор›",
+   "deadline": "2026-12-20 23:59",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Глава 1: обзор / Написать раздел 1.1›",
+   "duration_min": 180,
+   "group_id": "‹Глава 1: обзор›",
+   "deadline": "2026-12-20 23:59",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": null,
+   "buffer_days": null,
+   "sequence": 1,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 03.12›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2026-12-04 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2026-12-03 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 10.12›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2026-12-11 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2026-12-10 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 17.12›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2026-12-18 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2026-12-17 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 24.12›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2026-12-25 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2026-12-24 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 31.12›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2027-01-01 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2026-12-31 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 07.01›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2027-01-08 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2027-01-07 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 14.01›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2027-01-15 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2027-01-14 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 21.01›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2027-01-22 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2027-01-21 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "subtask:‹Встреча с научруком / Встреча с научруком 28.01›",
+   "duration_min": 60,
+   "group_id": "‹Встреча с научруком›",
+   "deadline": "2027-01-29 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "09:00",
+     "end": "19:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": true,
+   "earliest": "2027-01-28 00:00",
+   "buffer_days": 0,
+   "sequence": 0,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": false
+  },
+  {
+   "id": "backlog_item:‹Сдать книги в библиотеку›",
+   "duration_min": 30,
+   "group_id": null,
+   "deadline": "2026-12-07 00:00",
+   "priority": 5,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "10:00",
+     "end": "18:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": false,
+   "earliest": "2026-11-30 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": true,
+   "days": ["2026-11-30", "2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04", "2026-12-05", "2026-12-07", "2026-12-08", "2026-12-09", "2026-12-11", "2026-12-12", "2026-12-14", "2026-12-15", "2026-12-16", "2026-12-17", "2026-12-18", "2026-12-19", "2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-25", "2026-12-26"],
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "backlog_item:‹Продлить студенческий›",
+   "duration_min": 60,
+   "group_id": null,
+   "deadline": "2026-12-07 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5],
+     "start": "10:00",
+     "end": "18:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": false,
+   "prefer_morning": false,
+   "earliest": "2026-11-30 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": true,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 05.01›",
+   "duration_min": 90,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-06 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-05 00:00",
+   "buffer_days": 0,
+   "sequence": 2219958,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 06.01›",
+   "duration_min": 90,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-07 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-06 00:00",
+   "buffer_days": 0,
+   "sequence": 2219961,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / review 06.01›",
+   "duration_min": 30,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-07 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-06 00:00",
+   "buffer_days": 0,
+   "sequence": 2219962,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 07.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-08 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-07 00:00",
+   "buffer_days": 0,
+   "sequence": 2219964,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / review 07.01›",
+   "duration_min": 30,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-08 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-07 00:00",
+   "buffer_days": 0,
+   "sequence": 2219965,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 08.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-09 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-08 00:00",
+   "buffer_days": 0,
+   "sequence": 2219967,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / review 08.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-09 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-08 00:00",
+   "buffer_days": 0,
+   "sequence": 2219968,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 09.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-10 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-09 00:00",
+   "buffer_days": 0,
+   "sequence": 2219970,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / review 09.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-10 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-09 00:00",
+   "buffer_days": 0,
+   "sequence": 2219971,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / learn 10.01›",
+   "duration_min": 45,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-11 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-10 00:00",
+   "buffer_days": 0,
+   "sequence": 2219973,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / review 10.01›",
+   "duration_min": 30,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-11 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-10 00:00",
+   "buffer_days": 0,
+   "sequence": 2219974,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "exam_session:‹Экзамен Климатология / run 11.01›",
+   "duration_min": 40,
+   "group_id": "exam:‹Экзамен Климатология›",
+   "deadline": "2027-01-12 00:00",
+   "priority": 3,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": true,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2027-01-11 00:00",
+   "buffer_days": 0,
+   "sequence": 2219978,
+   "filler": false,
+   "days": null,
+   "quota": null,
+   "reserve": false
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-11-30:0",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-07 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-11-30 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-11-30:1",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-07 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-11-30 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-11-30:2",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-07 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-11-30 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-12-07:0",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-14 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-12-07 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-12-07:1",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-14 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-12-07 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  },
+  {
+   "id": "project:‹ВКР: блокинги над Европой›:2026-12-07:2",
+   "duration_min": 90,
+   "group_id": "project:‹ВКР: блокинги над Европой›",
+   "deadline": "2026-12-14 00:00",
+   "priority": 1,
+   "windows": [
+    {
+     "weekdays": [1, 2, 3, 4, 5, 6, 7],
+     "start": "07:00",
+     "end": "01:00"
+    }
+   ],
+   "depends_on": [],
+   "splittable": false,
+   "counts_as_study": true,
+   "prefer_morning": false,
+   "earliest": "2026-12-07 00:00",
+   "buffer_days": 0,
+   "sequence": null,
+   "filler": false,
+   "days": null,
+   "quota": "project:‹ВКР: блокинги над Европой›",
+   "reserve": true
+  }
+ ],
+ "busy": [
+  {
+   "start": "2026-11-30 09:00",
+   "end": "2026-11-30 10:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-11-30 10:45",
+   "end": "2026-11-30 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-01 13:00",
+   "end": "2026-12-01 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-01 14:45",
+   "end": "2026-12-01 16:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-01 19:00",
+   "end": "2026-12-01 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-02 13:00",
+   "end": "2026-12-02 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-02 17:00",
+   "end": "2026-12-02 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-03 09:00",
+   "end": "2026-12-03 10:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-03 13:00",
+   "end": "2026-12-03 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-03 19:00",
+   "end": "2026-12-03 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-04 18:30",
+   "end": "2026-12-04 20:00",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-05 10:00",
+   "end": "2026-12-05 11:30",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-06 15:00",
+   "end": "2026-12-06 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-07 10:45",
+   "end": "2026-12-07 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-08 13:00",
+   "end": "2026-12-08 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-08 14:45",
+   "end": "2026-12-08 16:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-08 19:00",
+   "end": "2026-12-08 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-09 10:45",
+   "end": "2026-12-09 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-10 19:00",
+   "end": "2026-12-10 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-11 18:30",
+   "end": "2026-12-11 20:00",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-12 10:00",
+   "end": "2026-12-12 11:30",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-13 15:00",
+   "end": "2026-12-13 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-14 09:00",
+   "end": "2026-12-14 10:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-14 10:45",
+   "end": "2026-12-14 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-15 13:00",
+   "end": "2026-12-15 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-15 14:45",
+   "end": "2026-12-15 16:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-15 19:00",
+   "end": "2026-12-15 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-16 10:45",
+   "end": "2026-12-16 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-17 09:00",
+   "end": "2026-12-17 10:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-17 13:00",
+   "end": "2026-12-17 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-17 19:00",
+   "end": "2026-12-17 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-18 18:30",
+   "end": "2026-12-18 20:00",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-19 10:00",
+   "end": "2026-12-19 11:30",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-20 15:00",
+   "end": "2026-12-20 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-21 09:00",
+   "end": "2026-12-21 10:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-21 10:45",
+   "end": "2026-12-21 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-22 13:00",
+   "end": "2026-12-22 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-22 14:45",
+   "end": "2026-12-22 16:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-22 19:00",
+   "end": "2026-12-22 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-23 10:45",
+   "end": "2026-12-23 12:20",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-24 13:00",
+   "end": "2026-12-24 14:35",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-24 19:00",
+   "end": "2026-12-24 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-25 18:30",
+   "end": "2026-12-25 20:00",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-26 10:00",
+   "end": "2026-12-26 11:30",
+   "is_class": true
+  },
+  {
+   "start": "2026-12-27 15:00",
+   "end": "2026-12-27 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-29 19:00",
+   "end": "2026-12-29 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2026-12-31 19:00",
+   "end": "2026-12-31 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-03 15:00",
+   "end": "2027-01-03 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-05 19:00",
+   "end": "2027-01-05 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-07 19:00",
+   "end": "2027-01-07 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-10 15:00",
+   "end": "2027-01-10 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-12 10:00",
+   "end": "2027-01-12 13:00",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-12 19:00",
+   "end": "2027-01-12 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-14 19:00",
+   "end": "2027-01-14 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-17 15:00",
+   "end": "2027-01-17 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-19 19:00",
+   "end": "2027-01-19 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-21 19:00",
+   "end": "2027-01-21 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-24 15:00",
+   "end": "2027-01-24 18:00",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-26 19:00",
+   "end": "2027-01-26 20:30",
+   "is_class": false
+  },
+  {
+   "start": "2027-01-28 19:00",
+   "end": "2027-01-28 20:30",
+   "is_class": false
+  }
+ ],
+ "fixed": [
+  {
+   "id": "event:‹Написать отчёт 01.12 16:30›",
+   "start": "2026-12-01 16:30",
+   "end": "2026-12-01 18:00",
+   "group_id": "‹Лабораторная №3›",
+   "counts_as_study": true,
+   "quota": null
+  }
+ ],
+ "previous": [],
+ "settings": {
+  "work_weekdays": {
+   "start": "09:00",
+   "end": "22:00"
+  },
+  "work_weekends": {
+   "start": "11:00",
+   "end": "19:00"
+  },
+  "sleep": {
+   "start": "00:00",
+   "end": "08:00"
+  },
+  "lunch": {
+   "start": "13:00",
+   "end": "14:00"
+  },
+  "travel_buffer_min": 40,
+  "study_limit_min_per_day": 300,
+  "deadline_buffer_days": 1,
+  "max_subtasks_per_task_per_day": 2,
+  "free_evenings_per_week": 2,
+  "weekend_half_days": 1,
+  "evening_start": "18:00",
+  "half_day_split": "14:00",
+  "long_block_min": 60,
+  "break_min": 10,
+  "min_part_min": 30
+ },
+ "study_limits": [
+  ["2026-12-03", 480]
+ ],
+ "quotas": [
+  {
+   "id": "quota:‹ВКР: блокинги над Европой›:2026-11-30",
+   "tag": "project:‹ВКР: блокинги над Европой›",
+   "start": "2026-11-30",
+   "end": "2026-12-07",
+   "minutes": 240
+  },
+  {
+   "id": "quota:‹ВКР: блокинги над Европой›:2026-12-07",
+   "tag": "project:‹ВКР: блокинги над Европой›",
+   "start": "2026-12-07",
+   "end": "2026-12-14",
+   "minutes": 240
+  }
+ ],
+ "max_horizon_days": 60,
+ "min_horizon_days": 14,
+ "time_limit_s": 0,
+ "grid_min": 15
+}

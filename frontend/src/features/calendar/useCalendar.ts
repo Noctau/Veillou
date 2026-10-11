@@ -2,11 +2,11 @@ import { type QueryClient, queryOptions, useMutation, useQuery, useQueryClient }
 import { toast } from 'sonner'
 
 import type { components } from '@/api/schema'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
 import { wallDate } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 export type CalendarEvent = components['schemas']['EventRead']
 export type CalendarData = components['schemas']['CalendarRead']

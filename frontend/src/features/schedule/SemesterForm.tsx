@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { PARITY_LABEL } from '@/lib/terms'
 
-import { DEFAULT_BELLS, PARITY_LABEL } from './parity'
+import { DEFAULT_BELLS } from './parity'
 import { type Semester, type SemesterCreate, useCreateSemester, useUpdateSemester } from './useSchedule'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Укажите дату')

@@ -7,8 +7,8 @@ import { CalendarView } from '@/features/calendar/CalendarView'
 import { PersonalEventDialog } from '@/features/calendar/PersonalEventDialog'
 import { RecurringList } from '@/features/calendar/RecurringList'
 import { usePlanState, usePreviewPlan, useUndoPlan } from '@/features/plan/usePlan'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { todayIn } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 export function CalendarPage() {
   const tz = useTimeZone()

@@ -11,8 +11,8 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { addDaysIso, isoWeekday, WEEKDAYS_SHORT, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { rruleToWeekdays, weekdaysToRrule } from './rrule'
 import {

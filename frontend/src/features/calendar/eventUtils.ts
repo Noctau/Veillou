@@ -1,31 +1,8 @@
-import { CLASS_TYPE_LABEL } from '@/features/schedule/parity'
 import { KIND_COLORS } from '@/lib/colors'
+import { CLASS_TYPE_LABEL } from '@/lib/terms'
 import { wallTime } from '@/lib/time'
 
 import type { CalendarEvent, EventKind } from './useCalendar'
-
-export const KIND_LABEL: Record<EventKind, string> = {
-  class: 'Пары',
-  personal: 'Личное',
-  rest: 'Отдых',
-  subtask: 'Задания',
-  backlog: 'Ящик',
-  exam_prep: 'Подготовка',
-  exam: 'Экзамены',
-  project: 'Проекты',
-}
-
-/** Тип одного события — для карточки. */
-export const KIND_SINGLE: Record<EventKind, string> = {
-  class: 'Пара',
-  personal: 'Личное',
-  rest: 'Отдых',
-  subtask: 'Подзадача',
-  backlog: 'Дело из ящика',
-  exam_prep: 'Подготовка к экзамену',
-  exam: 'Экзамен',
-  project: 'Работа над проектом',
-}
 
 /** То, что отмечают «сделано» и что входит в прогресс дня (пары и отдых — нет). */
 export const DOABLE_KINDS: ReadonlySet<EventKind> = new Set(['personal', 'subtask', 'backlog', 'exam_prep', 'project'])

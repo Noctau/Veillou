@@ -11,14 +11,6 @@ export type SubjectCreate = components['schemas']['SubjectCreate']
 export type SubjectUpdate = components['schemas']['SubjectUpdate']
 export type ControlForm = components['schemas']['ControlForm']
 
-export const CONTROL_FORM_LABEL: Record<ControlForm, string> = {
-  exam: 'Экзамен',
-  credit: 'Зачёт',
-  graded_credit: 'Дифзачёт',
-  coursework: 'Курсовая',
-  none: 'Без контроля',
-}
-
 /** Все предметы пользователя; фильтр по семестру — на клиенте. */
 export function useSubjects() {
   return useQuery({

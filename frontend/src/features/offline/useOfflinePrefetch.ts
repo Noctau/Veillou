@@ -4,9 +4,9 @@ import { useEffect } from 'react'
 import { attachmentsQueryOptions } from '@/features/attachments/useAttachments'
 import { calendarQueryOptions } from '@/features/calendar/useCalendar'
 import { noteQueryOptions, notesQueryOptions } from '@/features/notes/useNotes'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { FILES_CACHE, fileCacheKey } from '@/lib/pwa-shared'
 import { addDaysIso, dayStartUtc, todayIn, weekMonday } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 /** Сколько последних конспектов держать открываемыми без сети. */
 const RECENT_NOTES = 10

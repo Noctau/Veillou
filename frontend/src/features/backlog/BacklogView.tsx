@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CategoryIcon } from '@/features/catalog/CategoryIcon'
 import { byId, type Category, useCategories } from '@/features/catalog/useCatalog'
 import { errorMessage } from '@/lib/errors'
+import { CONDITION_LABEL } from '@/lib/terms'
 import { formatDay } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import { BacklogItemDialog } from './BacklogItemDialog'
-import { ageLabel, CONDITION_LABEL, estimateLabel } from './labels'
+import { ageLabel, estimateLabel } from './labels'
 import { type BacklogItem, type BacklogStatus, useBacklog, useCreateBacklog, useUpdateBacklog } from './useBacklog'
 
 function QuickInput() {
