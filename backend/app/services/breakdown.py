@@ -36,12 +36,12 @@ from app.domain.enums import (
 from app.domain.planner import free_minutes
 from app.models import (
     ActionType,
+    Area,
     BreakdownTemplate,
     Category,
     Event,
     Job,
     Project,
-    Subject,
     Subtask,
     Task,
     User,
@@ -168,7 +168,7 @@ class BreakdownService:
         coef = coefs.get((task.task_type_id, task.action_type_id), 1.0)
         free = await self._free_minutes(task, catalog)
 
-        subject = await self.db.get(Subject, task.subject_id) if task.subject_id else None
+        subject = await self.db.get(Area, task.area_id) if task.area_id else None
         project = await self.db.get(Project, task.project_id) if task.project_id else None
         done = await self.db.scalars(
             select(Subtask.title)

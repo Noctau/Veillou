@@ -79,6 +79,7 @@ from app.domain.planner import (
 )
 from app.models import (
     ActionType,
+    Area,
     BacklogItem,
     Category,
     Event,
@@ -88,7 +89,6 @@ from app.models import (
     Job,
     PlanRevision,
     Project,
-    Subject,
     Subtask,
     Task,
     User,
@@ -201,7 +201,7 @@ class Source:
     group_id: uuid.UUID
     group_title: str
     deadline: datetime | None = None
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     # Незакреплённые будущие блоки этого источника — «прошлый план»
     events: list[Event] = field(default_factory=list)
 
@@ -313,7 +313,7 @@ class _Builder:
             for q in await self._scalars(ExamQuestion, ExamQuestion.exam_id.in_(exam_by_id))
         }
         subjects = {
-            x.id: x for x in await self._scalars(Subject) if x.id in {e.subject_id for e in exams}
+            x.id: x for x in await self._scalars(Area) if x.id in {e.area_id for e in exams}
         }
         # Проекты с недельной нормой (итоговый срок ещё не прошёл)
         projects = {
@@ -538,7 +538,7 @@ class _Builder:
                         task.id,
                         task.title,
                         deadline=task.deadline,
-                        subject_id=task.subject_id,
+                        area_id=task.area_id,
                     ),
                 )
 
@@ -602,7 +602,7 @@ class _Builder:
             remaining = sess.minutes - consumed.get(key, 0)
             if remaining < MIN_BLOCK_MIN:
                 continue
-            subject = subjects.get(exam.subject_id)
+            subject = subjects.get(exam.area_id)
             name = subject.short_name or subject.name if subject else "экзамен"
             day_end = wall_to_utc(sess.date + timedelta(days=1), time(0), self.tz)
             add(
@@ -635,7 +635,7 @@ class _Builder:
                     exam.id,
                     exam_title(exam.title, subject.name if subject else None),
                     deadline=exam.starts_at,
-                    subject_id=exam.subject_id,
+                    area_id=exam.area_id,
                 ),
             )
 
@@ -879,7 +879,7 @@ def _ops(snap: Snapshot, result: PlanResult) -> list[dict[str, Any]]:
                         **base,
                         "before": None,
                         "after": _slot(p.start, p.end),
-                        "subject_id": str(src.subject_id) if src.subject_id else None,
+                        "area_id": str(src.area_id) if src.area_id else None,
                         "color": src.color,
                     }
                 )
@@ -1122,7 +1122,7 @@ class ReplanService:
                     status=EventStatus.planned,
                     source_type=op["source_type"],
                     source_id=uuid.UUID(op["source_id"]),
-                    subject_id=uuid.UUID(op["subject_id"]) if op.get("subject_id") else None,
+                    area_id=uuid.UUID(op["area_id"]) if op.get("area_id") else None,
                     color=op.get("color"),
                 )
                 self.db.add(created)

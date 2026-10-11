@@ -27,11 +27,11 @@ export const SOURCE_STATUS_LABEL: Record<SourceStatus, string> = {
   done: 'Прочитано',
 }
 
-export function useSources(subjectId: string) {
+export function useSources(areaId: string) {
   return useQuery({
-    queryKey: queryKeys.sources(subjectId),
+    queryKey: queryKeys.sources(areaId),
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/sources', { params: { query: { subject_id: subjectId } } })
+      const { data, error } = await api.GET('/api/v1/sources', { params: { query: { area_id: areaId } } })
       if (error) throw error
       return data
     },
@@ -51,9 +51,9 @@ export function useCreateSource() {
   })
 }
 
-export function useUpdateSource(subjectId: string) {
+export function useUpdateSource(areaId: string) {
   const queryClient = useQueryClient()
-  const key = queryKeys.sources(subjectId)
+  const key = queryKeys.sources(areaId)
   return useMutation({
     mutationFn: async ({ id, body }: { id: string; body: SourceUpdate }) => {
       const { data, error } = await api.PATCH('/api/v1/sources/{source_id}', {

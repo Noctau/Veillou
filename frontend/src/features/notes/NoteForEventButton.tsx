@@ -16,7 +16,7 @@ type Props = {
   label?: string
 }
 
-/** «Конспект к этой паре»: открывает начатый конспект пары или создаёт новый с предметом и датой. */
+/** «Конспект к этой паре»: открывает начатый конспект пары или создаёт новый со сферой и датой. */
 export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'outline', onDone, className, label }: Props) {
   const navigate = useNavigate()
   const open = useNoteForEvent()

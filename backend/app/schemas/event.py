@@ -35,7 +35,7 @@ class EventCreate(InputModel):
     location: Location | None = None
     color: HexColor | None = None
     note: Note = ""
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -78,7 +78,7 @@ class EventRead(ReadModel):
     detached: bool
     source_type: str | None
     source_id: uuid.UUID | None
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     location: str | None
     color: str | None
     note: str

@@ -6,31 +6,34 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { AreaSelect } from '@/features/areas/AreaSelect'
 import { CategorySelect } from '@/features/catalog/CatalogSelect'
+import { AREAS_UI } from '@/lib/terms'
 
 import { useCreateProject } from './useProjects'
 
-type Props = { open: boolean; onOpenChange: (open: boolean) => void }
+type Props = { open: boolean; onOpenChange: (open: boolean) => void; areaId?: string }
 
-export function ProjectDialog({ open, onOpenChange }: Props) {
+export function ProjectDialog({ open, onOpenChange, areaId }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Новый проект</DialogTitle>
         </DialogHeader>
-        {open && <ProjectForm onDone={() => onOpenChange(false)} />}
+        {open && <ProjectForm areaId={areaId} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function ProjectForm({ onDone }: { onDone: () => void }) {
+function ProjectForm({ areaId: initialArea, onDone }: { areaId?: string; onDone: () => void }) {
   const navigate = useNavigate()
   const create = useCreateProject()
   const [title, setTitle] = useState('')
   const [deadline, setDeadline] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [areaId, setAreaId] = useState<string | null>(initialArea ?? null)
   const [description, setDescription] = useState('')
   const [hours, setHours] = useState('')
   const norm = hours ? Math.round(Number(hours) * 60) : null
@@ -42,6 +45,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         title: title.trim(),
         deadline: deadline || null,
         category_id: categoryId,
+        area_id: areaId,
         description,
         contacts: [],
         links: [],
@@ -77,6 +81,10 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
           <CategorySelect id="pr-category" value={categoryId} onChange={setCategoryId} emptyLabel="Учёба" />
         </Field>
       </div>
+      <Field>
+        <FieldLabel htmlFor="pr-area">{AREAS_UI.area}</FieldLabel>
+        <AreaSelect id="pr-area" value={areaId} onChange={setAreaId} />
+      </Field>
       <Field>
         <FieldLabel htmlFor="pr-norm">Часов в неделю</FieldLabel>
         <Input

@@ -134,14 +134,14 @@ async def delete_template(template_id: uuid.UUID, svc: Service) -> None:
 @router.post("/quick-add/ai-parse", status_code=ACCEPTED)
 async def ai_parse(data: AIParseRequest, db: SessionDep, user: CurrentUser) -> JobStarted:
     """Разобрать текст ИИ (когда quickparse не уверен). Ничего не создаёт —
-    в результате карточка: что это, название, предмет, тип, дедлайн."""
+    в результате карточка: что это, название, сфера, тип, дедлайн."""
     return JobStarted(job_id=await AIParseService(db, user).start_parse(data.text))
 
 
 @router.post("/tasks/{task_id}/recognize", status_code=ACCEPTED)
 async def recognize_photo(task_id: uuid.UUID, db: SessionDep, user: CurrentUser) -> JobStarted:
     """Распознать фото задания (его вложения-картинки): текст — в описание,
-    дедлайн, предмет и тип — если их ещё нет."""
+    дедлайн, сфера и тип — если их ещё нет."""
     return JobStarted(job_id=await AIParseService(db, user).start_photo(task_id))
 
 

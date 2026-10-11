@@ -1,4 +1,4 @@
-"""Семестр, звонки, выходные, предметы, правила пар.
+"""Семестр, звонки, выходные, правила пар (сферы — schemas/area.py).
 
 `*Update` — частичные: все поля необязательны. Сервис накладывает их на текущие
 значения и валидирует итог через `*Create`, так что межполевые проверки
@@ -9,12 +9,11 @@ import uuid
 from datetime import date
 from typing import Annotated, Self
 
-from pydantic import Field, HttpUrl, StringConstraints, field_serializer, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
-from app.domain.enums import ClassType, ControlForm, Parity, RuleParity
+from app.domain.enums import ClassType, Parity, RuleParity
 from app.schemas.common import (
     MAX_PERIOD,
-    HexColor,
     InputModel,
     ReadModel,
     SaneDate,
@@ -152,71 +151,12 @@ class DayOffRead(ReadModel):
     title: str
 
 
-# ---------- предметы ----------
-
-
-class Teacher(InputModel):
-    name: Name
-    role: ShortText = ""  # лектор, семинарист…
-    contact: ShortText = ""
-
-
-class SubjectLink(InputModel):
-    title: ShortText = ""
-    url: HttpUrl
-
-    @field_serializer("url")
-    def _url(self, url: HttpUrl) -> str:
-        return str(url)
-
-
-class SubjectCreate(InputModel):
-    semester_id: uuid.UUID | None = None
-    name: Name
-    short_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)] | None = (
-        None
-    )
-    color: HexColor = "#3b82f6"
-    control_form: ControlForm = ControlForm.exam
-    teachers: list[Teacher] = Field(default_factory=list)
-    links: list[SubjectLink] = Field(default_factory=list)
-    synonyms: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]] = Field(
-        default_factory=list
-    )
-    notes: str = ""
-
-
-class SubjectUpdate(InputModel):
-    semester_id: uuid.UUID | None = None
-    name: str | None = None
-    short_name: str | None = None
-    color: str | None = None
-    control_form: ControlForm | None = None
-    teachers: list[Teacher] | None = None
-    links: list[SubjectLink] | None = None
-    synonyms: list[str] | None = None
-    notes: str | None = None
-
-
-class SubjectRead(ReadModel):
-    id: uuid.UUID
-    semester_id: uuid.UUID | None
-    name: str
-    short_name: str | None
-    color: str
-    control_form: ControlForm
-    teachers: list[Teacher]
-    links: list[SubjectLink]
-    synonyms: list[str]
-    notes: str
-
-
 # ---------- правила пар ----------
 
 
 class ClassRuleCreate(InputModel):
     semester_id: uuid.UUID
-    subject_id: uuid.UUID
+    area_id: uuid.UUID
     weekday: Weekday
     pair_number: int | None = Field(default=None, ge=1, le=12)
     start_time: WallTime | None = Field(default=None, description="Своё время вместо звонков")
@@ -242,7 +182,7 @@ class ClassRuleCreate(InputModel):
 
 
 class ClassRuleUpdate(InputModel):
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     weekday: Weekday | None = None
     pair_number: int | None = None
     start_time: WallTime | None = None
@@ -258,7 +198,7 @@ class ClassRuleUpdate(InputModel):
 class ClassRuleRead(ReadModel):
     id: uuid.UUID
     semester_id: uuid.UUID
-    subject_id: uuid.UUID
+    area_id: uuid.UUID
     weekday: int
     pair_number: int | None
     start_time: WallTime | None

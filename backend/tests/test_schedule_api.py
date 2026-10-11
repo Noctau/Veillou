@@ -29,9 +29,42 @@ async def make_semester(client: AsyncClient, **over) -> dict:
     return resp.json()
 
 
-async def make_subject(client: AsyncClient, semester_id: str, **over) -> dict:
-    body = {"semester_id": semester_id, "name": "Климатология", "short_name": "клим", **over}
-    resp = await client.post(f"{API}/subjects", json=body)
+SUBJECT_TYPE = {
+    "name": "Предмет",
+    "name_plural": "Предметы",
+    "icon": "graduation-cap",
+    "fields": [
+        {"label": "Преподаватели", "type": "contact", "multiple": True},
+        {
+            "label": "Форма контроля",
+            "type": "select",
+            "options": ["Экзамен", "Зачёт", "Дифзачёт"],
+            "show_in_reminder": True,
+        },
+    ],
+    "sections": ["schedule", "tasks", "notes", "materials", "prep"],
+}
+
+
+async def area_type_id(client: AsyncClient) -> str:
+    """Первый тип сферы пользователя; нет ни одного — создаёт «Предмет»."""
+    types = (await client.get(f"{API}/area-types")).json()
+    if types:
+        return str(types[0]["id"])
+    resp = await client.post(f"{API}/area-types", json=SUBJECT_TYPE)
+    assert resp.status_code == 201, resp.text
+    return str(resp.json()["id"])
+
+
+async def make_area(client: AsyncClient, period_id: str | None = None, **over) -> dict:
+    body = {
+        "area_type_id": await area_type_id(client),
+        "period_id": period_id,
+        "name": "Климатология",
+        "short_name": "клим",
+        **over,
+    }
+    resp = await client.post(f"{API}/areas", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
 
@@ -49,7 +82,7 @@ async def other_client(client: AsyncClient, session) -> AsyncIterator[AsyncClien
 
 
 async def test_requires_auth(client: AsyncClient):
-    for url in ("/semesters", "/subjects", "/class-rules", "/days-off"):
+    for url in ("/semesters", "/areas", "/class-rules", "/days-off"):
         assert (await client.get(API + url)).status_code == 401
 
 
@@ -145,53 +178,15 @@ async def test_days_off(auth_client: AsyncClient):
     assert (await auth_client.get(f"{API}/days-off")).json() == []
 
 
-# ---------- предметы ----------
-
-
-async def test_subject_crud(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
-    subj = await make_subject(
-        auth_client,
-        sem["id"],
-        color="#10b981",
-        control_form="graded_credit",
-        teachers=[{"name": "Иванова А. П.", "role": "лектор"}],
-        links=[{"title": "Курс", "url": "https://example.com/course"}],
-        synonyms=["климат"],
-    )
-    assert subj["teachers"] == [{"name": "Иванова А. П.", "role": "лектор", "contact": ""}]
-    assert subj["links"] == [{"title": "Курс", "url": "https://example.com/course"}]
-
-    resp = await auth_client.patch(f"{API}/subjects/{subj['id']}", json={"short_name": None})
-    assert resp.status_code == 200
-    assert resp.json()["short_name"] is None
-    assert resp.json()["synonyms"] == ["климат"]
-
-    resp = await auth_client.patch(f"{API}/subjects/{subj['id']}", json={"color": "red"})
-    assert resp.status_code == 400
-
-    listed = await auth_client.get(f"{API}/subjects", params={"semester_id": sem["id"]})
-    assert [s["id"] for s in listed.json()] == [subj["id"]]
-    assert (await auth_client.delete(f"{API}/subjects/{subj['id']}")).status_code == 204
-    assert (await auth_client.get(f"{API}/subjects/{subj['id']}")).status_code == 404
-
-
-async def test_subject_link_must_be_url(auth_client: AsyncClient):
-    resp = await auth_client.post(
-        f"{API}/subjects", json={"name": "X", "links": [{"url": "not a url"}]}
-    )
-    assert resp.status_code == 422
-
-
 # ---------- правила пар ----------
 
 
 async def test_class_rule_crud(auth_client: AsyncClient):
     sem = await make_semester(auth_client)
-    subj = await make_subject(auth_client, sem["id"])
+    subj = await make_area(auth_client, sem["id"])
     body = {
         "semester_id": sem["id"],
-        "subject_id": subj["id"],
+        "area_id": subj["id"],
         "weekday": 2,
         "pair_number": 3,
         "parity": "odd",
@@ -213,15 +208,15 @@ async def test_class_rule_crud(auth_client: AsyncClient):
     resp = await auth_client.patch(f"{API}/class-rules/{rule['id']}", json={"end_time": None})
     assert resp.status_code == 400
 
-    # Удаление предмета удаляет его пары
-    await auth_client.delete(f"{API}/subjects/{subj['id']}")
+    # Удаление сферы удаляет её пары
+    await auth_client.delete(f"{API}/areas/{subj['id']}")
     assert (await auth_client.get(f"{API}/class-rules")).json() == []
 
 
 async def test_class_rule_validation(auth_client: AsyncClient):
     sem = await make_semester(auth_client)
-    subj = await make_subject(auth_client, sem["id"])
-    base = {"semester_id": sem["id"], "subject_id": subj["id"], "weekday": 1}
+    subj = await make_area(auth_client, sem["id"])
+    base = {"semester_id": sem["id"], "area_id": subj["id"], "weekday": 1}
     resp = await auth_client.post(f"{API}/class-rules", json=base)
     assert resp.status_code == 422  # ни номера пары, ни времени
     resp = await auth_client.post(
@@ -232,18 +227,18 @@ async def test_class_rule_validation(auth_client: AsyncClient):
 
 async def test_other_users_data_invisible(auth_client: AsyncClient, client: AsyncClient, session):
     sem = await make_semester(auth_client)
-    subj = await make_subject(auth_client, sem["id"])
+    subj = await make_area(auth_client, sem["id"])
     async with other_client(client, session) as other:
         assert (await other.get(f"{API}/semesters")).json() == []
-        assert (await other.get(f"{API}/subjects/{subj['id']}")).status_code == 404
+        assert (await other.get(f"{API}/areas/{subj['id']}")).status_code == 404
         assert (await other.patch(f"{API}/semesters/{sem['id']}", json={})).status_code == 404
-        # Нельзя повесить пару на чужой семестр/предмет
+        # Нельзя повесить пару на чужой семестр/сферу
         other_sem = await make_semester(other)
         resp = await other.post(
             f"{API}/class-rules",
             json={
                 "semester_id": other_sem["id"],
-                "subject_id": subj["id"],
+                "area_id": subj["id"],
                 "weekday": 1,
                 "pair_number": 1,
             },

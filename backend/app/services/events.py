@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz
 from app.domain.enums import FIXED_KINDS, EventStatus, SourceType
-from app.models import DayOff, Event, RecurringEvent, Subject, User
+from app.models import Area, DayOff, Event, RecurringEvent, User
 from app.schemas.event import (
     EventCreate,
     EventUpdate,
@@ -30,9 +30,9 @@ class EventRepo(UserScopedRepository[Event]):
     not_found_message = "Событие не найдено"
 
 
-class SubjectRefRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class AreaRefRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
 class RecurringRepo(UserScopedRepository[RecurringEvent]):
@@ -93,8 +93,8 @@ class EventService:
         return await self.events.get_or_404(id)
 
     async def create(self, data: EventCreate) -> Event:
-        if data.subject_id:
-            await SubjectRefRepo(self.db, self.user_id).get_or_404(data.subject_id)
+        if data.area_id:
+            await AreaRefRepo(self.db, self.user_id).get_or_404(data.area_id)
         event = Event(is_fixed=data.kind in FIXED_KINDS, status=EventStatus.planned)
         apply_fields(event, data)
         self.events.add(event)

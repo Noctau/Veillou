@@ -21,7 +21,7 @@ from app.domain.enums import (
     SubtaskStatus,
     TaskStatus,
 )
-from app.models import Event, Reminder, Subject, Subtask, Task, User
+from app.models import Area, Event, Reminder, Subtask, Task, User
 from app.notify.message import Message, Section, fmt_moment, fmt_range, lines, plural
 from app.services.digest import CLASS_TYPE_SHORT, Digest, deadline_line, task_progress
 
@@ -75,8 +75,8 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
     if e.note.strip():
         sections.append(Section("Взять / подготовить", tuple(e.note.strip().splitlines())))
 
-    if e.subject_id is not None:
-        # Что сдавать по предмету до конца завтрашнего дня
+    if e.area_id is not None:
+        # Что сдавать по сфере до конца завтрашнего дня
         day = local_date(e.start, tz)
         _, until = day_bounds_utc(day + timedelta(days=1), tz)
         tasks = list(
@@ -86,7 +86,7 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
                     Task.user_id == user.id,
                     Task.deleted_at.is_(None),
                     Task.status == TaskStatus.active,
-                    Task.subject_id == e.subject_id,
+                    Task.area_id == e.area_id,
                     Task.deadline >= now,
                     Task.deadline < until,
                 )
@@ -98,7 +98,7 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
             sections.append(
                 Section("Сдать", tuple(deadline_line(t, shares[t.id], tz, day) for t in tasks))
             )
-    url = f"/subjects/{e.subject_id}" if e.subject_id else "/calendar"
+    url = f"/areas/{e.area_id}" if e.area_id else "/calendar"
     return Message(
         title=f"{when}: {e.title}",
         sections=tuple(sections),
@@ -124,7 +124,7 @@ async def _deadline(db: AsyncSession, user: User, r: Reminder, now: datetime) ->
     today = local_date(now, tz)
     days_before = (local_date(t.deadline, tz) - today).days
     share = (await task_progress(db, [t]))[t.id]
-    subject = await db.get(Subject, t.subject_id) if t.subject_id else None
+    subject = await db.get(Area, t.area_id) if t.area_id else None
     info = lines(
         f"Сдать: {fmt_moment(t.deadline, tz, today)}",
         f"Готово {round(share * 100)}%" if share > 0 else None,

@@ -19,9 +19,9 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 
 
 @router.get("")
-async def list_sources(svc: Service, subject_id: uuid.UUID | None = None) -> list[SourceRead]:
+async def list_sources(svc: Service, area_id: uuid.UUID | None = None) -> list[SourceRead]:
     """Обязательные первыми; внутри — «читаю», «прочитать», «прочитано»."""
-    return await svc.list(subject_id)
+    return await svc.list(area_id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -49,5 +49,5 @@ async def delete_source(source_id: uuid.UUID, svc: Service) -> None:
 async def create_reading_task(
     source_id: uuid.UUID, data: ReadingTaskCreate, svc: Service
 ) -> TaskDetail:
-    """Задание «прочитать …» (тип «чтение», предмет источника, ссылка в описании)."""
+    """Задание «прочитать …» (тип «чтение», сфера источника, ссылка в описании)."""
     return await svc.create_reading_task(source_id, data)

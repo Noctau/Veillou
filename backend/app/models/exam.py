@@ -21,8 +21,8 @@ from app.models.base import UserOwnedMixin, UTCDateTime
 class Exam(UserOwnedMixin, Base):
     __tablename__ = "exams"
 
-    subject_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("subjects.id", ondelete="CASCADE"), index=True
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("areas.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(300), default="")  # пусто — «Экзамен»
     starts_at: Mapped[datetime] = mapped_column(UTCDateTime)

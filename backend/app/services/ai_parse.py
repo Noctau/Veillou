@@ -26,17 +26,18 @@ from app.core.exceptions import InvalidDataError
 from app.core.storage import Storage, get_storage
 from app.core.time import get_tz, now_utc, wall_to_utc
 from app.domain.enums import AIOrigin, AIPurpose, AttachmentOwner, JobKind
-from app.domain.quickparse import AI_TEXT_LEN, END_OF_DAY, KindHint, SubjectRef, has_date_cue
-from app.models import Attachment, Job, Subject, Task, User
+from app.domain.quickparse import AI_TEXT_LEN, END_OF_DAY, AreaRef, KindHint, has_date_cue
+from app.models import Area, Attachment, Job, Task, User
 from app.schemas.ai import ParseDraft, PhotoDraft
 from app.schemas.backlog import BacklogCreate
 from app.schemas.task import TaskCreate
 from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
+from app.services.areas import area_refs_for_parse
 from app.services.backlog import BacklogService
 from app.services.breakdown import load_catalog
 from app.services.catalog import load_task_types
-from app.services.quickadd import Created, create_from_text, parse_text, subject_refs
+from app.services.quickadd import Created, create_from_text, parse_text
 from app.services.tasks import TaskRepo, TaskService
 
 # Название задания, созданного из фото без подписи: распознавание его заменит
@@ -46,8 +47,8 @@ MAX_IMAGES = 4
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 
 
-def _subject_names(refs: list[SubjectRef]) -> dict[str, uuid.UUID]:
-    """Название предмета → id (первое имя в SubjectRef — полное название)."""
+def _area_names(refs: list[AreaRef]) -> dict[str, uuid.UUID]:
+    """Название сферы → id (первое имя в AreaRef — полное название)."""
     result: dict[str, uuid.UUID] = {}
     for ref in refs:
         if ref.names and isinstance(ref.id, uuid.UUID):
@@ -99,8 +100,8 @@ class AIParseService:
 
     async def parse(self, text: str, job_id: uuid.UUID | None = None) -> ParseDraft:
         now = now_utc().astimezone(self.tz)
-        refs = await subject_refs(self.db, self.user, now.date())
-        names = _subject_names(refs)
+        refs = await area_refs_for_parse(self.db, self.user, now.date())
+        names = _area_names(refs)
         task_types = await load_task_types(self.db, self.user_id)
         parsed = await parse_text(self.db, self.user, text)
         quick = parsed.result
@@ -122,8 +123,8 @@ class AIParseService:
         elif (wall := answer.deadline_wall()) and has_date_cue(text):
             day, at = wall
             deadline = wall_to_utc(day, _said(at, text) or END_OF_DAY, self.tz)
-        subject_id = quick.subject_id if isinstance(quick.subject_id, uuid.UUID) else None
-        subject_id = subject_id or (names.get(answer.subject) if answer.subject else None)
+        area_id = quick.area_id if isinstance(quick.area_id, uuid.UUID) else None
+        area_id = area_id or (names.get(answer.subject) if answer.subject else None)
         kind = KindHint(answer.kind)
         if kind == KindHint.event and (quick.date is None or quick.time is None):
             # Событию нужно точное время — без него это задание или дело
@@ -138,7 +139,7 @@ class AIParseService:
             title=answer.title[:300],
             description=_description(answer.description, text),
             task_type_id=task_types.id_of(answer.task_type) or parsed.task_type_id,
-            subject_id=subject_id,
+            area_id=area_id,
             deadline=deadline,
             action_type_id=action_type_id,
             text=text,
@@ -202,7 +203,7 @@ class AIParseService:
         if not images:
             raise jobs.JobFailedError("У задания нет фото")
         now = now_utc().astimezone(self.tz)
-        names = _subject_names(await subject_refs(self.db, self.user, now.date()))
+        names = _area_names(await area_refs_for_parse(self.db, self.user, now.date()))
         task_types = await load_task_types(self.db, self.user_id)
         caption = "" if task.title == PHOTO_TITLE else task.title
         answer = await call_llm(
@@ -220,7 +221,7 @@ class AIParseService:
         if wall := answer.deadline_wall():
             day, at = wall
             deadline = wall_to_utc(day, at or END_OF_DAY, self.tz)
-        subject_id = names.get(answer.subject) if answer.subject else None
+        area_id = names.get(answer.subject) if answer.subject else None
 
         updated: list[str] = []
         text = answer.text.strip()
@@ -233,9 +234,9 @@ class AIParseService:
         if task.deadline is None and deadline is not None:
             task.deadline = deadline
             updated.append("deadline")
-        if task.subject_id is None and subject_id is not None:
-            task.subject_id = subject_id
-            updated.append("subject_id")
+        if task.area_id is None and area_id is not None:
+            task.area_id = area_id
+            updated.append("area_id")
         task_type_id = task_types.id_of(answer.task_type)
         if task.task_type_id is None and task_type_id is not None:
             task.task_type_id = task_type_id
@@ -245,7 +246,7 @@ class AIParseService:
             title=task.title,
             text=text,
             task_type_id=task_type_id,
-            subject_id=subject_id,
+            area_id=area_id,
             deadline=deadline,
             updated=updated,
         )
@@ -267,7 +268,7 @@ async def create_from_draft(
     kind = kind or draft.kind
     if kind == KindHint.event:
         return await create_from_text(db, user, draft.text, kind=KindHint.event)
-    subject = await db.get(Subject, draft.subject_id) if draft.subject_id else None
+    area = await db.get(Area, draft.area_id) if draft.area_id else None
     if kind == KindHint.backlog:
         tz = get_tz(user.timezone)
         desired = draft.deadline.astimezone(tz).date() if draft.deadline else None
@@ -286,7 +287,7 @@ async def create_from_draft(
             title=draft.title,
             task_type_id=draft.task_type_id,
             description=draft.description,
-            subject_id=draft.subject_id,
+            area_id=draft.area_id,
             action_type_id=draft.action_type_id,
             deadline=draft.deadline,
         )
@@ -296,5 +297,5 @@ async def create_from_draft(
         task.id,
         draft.title,
         deadline=draft.deadline,
-        subject=subject.name if subject else None,
+        area=area.name if area else None,
     )

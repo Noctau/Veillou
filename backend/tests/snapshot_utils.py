@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     ActionType,
+    Area,
+    AreaType,
     BacklogItem,
     Category,
     ClassRule,
@@ -42,7 +44,6 @@ from app.models import (
     RecurringEvent,
     Semester,
     Source,
-    Subject,
     Subtask,
     Task,
     TaskType,
@@ -115,12 +116,13 @@ class Labels:
             stmt = select(model).where(model.user_id == user_id)  # type: ignore[attr-defined]
             return list(await db.scalars(stmt.order_by(model.created_at, model.id)))  # type: ignore[attr-defined]
 
-        subjects = {s.id: s.name for s in await rows(Subject)}
+        areas = {a.id: a.name for a in await rows(Area)}
         tasks = {t.id: t.title for t in await rows(Task)}
-        exams = {e.id: f"Экзамен {subjects.get(e.subject_id, '?')}" for e in await rows(Exam)}
+        exams = {e.id: f"Экзамен {areas.get(e.area_id, '?')}" for e in await rows(Exam)}
         simple: list[tuple[Iterable[Any], str]] = [
             (await rows(Semester), "name"),
-            (await rows(Subject), "name"),
+            (await rows(AreaType), "name"),
+            (await rows(Area), "name"),
             (await rows(DayOff), "title"),
             (await rows(RecurringEvent), "title"),
             (await rows(Category), "name"),
@@ -143,7 +145,7 @@ class Labels:
         for r in await rows(ClassRule):
             when = f"пара {r.pair_number}" if r.pair_number else f"{r.start_time:%H:%M}"
             parity = f" {r.parity}" if r.parity != "all" else ""
-            self._add(r.id, f"{subjects.get(r.subject_id)} д{r.weekday} {when}{parity}")
+            self._add(r.id, f"{areas.get(r.area_id)} д{r.weekday} {when}{parity}")
         for st in await rows(Subtask):
             occ = f" {st.occurrence_date:%d.%m}" if st.occurrence_date else ""
             self._add(st.id, f"{tasks.get(st.task_id)} / {st.title}{occ}")

@@ -47,7 +47,8 @@ import { describeRrule } from '@/features/calendar/rrule'
 import { ActionTypeSelect, CategorySelect, TaskTypeSelect } from '@/features/catalog/CatalogSelect'
 import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useProject, useProjects } from '@/features/projects/useProjects'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { AreaSelect } from '@/features/areas/AreaSelect'
+import { AREAS_UI } from '@/lib/terms'
 import { errorMessage } from '@/lib/errors'
 import { wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
@@ -171,7 +172,6 @@ function ProjectFields({ task, patch }: { task: TaskDetail; patch: (body: TaskUp
 }
 
 function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => void }) {
-  const { data: subjects } = useSubjects()
   return (
     <Card>
       <CardContent className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
@@ -180,20 +180,8 @@ function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => 
           <DeadlineEditor task={task} onSave={(deadline) => patch({ deadline })} />
         </Field>
         <Field>
-          <FieldLabel htmlFor="task-subject">Предмет</FieldLabel>
-          <Select value={task.subject_id ?? NONE} onValueChange={(v) => patch({ subject_id: v === NONE ? null : v })}>
-            <SelectTrigger id="task-subject" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Без предмета</SelectItem>
-              {subjects?.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FieldLabel htmlFor="task-area">{AREAS_UI.area}</FieldLabel>
+          <AreaSelect id="task-area" value={task.area_id} onChange={(area_id) => patch({ area_id })} />
         </Field>
         <Field>
           <FieldLabel htmlFor="task-type">Тип</FieldLabel>
@@ -421,7 +409,7 @@ export function TaskView({ taskId }: { taskId: string }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/study?tab=tasks', { replace: true }) })}
+              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/areas?tab=tasks', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>

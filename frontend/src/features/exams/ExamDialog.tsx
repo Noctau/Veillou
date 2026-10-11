@@ -29,27 +29,27 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 type Props = {
-  subjectId: string
+  areaId: string
   exam?: Exam
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 /** Экзамен: дата, время, аудитория; подготовка — за сколько дней и минуты на вопрос. */
-export function ExamDialog({ subjectId, exam, open, onOpenChange }: Props) {
+export function ExamDialog({ areaId, exam, open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{exam ? 'Экзамен' : 'Новый экзамен'}</DialogTitle>
         </DialogHeader>
-        {open && <ExamForm key={exam?.id ?? 'new'} subjectId={subjectId} exam={exam} onDone={() => onOpenChange(false)} />}
+        {open && <ExamForm key={exam?.id ?? 'new'} areaId={areaId} exam={exam} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function ExamForm({ subjectId, exam, onDone }: { subjectId: string; exam?: Exam; onDone: () => void }) {
+function ExamForm({ areaId, exam, onDone }: { areaId: string; exam?: Exam; onDone: () => void }) {
   const tz = useTimeZone()
   const create = useCreateExam()
   const update = useUpdateExam()
@@ -84,7 +84,7 @@ function ExamForm({ subjectId, exam, onDone }: { subjectId: string; exam?: Exam;
       run_min: v.run_min,
     }
     if (exam) update.mutate({ id: exam.id, body }, { onSuccess: onDone })
-    else create.mutate({ ...body, subject_id: subjectId, note: '' }, { onSuccess: onDone })
+    else create.mutate({ ...body, area_id: areaId, note: '' }, { onSuccess: onDone })
   })
 
   return (
@@ -141,7 +141,7 @@ function ExamForm({ subjectId, exam, onDone }: { subjectId: string; exam?: Exam;
         )}
         <Field>
           <FieldLabel htmlFor="ex-title">Название</FieldLabel>
-          <Input id="ex-title" placeholder="Экзамен: <предмет>" {...form.register('title')} />
+          <Input id="ex-title" placeholder="Экзамен: <сфера>" {...form.register('title')} />
         </Field>
       </FieldGroup>
       <DialogFooter className="flex-row items-center">

@@ -21,17 +21,17 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 @router.get("")
 async def list_notes(
     svc: Service,
-    subject_id: uuid.UUID | None = None,
+    area_id: uuid.UUID | None = None,
     event_id: Annotated[list[uuid.UUID], Query(max_length=200)] = [],  # noqa: B006
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[NoteListItem]:
     """Свежие пары первыми. `event_id` можно повторять — конспекты этих пар."""
-    return await svc.list(subject_id=subject_id, event_ids=event_id, limit=limit)
+    return await svc.list(area_id=area_id, event_ids=event_id, limit=limit)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_note(data: NoteCreate, svc: Service) -> NoteRead:
-    """С `event_id` предмет и дата берутся из пары, если не указаны."""
+    """С `event_id` сфера и дата берутся из пары, если не указаны."""
     return await svc.create(data)
 
 
@@ -40,7 +40,7 @@ async def note_for_event(
     event_id: uuid.UUID, svc: Service, response: Response, kind: NoteKind = NoteKind.text
 ) -> NoteRead:
     """«Конспект к этой паре»: открывает уже начатый конспект пары (200) или
-    создаёт новый с предметом, датой и названием из пары (201)."""
+    создаёт новый со сферой, датой и названием из пары (201)."""
     note, created = await svc.for_event(event_id, kind)
     if created:
         response.status_code = status.HTTP_201_CREATED

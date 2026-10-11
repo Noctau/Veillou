@@ -210,7 +210,7 @@ function Header({ project }: { project: ProjectDetail }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/study?tab=projects', { replace: true }) })}
+              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/areas?tab=projects', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>

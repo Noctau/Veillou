@@ -12,7 +12,7 @@ from app.models import Event, ExamSession, User
 from app.services.exams import ExamService, sync_all
 from app.services.replan import ReplanService
 
-from .test_ai import make_subject
+from .test_ai import make_area
 from .test_schedule_api import other_client
 
 API = "/api/v1"
@@ -31,15 +31,15 @@ def in_days(n: int, h: int = 10) -> datetime:
     return wall_to_utc(local_date(now_utc(), TZ) + timedelta(days=n), time(h), TZ)
 
 
-async def make_exam(client, subject_id: str, days: int = 5, **over) -> dict:
-    body = {"subject_id": subject_id, "starts_at": in_days(days).isoformat(), **over}
+async def make_exam(client, area_id: str, days: int = 5, **over) -> dict:
+    body = {"area_id": area_id, "starts_at": in_days(days).isoformat(), **over}
     resp = await client.post(f"{API}/exams", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
 async def subject(client) -> dict:
-    return await make_subject(client, "Климатология", "клим")
+    return await make_area(client, "Климатология", "клим")
 
 
 async def calendar(client, kind: str | None = None) -> list[dict]:
@@ -75,7 +75,7 @@ async def test_create_exam_puts_it_in_calendar(auth_client):
     [event] = await calendar(auth_client, "exam")
     assert datetime.fromisoformat(event["start"]) == new_start
 
-    resp = await auth_client.get(f"{API}/exams", params={"subject_id": subj["id"]})
+    resp = await auth_client.get(f"{API}/exams", params={"area_id": subj["id"]})
     assert [e["id"] for e in resp.json()] == [exam["id"]]
     assert (await auth_client.delete(f"{API}/exams/{exam['id']}")).status_code == 204
     assert await calendar(auth_client, "exam") == []

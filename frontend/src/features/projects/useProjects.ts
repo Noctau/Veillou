@@ -16,12 +16,12 @@ export type Milestone = components['schemas']['MilestoneRead']
 export type MilestoneCreate = components['schemas']['MilestoneCreate']
 export type MilestoneUpdate = components['schemas']['MilestoneUpdate']
 
-export function useProjects(status: ProjectStatus[] = ['active']) {
+export function useProjects(status: ProjectStatus[] = ['active'], areaId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.projects, 'list', status],
+    queryKey: [...queryKeys.projects, 'list', status, areaId ?? ''],
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/projects', {
-        params: { query: { status } },
+        params: { query: { status, area_id: areaId } },
       })
       if (error) throw error
       return data

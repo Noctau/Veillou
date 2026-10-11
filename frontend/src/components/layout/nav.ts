@@ -1,5 +1,5 @@
 import {
-  BookOpenIcon,
+  LayersIcon,
   CalendarDaysIcon,
   InboxIcon,
   PlusIcon,
@@ -15,12 +15,12 @@ export type NavItem = {
   primary?: boolean
 }
 
-// Порядок нижней панели: Сегодня · Календарь · ＋ · Учёба · Ящик
+// Порядок нижней панели: Сегодня · Календарь · ＋ · Сферы · Ящик
 export const mainNav: NavItem[] = [
   { to: '/', label: 'Сегодня', icon: SunIcon },
   { to: '/calendar', label: 'Календарь', icon: CalendarDaysIcon },
   { to: '/add', label: 'Добавить', icon: PlusIcon, primary: true },
-  { to: '/study', label: 'Учёба', icon: BookOpenIcon },
+  { to: '/areas', label: 'Сферы', icon: LayersIcon },
   { to: '/inbox', label: 'Ящик', icon: InboxIcon },
 ]
 

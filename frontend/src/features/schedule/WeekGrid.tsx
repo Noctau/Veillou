@@ -1,6 +1,6 @@
 import { PlusIcon } from 'lucide-react'
 
-import type { Subject } from '@/features/subjects/useSubjects'
+import type { Area } from '@/features/areas/useAreas'
 import { paletteColor } from '@/lib/colors'
 import { CLASS_TYPE_LABEL } from '@/lib/terms'
 import { WEEKDAYS_SHORT } from '@/lib/time'
@@ -10,7 +10,7 @@ import type { BellSlot, ClassRule, Parity } from './useSchedule'
 
 type Props = {
   rules: ClassRule[]
-  subjects: Map<string, Subject>
+  areas: Map<string, Area>
   bellsFor: (weekday: number) => BellSlot[]
   parity: Parity
   /** Дни недели, которые показываем (на телефоне — один). */
@@ -30,8 +30,8 @@ function visible(rule: ClassRule, parity: Parity) {
   return rule.parity === 'all' || rule.parity === parity
 }
 
-function RuleChip({ rule, subject, onClick }: { rule: ClassRule; subject?: Subject; onClick: () => void }) {
-  const color = paletteColor(subject?.color)
+function RuleChip({ rule, area, onClick }: { rule: ClassRule; area?: Area; onClick: () => void }) {
+  const color = paletteColor(area?.color)
   return (
     <button
       type="button"
@@ -43,7 +43,7 @@ function RuleChip({ rule, subject, onClick }: { rule: ClassRule; subject?: Subje
       )}
     >
       <span className="line-clamp-2 font-medium leading-tight text-foreground">
-        {subject?.short_name || subject?.name || '—'}
+        {area?.short_name || area?.name || '—'}
       </span>
       <span className="text-muted-foreground">
         {CLASS_TYPE_LABEL[rule.class_type]}
@@ -74,7 +74,7 @@ function EmptyCell({ onClick, disabled }: { onClick: () => void; disabled?: bool
 }
 
 /** Сетка «дни × номер пары» для выбранной чётности. */
-export function WeekGrid({ rules, subjects, bellsFor, parity, weekdays, onCreate, onEdit }: Props) {
+export function WeekGrid({ rules, areas, bellsFor, parity, weekdays, onCreate, onEdit }: Props) {
   const numbers = [...new Set(weekdays.flatMap((wd) => bellsFor(wd).map((s) => s.number)))].sort((a, b) => a - b)
   // Время пары в заголовке строки — по первому показанному дню, где эта пара есть
   const rowTime = (n: number) => {
@@ -93,7 +93,7 @@ export function WeekGrid({ rules, subjects, bellsFor, parity, weekdays, onCreate
     return (
       <div key={`${wd}-${n}`} className="flex flex-col gap-1">
         {here.map((r) => (
-          <RuleChip key={r.id} rule={r} subject={subjects.get(r.subject_id)} onClick={() => onEdit(r)} />
+          <RuleChip key={r.id} rule={r} area={areas.get(r.area_id)} onClick={() => onEdit(r)} />
         ))}
         {here.length === 0 && <EmptyCell disabled={!hasSlot} onClick={() => onCreate(wd, n)} />}
       </div>
@@ -138,7 +138,7 @@ export function WeekGrid({ rules, subjects, bellsFor, parity, weekdays, onCreate
               {custom
                 .filter((r) => r.weekday === wd)
                 .map((r) => (
-                  <RuleChip key={r.id} rule={r} subject={subjects.get(r.subject_id)} onClick={() => onEdit(r)} />
+                  <RuleChip key={r.id} rule={r} area={areas.get(r.area_id)} onClick={() => onEdit(r)} />
                 ))}
             </div>
           ))}

@@ -28,9 +28,9 @@ questions_router = APIRouter(prefix="/exam-questions", tags=["exams"])
 
 
 @router.get("")
-async def list_exams(svc: Service, subject_id: uuid.UUID | None = None) -> list[ExamRead]:
-    """Экзамены (ближайшие первыми); с subject_id — только по предмету."""
-    return await svc.list_exams(subject_id)
+async def list_exams(svc: Service, area_id: uuid.UUID | None = None) -> list[ExamRead]:
+    """Экзамены (ближайшие первыми); с area_id — только по сфере."""
+    return await svc.list_exams(area_id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

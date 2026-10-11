@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { useAreas } from '@/features/areas/useAreas'
 import { paletteColor } from '@/lib/colors'
 import { cn } from '@/lib/utils'
 
@@ -21,8 +21,8 @@ export function DeadlinesCard({ tz, now }: { tz: string; now: Date }) {
   horizon.setMinutes(0, 0, 0)
   horizon.setDate(horizon.getDate() + HORIZON_DAYS)
   const { data: tasks, isPending } = useTasks({ status: ['active'], due_before: horizon.toISOString() })
-  const { data: subjects } = useSubjects()
-  const subjectById = new Map(subjects?.map((s) => [s.id, s]))
+  const { data: areas } = useAreas()
+  const areaById = new Map(areas?.map((s) => [s.id, s]))
   const shown = tasks?.slice(0, LIMIT) ?? []
 
   return (
@@ -39,19 +39,19 @@ export function DeadlinesCard({ tz, now }: { tz: string; now: Date }) {
         )}
         <ul className="flex flex-col gap-1">
           {shown.map((t) => {
-            const subject = t.subject_id ? subjectById.get(t.subject_id) : undefined
+            const area = t.area_id ? areaById.get(t.area_id) : undefined
             const due = describeDeadline(t.deadline!, tz, now)
             return (
               <li key={t.id}>
                 <Link to={`/tasks/${t.id}`} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted">
-                  <span className={cn('h-8 w-1 shrink-0 rounded-full', subject ? paletteColor(subject.color).bg : 'bg-muted-foreground/40')} />
+                  <span className={cn('h-8 w-1 shrink-0 rounded-full', area ? paletteColor(area.color).bg : 'bg-muted-foreground/40')} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">
                       {t.priority === 'high' && <span className="text-destructive">! </span>}
                       {t.title}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {subject && <span className="truncate">{subject.short_name || subject.name}</span>}
+                      {area && <span className="truncate">{area.short_name || area.name}</span>}
                       {t.subtasks_total > 0 && (
                         <>
                           <Progress value={t.progress * 100} className="h-1 w-12" aria-label="Прогресс" />
@@ -78,7 +78,7 @@ export function DeadlinesCard({ tz, now }: { tz: string; now: Date }) {
           })}
         </ul>
         {tasks && tasks.length > LIMIT && (
-          <Link to="/study?tab=tasks" className="mt-2 block px-2 text-xs text-muted-foreground underline-offset-4 hover:underline">
+          <Link to="/areas?tab=tasks" className="mt-2 block px-2 text-xs text-muted-foreground underline-offset-4 hover:underline">
             Ещё {tasks.length - LIMIT}
           </Link>
         )}

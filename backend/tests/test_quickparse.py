@@ -9,18 +9,18 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.domain.enums import ActionTypeKey, TaskTypeKey
-from app.domain.quickparse import KindHint, SubjectRef, guess, parse
+from app.domain.quickparse import AreaRef, KindHint, guess, parse
 from app.services.catalog import ACTION_TYPE_WORDS, TASK_TYPE_WORDS
 
 MSK = ZoneInfo("Europe/Moscow")
 NOW = datetime(2026, 10, 6, 15, 0, tzinfo=MSK)
 
 SUBJECTS = [
-    SubjectRef("clim", ("Климатология", "клим", "климат")),
-    SubjectRef("fiz", ("Физика атмосферы", "физат")),
-    SubjectRef("dyn", ("Динамическая метеорология", "динмет")),
-    SubjectRef("eng", ("Английский язык", "англ")),
-    SubjectRef("matan", ("Математический анализ", "матан")),
+    AreaRef("clim", ("Климатология", "клим", "климат")),
+    AreaRef("fiz", ("Физика атмосферы", "физат")),
+    AreaRef("dyn", ("Динамическая метеорология", "динмет")),
+    AreaRef("eng", ("Английский язык", "англ")),
+    AreaRef("matan", ("Математический анализ", "матан")),
 ]
 
 
@@ -39,7 +39,7 @@ def eod(d: date) -> datetime:
 def test_essay_with_subject_and_deadline():
     r = p("реферат климатология до 15 окт")
     assert r.title == "Реферат"
-    assert r.subject_id == "clim"
+    assert r.area_id == "clim"
     assert r.task_type == TaskTypeKey.essay
     assert r.date == date(2026, 10, 15)
     assert r.deadline == eod(date(2026, 10, 15))
@@ -49,14 +49,14 @@ def test_essay_with_subject_and_deadline():
 
 def test_report_by_friday_inflected_subject():
     r = p("доклад по физике атмосферы к пятнице")
-    assert (r.title, r.subject_id, r.task_type) == ("Доклад", "fiz", TaskTypeKey.report)
+    assert (r.title, r.area_id, r.task_type) == ("Доклад", "fiz", TaskTypeKey.report)
     assert r.date == date(2026, 10, 9)
     assert r.is_deadline
 
 
 def test_homework_in_two_weeks():
     r = p("дз по матану через 2 недели")
-    assert (r.title, r.subject_id, r.task_type) == ("Дз", "matan", TaskTypeKey.homework)
+    assert (r.title, r.area_id, r.task_type) == ("Дз", "matan", TaskTypeKey.homework)
     assert r.date == date(2026, 10, 20)
     assert r.kind_hint == KindHint.task
 
@@ -70,7 +70,7 @@ def test_number_words():
 def test_reading_chapter_numeric_date():
     r = p("прочитать главу 3 учебника по климатологии к 12.10")
     assert r.title == "Прочитать главу 3 учебника"
-    assert r.subject_id == "clim"
+    assert r.area_id == "clim"
     assert r.task_type == TaskTypeKey.reading
     assert r.date == date(2026, 10, 12)
     assert r.is_deadline
@@ -78,7 +78,7 @@ def test_reading_chapter_numeric_date():
 
 def test_lab_short_name_bare_date():
     r = p("лаба по физат 20.10")
-    assert (r.title, r.subject_id, r.task_type) == ("Лаба", "fiz", TaskTypeKey.lab)
+    assert (r.title, r.area_id, r.task_type) == ("Лаба", "fiz", TaskTypeKey.lab)
     assert r.date == date(2026, 10, 20)
     assert r.kind_hint == KindHint.task
 
@@ -94,7 +94,7 @@ def test_submit_coursework_month_name():
 def test_exam_prep_next_year():
     r = p("подготовиться к экзамену по климатологии до 20 января")
     assert r.task_type == TaskTypeKey.exam_prep
-    assert r.subject_id == "clim"
+    assert r.area_id == "clim"
     assert r.date == date(2027, 1, 20)
     assert r.title == "Подготовиться к экзамену"
 
@@ -106,7 +106,7 @@ def test_past_day_month_rolls_to_next_year():
 def test_explicit_year_kept():
     r = p("зачёт по англу 15.10.2026")
     assert r.date == date(2026, 10, 15)
-    assert (r.title, r.subject_id, r.task_type) == ("Зачёт", "eng", TaskTypeKey.exam_prep)
+    assert (r.title, r.area_id, r.task_type) == ("Зачёт", "eng", TaskTypeKey.exam_prep)
 
 
 def test_presentation_day_after_tomorrow():
@@ -142,7 +142,7 @@ def test_message_supervisor_by_friday():
 def test_word_srok_marks_deadline():
     r = p("лабораторная по физат, срок 30 октября")
     assert r.title == "Лабораторная"
-    assert r.subject_id == "fiz"
+    assert r.area_id == "fiz"
     assert r.date == date(2026, 10, 30)
     assert r.is_deadline
 
@@ -162,7 +162,7 @@ def test_tomorrow_at_14_is_event():
     r = p("завтра в 14 консультация по динмету")
     assert r.kind_hint == KindHint.event
     assert r.title == "Консультация"
-    assert r.subject_id == "dyn"
+    assert r.area_id == "dyn"
     assert (r.date, r.time) == (date(2026, 10, 7), time(14, 0))
 
 
@@ -307,24 +307,24 @@ def test_bare_dotted_time_and_latin_c():
 
 
 def test_ambiguous_subject_ignored():
-    subjects = [SubjectRef("a", ("Физика атмосферы",)), SubjectRef("b", ("Физика облаков",))]
-    assert p("доклад по физике", subjects=subjects).subject_id is None
+    subjects = [AreaRef("a", ("Физика атмосферы",)), AreaRef("b", ("Физика облаков",))]
+    assert p("доклад по физике", subjects=subjects).area_id is None
 
 
 def test_longest_subject_wins():
-    subjects = [SubjectRef("a", ("Физика",)), SubjectRef("b", ("Физика атмосферы",))]
-    assert p("доклад по физике атмосферы", subjects=subjects).subject_id == "b"
+    subjects = [AreaRef("a", ("Физика",)), AreaRef("b", ("Физика атмосферы",))]
+    assert p("доклад по физике атмосферы", subjects=subjects).area_id == "b"
 
 
 def test_short_name_needs_exact_match():
-    subjects = [SubjectRef("m", ("мат",))]
-    assert p("купить материалы", subjects=subjects).subject_id is None
-    assert p("дз по мат", subjects=subjects).subject_id == "m"
+    subjects = [AreaRef("m", ("мат",))]
+    assert p("купить материалы", subjects=subjects).area_id is None
+    assert p("дз по мат", subjects=subjects).area_id == "m"
 
 
 def test_subject_kept_in_title_if_nothing_else():
     r = p("климатология завтра")
-    assert r.subject_id == "clim"
+    assert r.area_id == "clim"
     assert r.title == "Климатология"
 
 

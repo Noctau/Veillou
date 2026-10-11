@@ -1,11 +1,11 @@
-"""CRUD шаблонов расписания: семестры, звонки, выходные, предметы, правила пар."""
+"""CRUD шаблонов расписания: семестры, звонки, выходные, правила пар."""
 
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import get_tz
-from app.models import BellSchedule, ClassRule, DayOff, Semester, Subject, User
+from app.models import Area, BellSchedule, ClassRule, DayOff, Semester, User
 from app.schemas.schedule import (
     BellsReplace,
     ClassRuleCreate,
@@ -14,8 +14,6 @@ from app.schemas.schedule import (
     DayOffUpdate,
     SemesterCreate,
     SemesterUpdate,
-    SubjectCreate,
-    SubjectUpdate,
 )
 from app.services.base import UserScopedRepository, apply_fields, validate_patch
 from app.services.schedule_sync import SeriesSync
@@ -35,9 +33,9 @@ class DayOffRepo(UserScopedRepository[DayOff]):
     not_found_message = "Выходной не найден"
 
 
-class SubjectRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
 class ClassRuleRepo(UserScopedRepository[ClassRule]):
@@ -55,7 +53,7 @@ class ScheduleService:
         self.semesters = SemesterRepo(db, user_id)
         self.bells = BellRepo(db, user_id)
         self.days_off = DayOffRepo(db, user_id)
-        self.subjects = SubjectRepo(db, user_id)
+        self.areas = AreaRepo(db, user_id)
         self.rules = ClassRuleRepo(db, user_id)
 
     # ---------- семестры ----------
@@ -79,15 +77,15 @@ class ScheduleService:
         return semester
 
     async def delete_semester(self, id: uuid.UUID) -> None:
-        """Удаляет семестр с его звонками и парами. Предметы остаются «без семестра»."""
+        """Удаляет семестр с его звонками и парами. Сферы остаются «без периода»."""
         semester = await self.semesters.get_or_404(id)
         for rule in await self.rules.find_all(ClassRule.semester_id == id):
             self.rules.soft_delete(rule)
             await self.sync.remove_series(rule)
         for bell in await self.bells.find_all(BellSchedule.semester_id == id):
             self.bells.soft_delete(bell)
-        for subject in await self.subjects.find_all(Subject.semester_id == id):
-            subject.semester_id = None
+        for area in await self.areas.find_all(Area.period_id == id):
+            area.period_id = None
         self.semesters.soft_delete(semester)
         await self.db.commit()
 
@@ -143,43 +141,6 @@ class ScheduleService:
         await self.sync.sync_all_class_rules()
         await self.db.commit()
 
-    # ---------- предметы ----------
-
-    async def list_subjects(self, semester_id: uuid.UUID | None = None) -> list[Subject]:
-        where = [Subject.semester_id == semester_id] if semester_id else []
-        return await self.subjects.find_all(*where, order_by=[Subject.name])
-
-    async def get_subject(self, id: uuid.UUID) -> Subject:
-        return await self.subjects.get_or_404(id)
-
-    async def create_subject(self, data: SubjectCreate) -> Subject:
-        if data.semester_id:
-            await self.semesters.get_or_404(data.semester_id)
-        subject = Subject()
-        apply_fields(subject, data)
-        self.subjects.add(subject)
-        await self.db.commit()
-        return subject
-
-    async def update_subject(self, id: uuid.UUID, patch: SubjectUpdate) -> Subject:
-        subject = await self.subjects.get_or_404(id)
-        data = validate_patch(subject, patch, SubjectCreate)
-        if data.semester_id and data.semester_id != subject.semester_id:
-            await self.semesters.get_or_404(data.semester_id)
-        apply_fields(subject, data)
-        await self.db.flush()
-        await self.sync.sync_subject(subject)
-        await self.db.commit()
-        return subject
-
-    async def delete_subject(self, id: uuid.UUID) -> None:
-        subject = await self.subjects.get_or_404(id)
-        for rule in await self.rules.find_all(ClassRule.subject_id == id):
-            self.rules.soft_delete(rule)
-            await self.sync.remove_series(rule)
-        self.subjects.soft_delete(subject)
-        await self.db.commit()
-
     # ---------- правила пар ----------
 
     async def list_rules(self, semester_id: uuid.UUID | None = None) -> list[ClassRule]:
@@ -190,7 +151,7 @@ class ScheduleService:
 
     async def create_rule(self, data: ClassRuleCreate) -> ClassRule:
         await self.semesters.get_or_404(data.semester_id)
-        await self.subjects.get_or_404(data.subject_id)
+        await self.areas.get_or_404(data.area_id)
         rule = ClassRule()
         apply_fields(rule, data)
         self.rules.add(rule)
@@ -202,8 +163,8 @@ class ScheduleService:
     async def update_rule(self, id: uuid.UUID, patch: ClassRuleUpdate) -> ClassRule:
         rule = await self.rules.get_or_404(id)
         data = validate_patch(rule, patch, ClassRuleCreate)
-        if data.subject_id != rule.subject_id:
-            await self.subjects.get_or_404(data.subject_id)
+        if data.area_id != rule.area_id:
+            await self.areas.get_or_404(data.area_id)
         apply_fields(rule, data)
         await self.db.flush()
         await self.sync.sync_class_rules([rule])

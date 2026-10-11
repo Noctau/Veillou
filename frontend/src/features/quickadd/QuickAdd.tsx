@@ -25,7 +25,7 @@ import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
 import { useCreateNote } from '@/features/notes/useNotes'
 import { byId, useActionTypes, useTaskTypes } from '@/features/catalog/useCatalog'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { useAreas } from '@/features/areas/useAreas'
 import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
 import { useCreateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
@@ -58,7 +58,7 @@ const FILE_KINDS: Kind[] = ['task', 'note']
 const PHOTO_TITLE = 'Задание с фото'
 
 /** Неуверенный ввод ушёл в ИИ: быстрый разбор держим на случай «создать как есть». */
-type AiPending = { jobId: string; raw: string; p: QuickParse; day: string | null; subjectId: string | null }
+type AiPending = { jobId: string; raw: string; p: QuickParse; day: string | null; areaId: string | null }
 
 type Saved = { id: string; kind: Kind; title: string; link?: string }
 
@@ -95,7 +95,7 @@ export function QuickAdd() {
   const tz = useTimeZone()
   const [text, setText] = useState(params.get('text') ?? '')
   const [kindOverride, setKindOverride] = useState<Kind | null>(null)
-  const [dropSubject, setDropSubject] = useState(false)
+  const [dropArea, setDropArea] = useState(false)
   const [dropDate, setDropDate] = useState(false)
   const [saved, setSaved] = useState<Saved[]>([])
   const [uploading, setUploading] = useState(false)
@@ -109,7 +109,7 @@ export function QuickAdd() {
 
   const { data: parsed } = useQuickParse(text)
   const parseNow = useParseNow()
-  const { data: subjects } = useSubjects()
+  const { data: areas } = useAreas()
   const actionTypes = byId(useActionTypes().data)
   const taskTypes = byId(useTaskTypes().data)
   const createTask = useCreateTask()
@@ -120,14 +120,14 @@ export function QuickAdd() {
   const live = text.trim() ? parsed : undefined
   const wanted: Kind = kindOverride ?? live?.kind_hint ?? (hasFiles ? 'task' : 'backlog')
   const kind: Kind = hasFiles && !FILE_KINDS.includes(wanted) ? 'task' : wanted
-  const subject = !dropSubject && live?.subject_id ? subjects?.find((s) => s.id === live.subject_id) : undefined
+  const area = !dropArea && live?.area_id ? areas?.find((s) => s.id === live.area_id) : undefined
   const date = dropDate ? null : (live?.date ?? null)
   const needsTime = kind === 'event' && (!date || !live?.time)
 
   const reset = () => {
     setText('')
     setKindOverride(null)
-    setDropSubject(false)
+    setDropArea(false)
     setDropDate(false)
     setSkipAi(false)
   }
@@ -147,13 +147,13 @@ export function QuickAdd() {
     try {
       const p = raw ? await parseNow(raw) : null
       const day = dropDate ? null : (p?.date ?? null)
-      const subjectId = dropSubject ? null : (p?.subject_id ?? null)
+      const areaId = dropArea ? null : (p?.area_id ?? null)
       if (kind === 'task') {
         const t = await createTask.mutateAsync({
           title: p?.title || raw || PHOTO_TITLE,
           task_type_id: p?.task_type_id ?? null,
           description: '',
-          subject_id: subjectId,
+          area_id: areaId,
           action_type_id: p?.action_type_id ?? null,
           deadline: day ? (p?.deadline ?? null) : null,
           priority: 'normal',
@@ -165,7 +165,7 @@ export function QuickAdd() {
         const n = await createNote.mutateAsync({
           title: p?.title || raw || null,
           kind: allImages ? 'photo' : 'file',
-          subject_id: subjectId,
+          area_id: areaId,
           class_date: day,
           body_md: '',
         })
@@ -205,7 +205,7 @@ export function QuickAdd() {
       return
     }
     const day = dropDate ? null : p.date
-    const subjectId = dropSubject ? null : p.subject_id
+    const areaId = dropArea ? null : p.area_id
     const title = p.title || raw
     const restore = () => setText(raw)
 
@@ -217,7 +217,7 @@ export function QuickAdd() {
       const start = wallToUtc(day, p.time, tz)
       reset()
       createEvent.mutate(
-        { kind: 'personal', title, start, end: eventEnd(p, start, tz), note: '', subject_id: subjectId },
+        { kind: 'personal', title, start, end: eventEnd(p, start, tz), note: '', area_id: areaId },
         { onSuccess: (e) => remember({ id: e.id, kind, title, link: '/calendar' }), onError: restore },
       )
       return
@@ -226,7 +226,7 @@ export function QuickAdd() {
     if (kind === 'note') {
       reset()
       createNote.mutate(
-        { title, kind: 'text', subject_id: subjectId, class_date: day, body_md: '' },
+        { title, kind: 'text', area_id: areaId, class_date: day, body_md: '' },
         { onSuccess: (n) => navigate(`/notes/${n.id}`), onError: restore },
       )
       return
@@ -245,25 +245,25 @@ export function QuickAdd() {
     if (p.needs_ai && !skipAi) {
       reset()
       aiParse.mutate(raw, {
-        onSuccess: (jobId) => setAi({ jobId, raw, p, day, subjectId }),
+        onSuccess: (jobId) => setAi({ jobId, raw, p, day, areaId }),
         onError: restore,
       })
       return
     }
 
     reset()
-    createPlainTask(raw, p, day, subjectId)
+    createPlainTask(raw, p, day, areaId)
   }
 
   /** Задание по быстрому разбору (без ИИ). */
-  const createPlainTask = (raw: string, p: QuickParse, day: string | null, subjectId: string | null) => {
+  const createPlainTask = (raw: string, p: QuickParse, day: string | null, areaId: string | null) => {
     const title = p.title || raw
     createTask.mutate(
       {
         title,
         task_type_id: p.task_type_id,
         description: '',
-        subject_id: subjectId,
+        area_id: areaId,
         action_type_id: p.action_type_id,
         deadline: day ? (p.deadline ?? null) : null,
         priority: 'normal',
@@ -299,7 +299,7 @@ export function QuickAdd() {
         title: card.title,
         task_type_id: card.task_type_id,
         description: card.description,
-        subject_id: card.subject_id,
+        area_id: card.area_id,
         action_type_id: card.action_type_id,
         deadline: card.deadline,
         priority: 'normal',
@@ -408,12 +408,12 @@ export function QuickAdd() {
                 <span className="font-medium">{live.title || text.trim()}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {subject && kind !== 'backlog' && (
+                {area && kind !== 'backlog' && (
                   <Chip
-                    icon={<span className={cn('size-2 rounded-full', paletteColor(subject.color).bg)} />}
-                    onRemove={() => setDropSubject(true)}
+                    icon={<span className={cn('size-2 rounded-full', paletteColor(area.color).bg)} />}
+                    onRemove={() => setDropArea(true)}
                   >
-                    {subject.short_name || subject.name}
+                    {area.short_name || area.name}
                   </Chip>
                 )}
                 {dateChip()}
@@ -431,7 +431,7 @@ export function QuickAdd() {
               {kind === 'task' && !hasFiles && live.needs_ai && (
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   <SparklesIcon className="size-3.5 text-primary" />
-                  {skipAi ? 'Сохраню как есть, без ИИ.' : 'ИИ уточнит предмет, тип и срок — вы проверите.'}
+                  {skipAi ? 'Сохраню как есть, без ИИ.' : 'ИИ уточнит сферу, тип и срок — вы проверите.'}
                   <button type="button" className="underline underline-offset-4" onClick={() => setSkipAi((v) => !v)}>
                     {skipAi ? 'с ИИ' : 'без ИИ'}
                   </button>
@@ -449,7 +449,7 @@ export function QuickAdd() {
           busy={createTask.isPending}
           onCreate={(card, breakDown) => void createFromAi(card, breakDown)}
           onPlain={() => {
-            createPlainTask(ai.raw, ai.p, ai.day, ai.subjectId)
+            createPlainTask(ai.raw, ai.p, ai.day, ai.areaId)
             setAi(null)
           }}
           onClose={() => {

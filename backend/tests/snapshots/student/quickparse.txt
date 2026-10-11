@@ -1,19 +1,19 @@
 реферат климатология до 15 окт
-  title=Реферат date=2026-10-15 deadline=2026-10-15 23:59 is_deadline=true subject_id=‹Климатология› task_type_id=‹Реферат› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Реферат date=2026-10-15 deadline=2026-10-15 23:59 is_deadline=true area_id=‹Климатология› task_type_id=‹Реферат› action_type_id=‹Самостоятельная учёба› kind_hint=task
 доклад по физике атмосферы к пятнице
-  title=Доклад date=2026-10-09 deadline=2026-10-09 23:59 is_deadline=true subject_id=‹Физика атмосферы› task_type_id=‹Доклад› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Доклад date=2026-10-09 deadline=2026-10-09 23:59 is_deadline=true area_id=‹Физика атмосферы› task_type_id=‹Доклад› action_type_id=‹Самостоятельная учёба› kind_hint=task
 дз по матану через 2 недели
-  title=Дз date=2026-10-20 deadline=2026-10-20 23:59 subject_id=‹Математический анализ› task_type_id=‹ДЗ› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Дз date=2026-10-20 deadline=2026-10-20 23:59 area_id=‹Математический анализ› task_type_id=‹ДЗ› action_type_id=‹Самостоятельная учёба› kind_hint=task
 прочитать главу 3 учебника по климатологии к 12.10
-  title=Прочитать главу 3 учебника date=2026-10-12 deadline=2026-10-12 23:59 is_deadline=true subject_id=‹Климатология› task_type_id=‹Чтение› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Прочитать главу 3 учебника date=2026-10-12 deadline=2026-10-12 23:59 is_deadline=true area_id=‹Климатология› task_type_id=‹Чтение› action_type_id=‹Самостоятельная учёба› kind_hint=task
 лаба по физат 20.10
-  title=Лаба date=2026-10-20 deadline=2026-10-20 23:59 subject_id=‹Физика атмосферы› task_type_id=‹Лабораторная› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Лаба date=2026-10-20 deadline=2026-10-20 23:59 area_id=‹Физика атмосферы› task_type_id=‹Лабораторная› action_type_id=‹Самостоятельная учёба› kind_hint=task
 сдать курсовую 1 декабря
   title=Сдать курсовую date=2026-12-01 deadline=2026-12-01 23:59 is_deadline=true task_type_id=‹Курсовая› action_type_id=‹Самостоятельная учёба› kind_hint=task needs_ai=true
 подготовиться к экзамену по климатологии до 20 января
-  title=Подготовиться к экзамену date=2027-01-20 deadline=2027-01-20 23:59 is_deadline=true subject_id=‹Климатология› task_type_id=‹Подготовка к экзамену› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Подготовиться к экзамену date=2027-01-20 deadline=2027-01-20 23:59 is_deadline=true area_id=‹Климатология› task_type_id=‹Подготовка к экзамену› action_type_id=‹Самостоятельная учёба› kind_hint=task
 зачёт по англу 15.10.2026
-  title=Зачёт date=2026-10-15 deadline=2026-10-15 23:59 subject_id=‹Английский язык› task_type_id=‹Подготовка к экзамену› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Зачёт date=2026-10-15 deadline=2026-10-15 23:59 area_id=‹Английский язык› task_type_id=‹Подготовка к экзамену› action_type_id=‹Самостоятельная учёба› kind_hint=task
 сделать презентацию к докладу послезавтра
   title=Сделать презентацию к докладу date=2026-10-08 deadline=2026-10-08 23:59 task_type_id=‹Доклад› action_type_id=‹Самостоятельная учёба› kind_hint=task needs_ai=true
 решить задачи к 18:00
@@ -23,11 +23,11 @@
 написать научруку до пятницы
   title=Написать научруку date=2026-10-09 deadline=2026-10-09 23:59 is_deadline=true action_type_id=‹Связь с людьми› kind_hint=task needs_ai=true
 лабораторная по физат, срок 30 октября
-  title=Лабораторная date=2026-10-30 deadline=2026-10-30 23:59 is_deadline=true subject_id=‹Физика атмосферы› task_type_id=‹Лабораторная› action_type_id=‹Самостоятельная учёба› kind_hint=task
+  title=Лабораторная date=2026-10-30 deadline=2026-10-30 23:59 is_deadline=true area_id=‹Физика атмосферы› task_type_id=‹Лабораторная› action_type_id=‹Самостоятельная учёба› kind_hint=task
 сдать реферат
   title=Сдать реферат task_type_id=‹Реферат› action_type_id=‹Самостоятельная учёба› kind_hint=task needs_ai=true
 завтра в 14 консультация по динмету
-  title=Консультация date=2026-10-07 time=14:00 deadline=2026-10-07 14:00 subject_id=‹Динамическая метеорология› action_type_id=‹Самостоятельная учёба› kind_hint=event
+  title=Консультация date=2026-10-07 time=14:00 deadline=2026-10-07 14:00 area_id=‹Динамическая метеорология› action_type_id=‹Самостоятельная учёба› kind_hint=event
 встреча с научруком в четверг в 15:30
   title=Встреча с научруком date=2026-10-08 time=15:30 deadline=2026-10-08 15:30 action_type_id=‹Связь с людьми› kind_hint=event
 бассейн с 19 до 20:30

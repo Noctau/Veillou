@@ -25,16 +25,6 @@ class ClassType(StrEnum):
     other = "other"
 
 
-class ControlForm(StrEnum):
-    """Форма контроля по предмету."""
-
-    exam = "exam"
-    credit = "credit"  # зачёт
-    graded_credit = "graded_credit"  # дифзачёт
-    coursework = "coursework"
-    none = "none"
-
-
 class EventKind(StrEnum):
     class_ = "class"  # пара (из ClassRule)
     personal = "personal"  # личное (жёсткое)
@@ -106,6 +96,34 @@ class CategoryIcon(StrEnum):
     flask_conical = "flask-conical"
     book_open = "book-open"
     clipboard_check = "clipboard-check"
+
+
+# ---------- сферы и поля (Part 2, M16) ----------
+
+
+class FieldType(StrEnum):
+    """Тип пользовательского поля (domain/fields.py)."""
+
+    text = "text"
+    number = "number"
+    bool = "bool"
+    select = "select"  # один из списка
+    multiselect = "multiselect"  # несколько из списка
+    date = "date"
+    contact = "contact"  # имя, роль, телефон, email, ссылка
+    link = "link"
+    area_ref = "area_ref"  # ссылка на другую сферу
+
+
+class AreaSection(StrEnum):
+    """Разделы страницы сферы."""
+
+    schedule = "schedule"
+    tasks = "tasks"
+    notes = "notes"
+    materials = "materials"
+    prep = "prep"
+    projects = "projects"
 
 
 # ---------- задания (M4.2) ----------

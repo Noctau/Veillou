@@ -1,4 +1,4 @@
-"""Шаблоны расписания: семестр, звонки, выходные, предметы, правила пар.
+"""Шаблоны расписания: семестр, звонки, выходные, правила пар (сферы — models/area.py).
 
 Время в шаблонах — «настенное» в TZ пользователя. В календарь они попадают
 через материализацию в `events` (services/schedule_sync.py).
@@ -8,12 +8,12 @@ import uuid
 from datetime import date, time
 from typing import Any
 
-from sqlalchemy import Date, ForeignKey, Index, SmallInteger, String, Text, Time, text
+from sqlalchemy import Date, ForeignKey, Index, SmallInteger, String, Time, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
-from app.domain.enums import ClassType, ControlForm, Parity, RuleParity
+from app.domain.enums import ClassType, Parity, RuleParity
 from app.models.base import UserOwnedMixin
 
 
@@ -62,35 +62,16 @@ class DayOff(UserOwnedMixin, Base):
     title: Mapped[str] = mapped_column(String(200), default="")
 
 
-class Subject(UserOwnedMixin, Base):
-    __tablename__ = "subjects"
-
-    semester_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
-    )
-    name: Mapped[str] = mapped_column(String(200))
-    short_name: Mapped[str | None] = mapped_column(String(50))
-    color: Mapped[str] = mapped_column(String(16), default="#3b82f6")
-    control_form: Mapped[str] = mapped_column(String(20), default=ControlForm.exam)
-    # [{"name": "...", "role": "лектор", "contact": "..."}]
-    teachers: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    # [{"title": "...", "url": "..."}]
-    links: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    # Другие названия для быстрого ввода («клим», «климат»)
-    synonyms: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    notes: Mapped[str] = mapped_column(Text, default="")
-
-
 class ClassRule(UserOwnedMixin, Base):
-    """Пара в сетке недели: день × номер пары × чётность."""
+    """Пара в сетке недели: день × номер пары × чётность. До M17.4 (schedule_rules)."""
 
     __tablename__ = "class_rules"
 
     semester_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("semesters.id", ondelete="CASCADE"), index=True
     )
-    subject_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("subjects.id", ondelete="CASCADE"), index=True
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("areas.id", ondelete="CASCADE"), index=True
     )
     weekday: Mapped[int] = mapped_column(SmallInteger)  # ISO: 1 = Пн
     pair_number: Mapped[int | None] = mapped_column(SmallInteger)

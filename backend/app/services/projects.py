@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import ColumnElement
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
@@ -22,7 +23,7 @@ from app.domain.enums import (
     TaskStatus,
 )
 from app.domain.projects import MilestoneDates, behind_days
-from app.models import Category, Event, Milestone, Project, Subtask, Task, User
+from app.models import Area, Category, Event, Milestone, Project, Subtask, Task, User
 from app.schemas.project import (
     MilestoneCreate,
     MilestoneRead,
@@ -52,6 +53,11 @@ class _CategoryRepo(UserScopedRepository[Category]):
     not_found_message = "Категория не найдена"
 
 
+class _AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
+
+
 _PROJECT_REQUIRED = {"title", "description", "contacts", "links", "status"}
 _MILESTONE_ORDER = [Milestone.date.asc().nulls_last(), Milestone.position, Milestone.created_at]
 
@@ -64,6 +70,7 @@ class ProjectService:
         self.projects = ProjectRepo(db, user.id)
         self.milestones = MilestoneRepo(db, user.id)
         self.categories = _CategoryRepo(db, user.id)
+        self.areas = _AreaRepo(db, user.id)
 
     # ---------- чтение ----------
 
@@ -186,8 +193,12 @@ class ProjectService:
         read.next_milestone = MilestoneRead.model_validate(upcoming) if upcoming else None
         return read
 
-    async def list(self, statuses: Sequence[ProjectStatus] = ()) -> list[ProjectRead]:
-        where = [Project.status.in_(statuses)] if statuses else []
+    async def list(
+        self, statuses: Sequence[ProjectStatus] = (), area_id: uuid.UUID | None = None
+    ) -> list[ProjectRead]:
+        where: list[ColumnElement[bool]] = [Project.status.in_(statuses)] if statuses else []
+        if area_id:
+            where.append(Project.area_id == area_id)
         projects = await self.projects.find_all(
             *where, order_by=[Project.deadline.asc().nulls_last(), Project.created_at]
         )
@@ -215,7 +226,10 @@ class ProjectService:
     async def create(self, data: ProjectCreate) -> ProjectDetail:
         fields = data.model_dump(mode="json")
         fields["category_id"] = data.category_id
+        fields["area_id"] = data.area_id
         fields["deadline"] = data.deadline
+        if data.area_id:
+            await self.areas.get_or_404(data.area_id)
         if data.category_id:
             await self.categories.get_or_404(data.category_id)
         else:
@@ -240,6 +254,10 @@ class ProjectService:
             changes["category_id"] = patch.category_id
             if patch.category_id:
                 await self.categories.get_or_404(patch.category_id)
+        if "area_id" in changes:
+            changes["area_id"] = patch.area_id
+            if patch.area_id and patch.area_id != project.area_id:
+                await self.areas.get_or_404(patch.area_id)
         if "deadline" in changes:
             changes["deadline"] = patch.deadline
         for name, value in changes.items():

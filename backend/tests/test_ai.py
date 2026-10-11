@@ -23,6 +23,7 @@ from app.worker.__main__ import build_handlers
 
 from .test_attachments import upload
 from .test_schedule_api import API, other_client
+from .test_schedule_api import make_area as _make_area
 from .test_tasks import add_subtask, get_task, make_task, make_task_type
 
 TZ = get_tz("Europe/Moscow")
@@ -440,7 +441,7 @@ async def test_templates(auth_client, session):
         ("реферат клим до пт", ParseResult("реферат", kind_hint=KindHint.task), True),
         (
             "реферат клим до пт",
-            ParseResult("реферат", kind_hint=KindHint.task, subject_id=1, date=now_utc().date()),
+            ParseResult("реферат", kind_hint=KindHint.task, area_id=1, date=now_utc().date()),
             False,
         ),
         ("x" * 81, ParseResult("x"), True),
@@ -452,16 +453,12 @@ def test_needs_ai(text, result, expected):
     assert needs_ai(text, result) is expected
 
 
-async def make_subject(client: AsyncClient, name: str, short: str) -> dict:
-    resp = await client.post(
-        f"{API}/subjects", json={"name": name, "short_name": short, "color": "#3b82f6"}
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+async def make_area(client: AsyncClient, name: str, short: str) -> dict:
+    return await _make_area(client, name=name, short_name=short, color="#3b82f6")
 
 
 async def test_ai_parse_card(auth_client, fake):
-    subject = await make_subject(auth_client, "Климатология", "клим")
+    subject = await make_area(auth_client, "Климатология", "клим")
     report = await make_task_type(auth_client, name="Доклад", synonyms=["доклад", "слайды"])
     text = "Нужно подготовить доклад про Эль-Ниньо на 10 минут, со слайдами, к семинару Петрова"
     job_id = (await auth_client.post(f"{API}/quick-add/ai-parse", json={"text": text})).json()[
@@ -484,7 +481,7 @@ async def test_ai_parse_card(auth_client, fake):
     assert draft["kind"] == "task"
     assert draft["title"] == "Доклад про Эль-Ниньо"
     assert draft["task_type_id"] == report["id"]
-    assert draft["subject_id"] == subject["id"]
+    assert draft["area_id"] == subject["id"]
     deadline = datetime.fromisoformat(draft["deadline"])
     assert deadline == wall_to_utc(date(2030, 1, 9), time(23, 59), TZ)
     assert draft["text"] == text

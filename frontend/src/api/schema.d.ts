@@ -224,43 +224,6 @@ export interface paths {
         patch: operations["update_day_off"];
         trace?: never;
     };
-    "/api/v1/subjects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Subjects */
-        get: operations["list_subjects"];
-        put?: never;
-        /** Create Subject */
-        post: operations["create_subject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/subjects/{subject_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Subject */
-        get: operations["read_subject"];
-        put?: never;
-        post?: never;
-        /** Delete Subject */
-        delete: operations["delete_subject"];
-        options?: never;
-        head?: never;
-        /** Update Subject */
-        patch: operations["update_subject"];
-        trace?: never;
-    };
     "/api/v1/class-rules": {
         parameters: {
             query?: never;
@@ -295,6 +258,92 @@ export interface paths {
         head?: never;
         /** Update Class Rule */
         patch: operations["update_class_rule"];
+        trace?: never;
+    };
+    "/api/v1/area-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Area Types */
+        get: operations["list_area_types"];
+        put?: never;
+        /** Create Area Type */
+        post: operations["create_area_type"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/area-types/{area_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Area Type
+         * @description Тип с живыми сферами не удаляется — 409.
+         */
+        delete: operations["delete_area_type"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Area Type
+         * @description `fields` — полный список: поле без id — новое, пропавшее — удалено (значения
+         *     сфер остаются и вернутся, если поле с тем же id прислать снова).
+         */
+        patch: operations["update_area_type"];
+        trace?: never;
+    };
+    "/api/v1/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Areas
+         * @description Все сферы (и архивные — у них `archived_at`), по названию.
+         */
+        get: operations["list_areas"];
+        put?: never;
+        /** Create Area */
+        post: operations["create_area"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/areas/{area_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Area */
+        get: operations["read_area"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Area
+         * @description Удаляет сферу и её правила пар; задачи и заметки остаются.
+         */
+        delete: operations["delete_area"];
+        options?: never;
+        head?: never;
+        /** Update Area */
+        patch: operations["update_area"];
         trace?: never;
     };
     "/api/v1/events": {
@@ -751,10 +800,10 @@ export interface paths {
         put?: never;
         /**
          * Parse Quick Add
-         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, типы.
+         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, сфера, типы.
          *
          *     Ничего не сохраняет — клиент создаёт задание / дело / событие обычными запросами.
-         *     `needs_ai` — разбор неуверенный (длинный текст, задание без срока или предмета):
+         *     `needs_ai` — разбор неуверенный (длинный текст, задание без срока или сферы):
          *     стоит спросить ИИ (`POST /quick-add/ai-parse`).
          */
         post: operations["parse_quick_add"];
@@ -927,7 +976,7 @@ export interface paths {
         put?: never;
         /**
          * Create Note
-         * @description С `event_id` предмет и дата берутся из пары, если не указаны.
+         * @description С `event_id` сфера и дата берутся из пары, если не указаны.
          */
         post: operations["create_note"];
         delete?: never;
@@ -948,7 +997,7 @@ export interface paths {
         /**
          * Note For Event
          * @description «Конспект к этой паре»: открывает уже начатый конспект пары (200) или
-         *     создаёт новый с предметом, датой и названием из пары (201).
+         *     создаёт новый со сферой, датой и названием из пары (201).
          */
         post: operations["note_for_event"];
         delete?: never;
@@ -1033,7 +1082,7 @@ export interface paths {
         put?: never;
         /**
          * Create Reading Task
-         * @description Задание «прочитать …» (тип «чтение», предмет источника, ссылка в описании).
+         * @description Задание «прочитать …» (тип «чтение», сфера источника, ссылка в описании).
          */
         post: operations["create_reading_task"];
         delete?: never;
@@ -1323,7 +1372,7 @@ export interface paths {
         };
         /**
          * List Exams
-         * @description Экзамены (ближайшие первыми); с subject_id — только по предмету.
+         * @description Экзамены (ближайшие первыми); с area_id — только по сфере.
          */
         get: operations["list_exams"];
         put?: never;
@@ -1797,7 +1846,7 @@ export interface paths {
         /**
          * Ai Parse
          * @description Разобрать текст ИИ (когда quickparse не уверен). Ничего не создаёт —
-         *     в результате карточка: что это, название, предмет, тип, дедлайн.
+         *     в результате карточка: что это, название, сфера, тип, дедлайн.
          */
         post: operations["ai_parse"];
         delete?: never;
@@ -1818,7 +1867,7 @@ export interface paths {
         /**
          * Recognize Photo
          * @description Распознать фото задания (его вложения-картинки): текст — в описание,
-         *     дедлайн, предмет и тип — если их ещё нет.
+         *     дедлайн, сфера и тип — если их ещё нет.
          */
         post: operations["recognize_photo"];
         delete?: never;
@@ -1972,6 +2021,181 @@ export interface components {
             prefer_morning?: boolean | null;
             /** Position */
             position?: number | null;
+        };
+        /** AreaCreate */
+        AreaCreate: {
+            /**
+             * Area Type Id
+             * Format: uuid
+             */
+            area_type_id: string;
+            /**
+             * Period Id
+             * @description Период (семестр); null — всегда
+             */
+            period_id?: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name?: string | null;
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Synonyms */
+            synonyms?: string[];
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** AreaRead */
+        AreaRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Area Type Id
+             * Format: uuid
+             */
+            area_type_id: string;
+            /** Period Id */
+            period_id: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name: string | null;
+            /** Color */
+            color: string;
+            /** Synonyms */
+            synonyms: string[];
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes: string;
+            /** Archived At */
+            archived_at: string | null;
+        };
+        /**
+         * AreaSection
+         * @description Разделы страницы сферы.
+         * @enum {string}
+         */
+        AreaSection: "schedule" | "tasks" | "notes" | "materials" | "prep" | "projects";
+        /** AreaTypeCreate */
+        AreaTypeCreate: {
+            /**
+             * Name
+             * @description В единственном числе: «Ученик»
+             */
+            name: string;
+            /**
+             * Name Plural
+             * @description Во множественном: «Ученики»
+             */
+            name_plural: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /**
+             * Sections
+             * @description Разделы страницы сферы по порядку
+             */
+            sections?: components["schemas"]["AreaSection"][];
+        };
+        /** AreaTypeRead */
+        AreaTypeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Key
+             * @description Ключ сида/миграции; у своих типов — null
+             */
+            key: string | null;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural: string;
+            icon: components["schemas"]["CategoryIcon"];
+            /** Color */
+            color: string;
+            /**
+             * Fields
+             * @description Живые поля (удалённые не показываются)
+             */
+            fields: components["schemas"]["FieldDefRead"][];
+            /** Sections */
+            sections: components["schemas"]["AreaSection"][];
+            /** Position */
+            position: number;
+        };
+        /** AreaTypeUpdate */
+        AreaTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Name Plural */
+            name_plural?: string | null;
+            icon?: components["schemas"]["CategoryIcon"] | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Полный список полей
+             */
+            fields?: components["schemas"]["FieldDefIn"][] | null;
+            /** Sections */
+            sections?: components["schemas"]["AreaSection"][] | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** AreaUpdate */
+        AreaUpdate: {
+            /** Period Id */
+            period_id?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Short Name */
+            short_name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /**
+             * Fields
+             * @description Все значения полей разом
+             */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Archived
+             * @description В архив / из архива
+             */
+            archived?: boolean | null;
         };
         /**
          * AttachmentOrder
@@ -2480,10 +2704,10 @@ export interface components {
              */
             semester_id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /**
              * Weekday
              * @description ISO: 1 = Пн, 7 = Вс
@@ -2524,10 +2748,10 @@ export interface components {
              */
             semester_id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /** Weekday */
             weekday: number;
             /** Pair Number */
@@ -2549,8 +2773,8 @@ export interface components {
         };
         /** ClassRuleUpdate */
         ClassRuleUpdate: {
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Weekday */
             weekday?: number | null;
             /** Pair Number */
@@ -2576,11 +2800,23 @@ export interface components {
          */
         ClassType: "lecture" | "seminar" | "lab" | "other";
         /**
-         * ControlForm
-         * @description Форма контроля по предмету.
-         * @enum {string}
+         * Contact
+         * @description Контакт проекта: научный руководитель, заказчик.
          */
-        ControlForm: "exam" | "credit" | "graded_credit" | "coursework" | "none";
+        Contact: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @default
+             */
+            role: string;
+            /**
+             * Contact
+             * @default
+             */
+            contact: string;
+        };
         /** DayOffCreate */
         DayOffCreate: {
             /**
@@ -2747,8 +2983,8 @@ export interface components {
              * @default
              */
             note: string;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
         };
         /**
          * EventKind
@@ -2791,8 +3027,8 @@ export interface components {
             source_type: string | null;
             /** Source Id */
             source_id: string | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Location */
             location: string | null;
             /** Color */
@@ -2834,13 +3070,13 @@ export interface components {
         /** ExamCreate */
         ExamCreate: {
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /**
              * Title
-             * @description Пусто — «Экзамен: <предмет>»
+             * @description Пусто — «Экзамен: <сфера>»
              * @default
              */
             title: string;
@@ -2895,13 +3131,13 @@ export interface components {
              */
             id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /**
              * Title
-             * @description Готовое название (с предметом, если своё не задано)
+             * @description Готовое название (со сферой, если своё не задано)
              */
             title: string;
             /**
@@ -3000,13 +3236,13 @@ export interface components {
              */
             id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /**
              * Title
-             * @description Готовое название (с предметом, если своё не задано)
+             * @description Готовое название (со сферой, если своё не задано)
              */
             title: string;
             /**
@@ -3106,6 +3342,61 @@ export interface components {
          * @enum {string}
          */
         Feel: "faster" | "ok" | "slower";
+        /**
+         * FieldDefIn
+         * @description Поле типа. Без `id` (или с незнакомым) — новое поле; id выдаёт сервер.
+         *     Поле, которого нет в новом списке, считается удалённым: значения сфер остаются.
+         */
+        FieldDefIn: {
+            /** Id */
+            id?: string | null;
+            /** Label */
+            label: string;
+            type: components["schemas"]["FieldType"];
+            /**
+             * Options
+             * @description Для select / multiselect
+             */
+            options?: string[];
+            /**
+             * Multiple
+             * @description Много значений: text, contact, link, area_ref
+             * @default false
+             */
+            multiple: boolean;
+            /**
+             * Show In Reminder
+             * @default false
+             */
+            show_in_reminder: boolean;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** FieldDefRead */
+        FieldDefRead: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["FieldType"];
+            /** Options */
+            options: string[];
+            /** Multiple */
+            multiple: boolean;
+            /** Show In Reminder */
+            show_in_reminder: boolean;
+            /** Required */
+            required: boolean;
+        };
+        /**
+         * FieldType
+         * @description Тип пользовательского поля (domain/fields.py).
+         * @enum {string}
+         */
+        FieldType: "text" | "number" | "bool" | "select" | "multiselect" | "date" | "contact" | "link" | "area_ref";
         /** FreeStart */
         FreeStart: {
             /**
@@ -3193,6 +3484,19 @@ export interface components {
          * @enum {string}
          */
         KindHint: "task" | "backlog" | "event";
+        /** Link */
+        Link: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+        };
         /** LoadBudgetCreate */
         LoadBudgetCreate: {
             /** Name */
@@ -3374,10 +3678,10 @@ export interface components {
             /** @default text */
             kind: components["schemas"]["NoteKind"];
             /**
-             * Subject Id
-             * @description null — предмет пары
+             * Area Id
+             * @description null — сфера пары
              */
-            subject_id?: string | null;
+            area_id?: string | null;
             /**
              * Event Id
              * @description Пара, к которой конспект
@@ -3434,8 +3738,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3491,8 +3795,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3536,8 +3840,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3579,8 +3883,8 @@ export interface components {
             /** Title */
             title?: string | null;
             kind?: components["schemas"]["NoteKind"] | null;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Event Id */
             event_id?: string | null;
             /** Class Date */
@@ -3621,8 +3925,8 @@ export interface components {
             description: string;
             /** Task Type Id */
             task_type_id?: string | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Action Type Id */
@@ -3654,8 +3958,8 @@ export interface components {
             text: string;
             /** Task Type Id */
             task_type_id?: string | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /**
@@ -3826,6 +4130,11 @@ export interface components {
              * @description null — «Учёба»
              */
             category_id?: string | null;
+            /**
+             * Area Id
+             * @description Сфера проекта (необязательно)
+             */
+            area_id?: string | null;
             /** Deadline */
             deadline?: string | null;
             /**
@@ -3834,9 +4143,9 @@ export interface components {
              */
             description: string;
             /** Contacts */
-            contacts?: components["schemas"]["Teacher"][];
+            contacts?: components["schemas"]["Contact"][];
             /** Links */
-            links?: components["schemas"]["SubjectLink"][];
+            links?: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
         };
@@ -3851,14 +4160,16 @@ export interface components {
             title: string;
             /** Category Id */
             category_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Description */
             description: string;
             /** Contacts */
-            contacts: components["schemas"]["Teacher"][];
+            contacts: components["schemas"]["Contact"][];
             /** Links */
-            links: components["schemas"]["SubjectLink"][];
+            links: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
@@ -3919,14 +4230,16 @@ export interface components {
             title: string;
             /** Category Id */
             category_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Description */
             description: string;
             /** Contacts */
-            contacts: components["schemas"]["Teacher"][];
+            contacts: components["schemas"]["Contact"][];
             /** Links */
-            links: components["schemas"]["SubjectLink"][];
+            links: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
@@ -3985,14 +4298,16 @@ export interface components {
             title?: string | null;
             /** Category Id */
             category_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Deadline */
             deadline?: string | null;
             /** Description */
             description?: string | null;
             /** Contacts */
-            contacts?: components["schemas"]["Teacher"][] | null;
+            contacts?: components["schemas"]["Contact"][] | null;
             /** Links */
-            links?: components["schemas"]["SubjectLink"][] | null;
+            links?: components["schemas"]["Link"][] | null;
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
             status?: components["schemas"]["ProjectStatus"] | null;
@@ -4069,8 +4384,8 @@ export interface components {
             deadline: string | null;
             /** Is Deadline */
             is_deadline: boolean;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /**
              * Task Type Id
              * @description Тип задачи из справочника по словам
@@ -4095,7 +4410,7 @@ export interface components {
         };
         /**
          * ReadingTaskCreate
-         * @description Задание «прочитать» из источника: предмет источника, тип — по словам названия.
+         * @description Задание «прочитать» из источника: сфера источника, тип — по словам названия.
          */
         ReadingTaskCreate: {
             /**
@@ -4513,10 +4828,10 @@ export interface components {
         /** SourceCreate */
         SourceCreate: {
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /** Title */
             title: string;
             /**
@@ -4555,10 +4870,10 @@ export interface components {
              */
             id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /** Title */
             title: string;
             /** Author */
@@ -4589,8 +4904,8 @@ export interface components {
         SourceStatus: "to_read" | "reading" | "done";
         /** SourceUpdate */
         SourceUpdate: {
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Title */
             title?: string | null;
             /** Author */
@@ -4603,91 +4918,6 @@ export interface components {
             status?: components["schemas"]["SourceStatus"] | null;
             /** Note */
             note?: string | null;
-        };
-        /** SubjectCreate */
-        SubjectCreate: {
-            /** Semester Id */
-            semester_id?: string | null;
-            /** Name */
-            name: string;
-            /** Short Name */
-            short_name?: string | null;
-            /**
-             * Color
-             * @default #3b82f6
-             */
-            color: string;
-            /** @default exam */
-            control_form: components["schemas"]["ControlForm"];
-            /** Teachers */
-            teachers?: components["schemas"]["Teacher"][];
-            /** Links */
-            links?: components["schemas"]["SubjectLink"][];
-            /** Synonyms */
-            synonyms?: string[];
-            /**
-             * Notes
-             * @default
-             */
-            notes: string;
-        };
-        /** SubjectLink */
-        SubjectLink: {
-            /**
-             * Title
-             * @default
-             */
-            title: string;
-            /**
-             * Url
-             * Format: uri
-             */
-            url: string;
-        };
-        /** SubjectRead */
-        SubjectRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Semester Id */
-            semester_id: string | null;
-            /** Name */
-            name: string;
-            /** Short Name */
-            short_name: string | null;
-            /** Color */
-            color: string;
-            control_form: components["schemas"]["ControlForm"];
-            /** Teachers */
-            teachers: components["schemas"]["Teacher"][];
-            /** Links */
-            links: components["schemas"]["SubjectLink"][];
-            /** Synonyms */
-            synonyms: string[];
-            /** Notes */
-            notes: string;
-        };
-        /** SubjectUpdate */
-        SubjectUpdate: {
-            /** Semester Id */
-            semester_id?: string | null;
-            /** Name */
-            name?: string | null;
-            /** Short Name */
-            short_name?: string | null;
-            /** Color */
-            color?: string | null;
-            control_form?: components["schemas"]["ControlForm"] | null;
-            /** Teachers */
-            teachers?: components["schemas"]["Teacher"][] | null;
-            /** Links */
-            links?: components["schemas"]["SubjectLink"][] | null;
-            /** Synonyms */
-            synonyms?: string[] | null;
-            /** Notes */
-            notes?: string | null;
         };
         /** SubtaskCreate */
         SubtaskCreate: {
@@ -4839,8 +5069,8 @@ export interface components {
              * @default
              */
             description: string;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /**
              * Category Id
              * @description null — выводится: тип задачи → проект → тип действия
@@ -4894,8 +5124,8 @@ export interface components {
             task_type_id: string | null;
             /** Description */
             description: string;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Category Id */
             category_id: string | null;
             /** Action Type Id */
@@ -4962,8 +5192,8 @@ export interface components {
             task_type_id: string | null;
             /** Description */
             description: string;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Category Id */
             category_id: string | null;
             /** Action Type Id */
@@ -5096,8 +5326,8 @@ export interface components {
             task_type_id?: string | null;
             /** Description */
             description?: string | null;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Category Id */
             category_id?: string | null;
             /** Action Type Id */
@@ -5122,21 +5352,6 @@ export interface components {
             recurrence?: string | null;
             /** Recurrence Start */
             recurrence_start?: string | null;
-        };
-        /** Teacher */
-        Teacher: {
-            /** Name */
-            name: string;
-            /**
-             * Role
-             * @default
-             */
-            role: string;
-            /**
-             * Contact
-             * @default
-             */
-            contact: string;
         };
         /** TelegramLinkCodeRead */
         TelegramLinkCodeRead: {
@@ -7294,480 +7509,6 @@ export interface operations {
             };
         };
     };
-    list_subjects: {
-        parameters: {
-            query?: {
-                semester_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    create_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubjectCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    read_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    update_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubjectUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     list_class_rules: {
         parameters: {
             query?: {
@@ -8072,6 +7813,858 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClassRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_area_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_areas: {
+        parameters: {
+            query?: {
+                period_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
                 };
             };
             /** @description Bad Request */
@@ -10897,7 +11490,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["TaskStatus"][];
-                subject_id?: string | null;
+                area_id?: string | null;
                 project_id?: string | null;
                 due_before?: string | null;
             };
@@ -12710,6 +13303,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["ProjectStatus"][];
+                area_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13471,7 +14065,7 @@ export interface operations {
     list_notes: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
                 event_id?: string[];
                 limit?: number;
             };
@@ -14043,7 +14637,7 @@ export interface operations {
     list_sources: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -14616,7 +15210,7 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
-                subject_id?: string | null;
+                area_id?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -15921,7 +16515,7 @@ export interface operations {
     list_exams: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
             };
             header?: never;
             path?: never;

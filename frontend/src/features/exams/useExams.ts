@@ -14,11 +14,11 @@ export type ExamQuestion = components['schemas']['ExamQuestionRead']
 export type ExamQuestionStatus = components['schemas']['ExamQuestionStatus']
 export type ExamSession = components['schemas']['ExamSessionRead']
 
-export function useExams(subjectId: string) {
+export function useExams(areaId: string) {
   return useQuery({
-    queryKey: queryKeys.exams(subjectId),
+    queryKey: queryKeys.exams(areaId),
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/exams', { params: { query: { subject_id: subjectId } } })
+      const { data, error } = await api.GET('/api/v1/exams', { params: { query: { area_id: areaId } } })
       if (error) throw error
       return data
     },

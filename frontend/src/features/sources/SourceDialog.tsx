@@ -26,12 +26,12 @@ const KINDS = Object.keys(SOURCE_KIND_LABEL) as SourceKind[]
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  subjectId: string
+  areaId: string
   /** Нет — новый источник. */
   source?: Source
 }
 
-export function SourceDialog({ open, onOpenChange, subjectId, source }: Props) {
+export function SourceDialog({ open, onOpenChange, areaId, source }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
@@ -39,16 +39,16 @@ export function SourceDialog({ open, onOpenChange, subjectId, source }: Props) {
           <DialogTitle>{source ? 'Источник' : 'Новый источник'}</DialogTitle>
         </DialogHeader>
         {open && (
-          <SourceForm key={source?.id ?? 'new'} subjectId={subjectId} source={source} onDone={() => onOpenChange(false)} />
+          <SourceForm key={source?.id ?? 'new'} areaId={areaId} source={source} onDone={() => onOpenChange(false)} />
         )}
       </DialogContent>
     </Dialog>
   )
 }
 
-function SourceForm({ subjectId, source, onDone }: { subjectId: string; source?: Source; onDone: () => void }) {
+function SourceForm({ areaId, source, onDone }: { areaId: string; source?: Source; onDone: () => void }) {
   const create = useCreateSource()
-  const update = useUpdateSource(subjectId)
+  const update = useUpdateSource(areaId)
   const remove = useDeleteSource()
   const [title, setTitle] = useState(source?.title ?? '')
   const [author, setAuthor] = useState(source?.author ?? '')
@@ -66,7 +66,7 @@ function SourceForm({ subjectId, source, onDone }: { subjectId: string; source?:
     }
     const body = { title: title.trim(), author: author.trim(), kind, required, url: link, note }
     if (source) update.mutate({ id: source.id, body }, { onSuccess: onDone })
-    else create.mutate({ ...body, subject_id: subjectId, status: 'to_read' }, { onSuccess: onDone })
+    else create.mutate({ ...body, area_id: areaId, status: 'to_read' }, { onSuccess: onDone })
   }
 
   return (

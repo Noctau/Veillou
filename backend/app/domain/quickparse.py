@@ -1,5 +1,5 @@
 """Быстрый ввод: из строки «реферат климатология до 15 окт» достаёт название, дату,
-время, предмет и подсказку, что это (задание / дело в ящик / событие).
+время, сферу и подсказку, что это (задание / дело в ящик / событие).
 
 Детерминированно и мгновенно, без ИИ и без БД. Время — настенное в TZ `now`.
 
@@ -11,7 +11,7 @@
   «на следующей неделе»;
 - время: «в 14», «в 14:30», «в 9 утра», «в 7 вечера», «к 18:00», «14:30»,
   «утром / днём / вечером», «с 14 до 16»; длительность «на 2 часа», «на 30 мин»;
-- предмет — по названию, короткому имени и синонимам, с учётом падежей
+- сфера — по названию, короткому имени и синонимам, с учётом падежей
   («по климатологии», «клим»);
 - тип задачи и тип действия — по словарям слов, которые передаёт сервис
   (сейчас — словари сида справочников, services/catalog.py; M21.1 — синонимы).
@@ -37,7 +37,7 @@ class KindHint(StrEnum):
 
 
 @dataclass(frozen=True)
-class SubjectRef:
+class AreaRef:
     id: Hashable
     names: tuple[str, ...]  # название, короткое имя, синонимы
 
@@ -52,7 +52,7 @@ class ParseResult:
     # date + time (или 23:59) в TZ `now`; только если есть дата
     deadline: datetime | None = None
     is_deadline: bool = False
-    subject_id: Hashable | None = None
+    area_id: Hashable | None = None
     # id типов из словарей слов, которые передал сервис (`task_words`, `action_words`)
     task_type: Hashable | None = None
     action_type: Hashable | None = None
@@ -215,13 +215,11 @@ def _word_match(name: str, token: str) -> bool:
     return stem is not None and token.startswith(stem) and len(token) - len(stem) <= 4
 
 
-def _match_subject(
-    sc: _Scanner, subjects: Sequence[SubjectRef]
-) -> tuple[Hashable, int, int] | None:
+def _match_area(sc: _Scanner, areas: Sequence[AreaRef]) -> tuple[Hashable, int, int] | None:
     tokens = [m for m in _word_re.finditer(sc.text) if sc.free(m.start(), m.end())]
     best: dict[Hashable, tuple[int, int, int]] = {}  # id -> (score, start, end)
-    for subject in subjects:
-        for raw in subject.names:
+    for area in areas:
+        for raw in area.names:
             words = _word_re.findall(_normalize(raw))
             if not words:
                 continue
@@ -229,15 +227,15 @@ def _match_subject(
                 window = tokens[i : i + len(words)]
                 if all(_word_match(w, t.group()) for w, t in zip(words, window, strict=True)):
                     score = sum(len(w) for w in words)
-                    if score > best.get(subject.id, (0, 0, 0))[0]:
-                        best[subject.id] = (score, window[0].start(), window[-1].end())
+                    if score > best.get(area.id, (0, 0, 0))[0]:
+                        best[area.id] = (score, window[0].start(), window[-1].end())
     if not best:
         return None
     ranked = sorted(best.items(), key=lambda kv: -kv[1][0])
     if len(ranked) > 1 and ranked[0][1][0] == ranked[1][1][0]:
         return None  # неоднозначно
-    subject_id, (_, start, end) = ranked[0]
-    return subject_id, start, end
+    area_id, (_, start, end) = ranked[0]
+    return area_id, start, end
 
 
 def _clean_title(text: str) -> str:
@@ -253,7 +251,7 @@ def _clean_title(text: str) -> str:
 def parse(
     text: str,
     now: datetime,
-    subjects: Sequence[SubjectRef] = (),
+    areas: Sequence[AreaRef] = (),
     task_words: Words = (),
     action_words: Words = (),
 ) -> ParseResult:
@@ -436,7 +434,7 @@ def parse(
     if at is not None and day is None:
         day = today if at > now.time() else today + timedelta(days=1)
 
-    # Тип задачи и предмет — по тексту без дат (в названии остаются)
+    # Тип задачи и сфера — по тексту без дат (в названии остаются)
     task_type: Hashable | None = None
     for candidate, pattern in task_words:
         if sc.find(_b(f"(?:{pattern})")):
@@ -444,15 +442,15 @@ def parse(
             break
     has_study_verb = sc.find(_b(f"(?:{STUDY_VERBS})")) is not None
 
-    subject_id: Hashable | None = None
-    if found := _match_subject(sc, subjects):
-        subject_id, start, end = found
+    area_id: Hashable | None = None
+    if found := _match_area(sc, areas):
+        area_id, start, end = found
         before = sc.text[:start].rstrip()
         cut_from = start
         if before.endswith(" по") or before == "по":
             cut_from = before.rfind("по")
         title_without = _clean_title(sc.rest()[:cut_from] + sc.rest()[end:])
-        # Если от названия ничего не остаётся — предмет в нём оставляем
+        # Если от названия ничего не остаётся — сферу в нём оставляем
         if title_without:
             sc.taken.append((cut_from, end))
 
@@ -467,13 +465,13 @@ def parse(
 
     action_type = guess(title, action_words)
     default_action = action_type is None and bool(
-        task_type is not None or subject_id is not None or has_study_verb
+        task_type is not None or area_id is not None or has_study_verb
     )
 
     kind: KindHint
     if at is not None and not is_deadline and task_type is None:
         kind = KindHint.event
-    elif task_type is not None or subject_id is not None or is_deadline:
+    elif task_type is not None or area_id is not None or is_deadline:
         kind = KindHint.task
     else:
         kind = KindHint.backlog
@@ -486,7 +484,7 @@ def parse(
         duration_min=duration,
         deadline=deadline,
         is_deadline=is_deadline,
-        subject_id=subject_id,
+        area_id=area_id,
         task_type=task_type,
         action_type=action_type,
         default_action=default_action,
@@ -504,12 +502,12 @@ def needs_ai(text: str, p: ParseResult) -> bool:
     """Разбор неуверенный — стоит спросить ИИ.
 
     Длинный или многострочный текст (пересланное задание) или задание без
-    срока либо без предмета. Короткие дела и события с временем ИИ не нужны.
+    срока либо без сферы. Короткие дела и события с временем ИИ не нужны.
     """
     text = text.strip()
     if "\n" in text or len(text) > AI_TEXT_LEN:
         return True
-    return p.kind_hint == KindHint.task and (p.date is None or p.subject_id is None)
+    return p.kind_hint == KindHint.task and (p.date is None or p.area_id is None)
 
 
 _DATE_CUE = re.compile(

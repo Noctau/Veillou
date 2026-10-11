@@ -233,7 +233,7 @@ function Plan({ exam }: { exam: ExamDetail }) {
   )
 }
 
-function ExamView({ examId, subjectId }: { examId: string; subjectId: string }) {
+function ExamView({ examId, areaId }: { examId: string; areaId: string }) {
   const tz = useTimeZone()
   const { data: exam, isPending, isError, error } = useExam(examId)
   const [editing, setEditing] = useState(false)
@@ -280,14 +280,14 @@ function ExamView({ examId, subjectId }: { examId: string; subjectId: string }) 
       </Card>
       <Plan exam={exam} />
       <Questions exam={exam} />
-      <ExamDialog subjectId={subjectId} exam={exam} open={editing} onOpenChange={setEditing} />
+      <ExamDialog areaId={areaId} exam={exam} open={editing} onOpenChange={setEditing} />
     </div>
   )
 }
 
-/** Вкладка «Экзамен» предмета: дата, билеты со статусами, план подготовки по дням (сценарий 8). */
-export function ExamPanel({ subjectId, emptyHint }: { subjectId: string; emptyHint?: string }) {
-  const { data: exams, isPending, isError, error } = useExams(subjectId)
+/** Раздел «Подготовка» сферы: дата, билеты со статусами, план подготовки по дням (сценарий 8). */
+export function ExamPanel({ areaId, emptyHint }: { areaId: string; emptyHint?: string }) {
+  const { data: exams, isPending, isError, error } = useExams(areaId)
   const [creating, setCreating] = useState(false)
   if (isPending) return <Skeleton className="h-32" />
   if (isError) return <p className="text-sm text-destructive">{errorMessage(error)}</p>
@@ -306,14 +306,14 @@ export function ExamPanel({ subjectId, emptyHint }: { subjectId: string; emptyHi
       ) : (
         <>
           {exams.map((e) => (
-            <ExamView key={e.id} examId={e.id} subjectId={subjectId} />
+            <ExamView key={e.id} examId={e.id} areaId={areaId} />
           ))}
           <Button variant="ghost" size="sm" className="self-start" onClick={() => setCreating(true)}>
             <PlusIcon /> Ещё экзамен
           </Button>
         </>
       )}
-      <ExamDialog subjectId={subjectId} open={creating} onOpenChange={setCreating} />
+      <ExamDialog areaId={areaId} open={creating} onOpenChange={setCreating} />
     </div>
   )
 }

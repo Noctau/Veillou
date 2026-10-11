@@ -21,9 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { type Subject, useCreateSubject } from '@/features/subjects/useSubjects'
+import { type Area, useAreaTypes, useCreateArea } from '@/features/areas/useAreas'
 import { PALETTE, paletteColor } from '@/lib/colors'
-import { CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
+import { AREAS_UI, CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
 import { cn } from '@/lib/utils'
 import { WEEKDAYS_FULL, WEEKDAYS_SHORT } from '@/lib/time'
 
@@ -40,13 +40,13 @@ import {
   useUpdateClassRule,
 } from './useSchedule'
 
-const NEW_SUBJECT = '__new__'
+const NEW_AREA = '__new__'
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'ЧЧ:ММ')
 
 const schema = z
   .object({
-    subject_id: z.string().min(1, 'Выберите предмет'),
-    new_subject: z.string().trim(),
+    area_id: z.string().min(1, 'Выберите сферу'),
+    new_area: z.string().trim(),
     weekday: z.number().int().min(1).max(7),
     pair_number: z.number().int().nullable(),
     custom_time: z.boolean(),
@@ -59,9 +59,9 @@ const schema = z
     valid_from: z.string(),
     valid_to: z.string(),
   })
-  .refine((v) => v.subject_id !== NEW_SUBJECT || v.new_subject.length > 0, {
-    message: 'Название предмета',
-    path: ['new_subject'],
+  .refine((v) => v.area_id !== NEW_AREA || v.new_area.length > 0, {
+    message: 'Название сферы',
+    path: ['new_area'],
   })
   .refine((v) => (v.custom_time ? time.safeParse(v.start_time).success && time.safeParse(v.end_time).success : true), {
     message: 'Укажите время',
@@ -81,7 +81,7 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   semesterId: string
-  subjects: Subject[]
+  areas: Area[]
   /** Звонки дня недели по номеру пары (для выбора пары). */
   bellsFor: (weekday: number) => BellSlot[]
   rule?: ClassRule
@@ -105,10 +105,10 @@ export function ClassRuleDialog(props: Props) {
   )
 }
 
-function toForm(rule: ClassRule | undefined, draft: RuleDraft | undefined, subjects: Subject[]): FormValues {
+function toForm(rule: ClassRule | undefined, draft: RuleDraft | undefined, areas: Area[]): FormValues {
   return {
-    subject_id: rule?.subject_id ?? (subjects.length ? '' : NEW_SUBJECT),
-    new_subject: '',
+    area_id: rule?.area_id ?? (areas.length ? '' : NEW_AREA),
+    new_area: '',
     weekday: rule?.weekday ?? draft?.weekday ?? 1,
     pair_number: rule ? rule.pair_number : (draft?.pair_number ?? null),
     custom_time: !!rule?.start_time,
@@ -125,7 +125,7 @@ function toForm(rule: ClassRule | undefined, draft: RuleDraft | undefined, subje
 
 function RuleForm({
   semesterId,
-  subjects,
+  areas,
   bellsFor,
   rule,
   draft,
@@ -136,24 +136,27 @@ function RuleForm({
   const createRule = useCreateClassRule()
   const updateRule = useUpdateClassRule()
   const deleteRule = useDeleteClassRule()
-  const createSubject = useCreateSubject()
+  const createArea = useCreateArea()
+  const { data: areaTypes } = useAreaTypes()
+  // Новая сфера — того же типа, что и сферы в сетке (или первого)
+  const newAreaType = areaTypes?.find((t) => areas.some((a) => a.area_type_id === t.id)) ?? areaTypes?.[0]
   const [showValidity, setShowValidity] = useState(!!(rule?.valid_from || rule?.valid_to))
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: toForm(rule, draft, subjects),
+    defaultValues: toForm(rule, draft, areas),
   })
   const { register, control, formState } = form
   const { errors } = formState
   const weekday = useWatch({ control, name: 'weekday' })
   const customTime = useWatch({ control, name: 'custom_time' })
-  const subjectId = useWatch({ control, name: 'subject_id' })
+  const areaId = useWatch({ control, name: 'area_id' })
   const slots = bellsFor(weekday)
-  const saving = createRule.isPending || updateRule.isPending || createSubject.isPending
+  const saving = createRule.isPending || updateRule.isPending || createArea.isPending
 
-  const body = (v: FormValues, subject_id: string): ClassRuleCreate => ({
+  const body = (v: FormValues, area_id: string): ClassRuleCreate => ({
     semester_id: semesterId,
-    subject_id,
+    area_id,
     weekday: v.weekday,
     pair_number: v.pair_number,
     start_time: v.custom_time ? v.start_time : null,
@@ -167,19 +170,23 @@ function RuleForm({
   })
 
   const onSubmit = form.handleSubmit(async (v) => {
-    let subject_id = v.subject_id
+    let area_id = v.area_id
     try {
-      if (subject_id === NEW_SUBJECT) {
-        const created = await createSubject.mutateAsync({
-          name: v.new_subject,
-          semester_id: semesterId,
-          color: PALETTE[subjects.length % PALETTE.length].hex,
-          control_form: 'exam',
+      if (area_id === NEW_AREA) {
+        if (!newAreaType) {
+          toast.error(AREAS_UI.noTypes)
+          return
+        }
+        const created = await createArea.mutateAsync({
+          area_type_id: newAreaType.id,
+          name: v.new_area,
+          period_id: semesterId,
+          color: PALETTE[areas.length % PALETTE.length].hex,
           notes: '',
         })
-        subject_id = created.id
+        area_id = created.id
       }
-      const data = body(v, subject_id)
+      const data = body(v, area_id)
       if (rule) {
         const { semester_id: _, ...patch } = data
         await updateRule.mutateAsync({ id: rule.id, body: patch })
@@ -222,46 +229,46 @@ function RuleForm({
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
       <FieldGroup>
-        <Field data-invalid={!!errors.subject_id}>
-          <FieldLabel htmlFor="rule-subject">Предмет</FieldLabel>
+        <Field data-invalid={!!errors.area_id}>
+          <FieldLabel htmlFor="rule-area">{newAreaType?.name ?? 'Сфера'}</FieldLabel>
           <Controller
             control={control}
-            name="subject_id"
+            name="area_id"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="rule-subject" className="w-full">
-                  <SelectValue placeholder="Выберите предмет" />
+                <SelectTrigger id="rule-area" className="w-full">
+                  <SelectValue placeholder="Выберите сферу" />
                 </SelectTrigger>
                 <SelectContent
                   onCloseAutoFocus={(e) => {
-                    // «Новый предмет» -> сразу в поле названия, а не обратно на селект
-                    if (form.getValues('subject_id') === NEW_SUBJECT) {
+                    // «Новая сфера» -> сразу в поле названия, а не обратно на селект
+                    if (form.getValues('area_id') === NEW_AREA) {
                       e.preventDefault()
-                      form.setFocus('new_subject')
+                      form.setFocus('new_area')
                     }
                   }}
                 >
-                  {subjects.map((s) => (
+                  {areas.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       <span className={cn('size-2.5 rounded-full', paletteColor(s.color).bg)} />
                       {s.name}
                     </SelectItem>
                   ))}
-                  <SelectItem value={NEW_SUBJECT}>＋ Новый предмет</SelectItem>
+                  {newAreaType && <SelectItem value={NEW_AREA}>＋ {newAreaType.name}</SelectItem>}
                 </SelectContent>
               </Select>
             )}
           />
-          {errors.subject_id && <FieldError>{errors.subject_id.message}</FieldError>}
+          {errors.area_id && <FieldError>{errors.area_id.message}</FieldError>}
         </Field>
-        {subjectId === NEW_SUBJECT && (
-          <Field data-invalid={!!errors.new_subject}>
+        {areaId === NEW_AREA && (
+          <Field data-invalid={!!errors.new_area}>
             <Input
-              placeholder="Название нового предмета"
-              aria-label="Название нового предмета"
-              {...register('new_subject')}
+              placeholder="Название"
+              aria-label="Название новой сферы"
+              {...register('new_area')}
             />
-            {errors.new_subject && <FieldError>{errors.new_subject.message}</FieldError>}
+            {errors.new_area && <FieldError>{errors.new_area.message}</FieldError>}
           </Field>
         )}
 

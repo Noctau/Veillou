@@ -20,6 +20,10 @@ class Project(UserOwnedMixin, Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL")
     )
+    # Сфера, которой принадлежит проект (необязательно)
+    area_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("areas.id", ondelete="SET NULL"), index=True
+    )
     # Итоговый срок: защита, подача документов
     deadline: Mapped[dt.date | None] = mapped_column(Date)
     description: Mapped[str] = mapped_column(Text, default="")

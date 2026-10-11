@@ -33,7 +33,7 @@ from app.core.time import get_tz, now_utc
 from app.domain.breakdown import fmt_minutes
 from app.domain.enums import AIOrigin, JobKind, JobStatus
 from app.domain.quickparse import KindHint
-from app.models import Job, Subject, User
+from app.models import Area, Job, User
 from app.notify.message import fmt_moment
 from app.schemas.ai import (
     BreakdownApply,
@@ -118,8 +118,8 @@ def _snippet(text: str, limit: int = 300) -> str:
     return html.escape(text if len(text) <= limit else text[: limit - 1] + "…")
 
 
-async def _subject_name(db: AsyncSession, subject_id: uuid.UUID | None) -> str | None:
-    subject = await db.get(Subject, subject_id) if subject_id else None
+async def _subject_name(db: AsyncSession, area_id: uuid.UUID | None) -> str | None:
+    subject = await db.get(Area, area_id) if area_id else None
     return subject.name if subject else None
 
 
@@ -128,7 +128,7 @@ async def _task_type_name(db: AsyncSession, user: User, type_id: uuid.UUID | Non
 
 
 async def parse_card(db: AsyncSession, user: User, draft: ParseDraft) -> str:
-    subject = await _subject_name(db, draft.subject_id)
+    subject = await _subject_name(db, draft.area_id)
     lines = [f"🤖 <b>{KIND_TITLE[draft.kind]}:</b> {html.escape(draft.title)}"]
     task_type = await _task_type_name(db, user, draft.task_type_id)
     if details := _details(draft.deadline, subject, task_type, user):
@@ -160,7 +160,7 @@ def edit_keyboard(job_id: uuid.UUID, draft: ParseDraft) -> InlineKeyboardMarkup:
 
 
 async def photo_card(db: AsyncSession, user: User, draft: PhotoDraft) -> str:
-    subject = await _subject_name(db, draft.subject_id)
+    subject = await _subject_name(db, draft.area_id)
     task = await TaskService(db, user).get_detail(draft.task_id)
     lines = [f"📷 <b>Задание:</b> {html.escape(task.title)}"]
     task_type = await _task_type_name(db, user, task.task_type_id)

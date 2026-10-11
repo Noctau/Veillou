@@ -5,23 +5,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { jobResult, type ParseDraft, useJob } from '@/features/ai/useJob'
 import { TaskTypeSelect } from '@/features/catalog/CatalogSelect'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { AreaSelect } from '@/features/areas/AreaSelect'
+import { AREAS_UI } from '@/lib/terms'
 import { wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 
-const NONE = 'none'
 
 export type AiCardResult = {
   kind: 'task' | 'backlog'
   title: string
   description: string
   task_type_id: string | null
-  subject_id: string | null
+  area_id: string | null
   deadline: string | null
   action_type_id: string | null
 }
@@ -38,11 +37,10 @@ type Props = {
 
 function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['onCreate']; busy?: boolean }) {
   const tz = useTimeZone()
-  const { data: subjects } = useSubjects()
   const [kind, setKind] = useState<'task' | 'backlog'>(draft.kind === 'backlog' ? 'backlog' : 'task')
   const [title, setTitle] = useState(draft.title)
   const [taskTypeId, setTaskTypeId] = useState(draft.task_type_id ?? null)
-  const [subjectId, setSubjectId] = useState(draft.subject_id)
+  const [areaId, setAreaId] = useState(draft.area_id)
   const [day, setDay] = useState(draft.deadline ? wallDate(draft.deadline, tz) : '')
   const [description, setDescription] = useState(draft.description)
   const time = draft.deadline ? wallTime(draft.deadline, tz) : '23:59'
@@ -52,7 +50,7 @@ function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['o
     title: title.trim(),
     description,
     task_type_id: taskTypeId,
-    subject_id: subjectId,
+    area_id: areaId,
     deadline: day ? wallToUtc(day, time, tz) : null,
     action_type_id: draft.action_type_id,
   })
@@ -78,20 +76,8 @@ function Form({ draft, onCreate, busy }: { draft: ParseDraft; onCreate: Props['o
       {kind === 'task' && (
         <div className="grid grid-cols-2 gap-2">
           <Field>
-            <FieldLabel htmlFor="ai-subject">Предмет</FieldLabel>
-            <Select value={subjectId ?? NONE} onValueChange={(v) => setSubjectId(v === NONE ? null : v)}>
-              <SelectTrigger id="ai-subject" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Без предмета</SelectItem>
-                {subjects?.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FieldLabel htmlFor="ai-area">{AREAS_UI.area}</FieldLabel>
+            <AreaSelect id="ai-area" value={areaId} onChange={setAreaId} />
           </Field>
           <Field>
             <FieldLabel htmlFor="ai-type">Тип</FieldLabel>

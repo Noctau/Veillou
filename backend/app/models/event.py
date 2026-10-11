@@ -51,8 +51,8 @@ class Event(UserOwnedMixin, Base):
     source_type: Mapped[str | None] = mapped_column(String(30))
     source_id: Mapped[uuid.UUID | None] = mapped_column()
 
-    subject_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL"), index=True
+    area_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
     location: Mapped[str | None] = mapped_column(String(200))
     color: Mapped[str | None] = mapped_column(String(16))

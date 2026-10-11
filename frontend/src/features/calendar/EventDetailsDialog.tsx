@@ -124,7 +124,7 @@ function EventDetails({
   const [editing, setEditing] = useState(false)
 
   const isClass = event.kind === 'class'
-  // Сам экзамен правится на его карточке (вкладка «Экзамен» предмета)
+  // Сам экзамен правится на его карточке (раздел «Подготовка» сферы)
   const isExam = event.kind === 'exam'
   const fromTemplate = !!event.template_id
   const cancelled = event.status === 'cancelled'
@@ -288,9 +288,9 @@ function EventDetails({
           {event.source_type === 'subtask' && event.source_id && (
             <OpenTaskButton subtaskId={event.source_id} />
           )}
-          {(event.source_type === 'exam' || event.source_type === 'exam_session') && event.subject_id && (
+          {(event.source_type === 'exam' || event.source_type === 'exam_session') && event.area_id && (
             <Button variant="ghost" asChild>
-              <Link to={`/subjects/${event.subject_id}?tab=exam`}>
+              <Link to={`/areas/${event.area_id}?tab=exam`}>
                 <ExternalLinkIcon /> Экзамен
               </Link>
             </Button>

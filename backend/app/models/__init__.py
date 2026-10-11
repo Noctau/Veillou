@@ -1,6 +1,7 @@
 """Импорт всех моделей, чтобы они попали в Base.metadata (Alembic, тесты)."""
 
 from app.models.ai import AILog, BreakdownTemplate
+from app.models.area import Area, AreaType
 from app.models.attachment import Attachment
 from app.models.backlog import BacklogItem
 from app.models.budget import BudgetDayOverride, LoadBudget, LoadBudgetMember
@@ -11,7 +12,7 @@ from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
 from app.models.plan import Calibration, PlanRevision
 from app.models.project import Milestone, Project
-from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester, Subject
+from app.models.schedule import BellSchedule, ClassRule, DayOff, Semester
 from app.models.session import LoginFailure, UserSession
 from app.models.source import Source
 from app.models.task import Subtask, Task
@@ -21,6 +22,8 @@ from app.models.user import User
 __all__ = [
     "AILog",
     "ActionType",
+    "Area",
+    "AreaType",
     "Attachment",
     "BacklogItem",
     "BellSchedule",
@@ -47,7 +50,6 @@ __all__ = [
     "Reminder",
     "Semester",
     "Source",
-    "Subject",
     "Subtask",
     "Task",
     "TaskType",

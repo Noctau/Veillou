@@ -10,7 +10,7 @@ occurrence_date) начиная с сегодняшнего дня (локаль
 - `detached` (правили руками) и прошедшие дни не трогаются.
 
 Вызывается после любого изменения ClassRule / BellSchedule / DayOff / Semester /
-Subject, а для личных повторов — RecurringEvent (и ночной докаткой окна).
+Area, а для личных повторов — RecurringEvent (и ночной докаткой окна).
 """
 
 import logging
@@ -36,13 +36,13 @@ from app.domain.recurrence import (
     expand_rrule,
 )
 from app.models import (
+    Area,
     BellSchedule,
     ClassRule,
     DayOff,
     Event,
     RecurringEvent,
     Semester,
-    Subject,
     User,
 )
 from app.services.jobs import request_reminders_sync
@@ -77,7 +77,7 @@ _TEMPLATE_FIELDS = (
     "is_fixed",
     "location",
     "color",
-    "subject_id",
+    "area_id",
     "class_type",
     "pair_number",
     "teacher",
@@ -105,7 +105,7 @@ class _ClassContext:
     days_off: list[DateRange]
     semesters: dict[uuid.UUID, Semester | None] = field(default_factory=dict)
     bells: dict[uuid.UUID, Bells] = field(default_factory=dict)
-    subjects: dict[uuid.UUID, Subject | None] = field(default_factory=dict)
+    areas: dict[uuid.UUID, Area | None] = field(default_factory=dict)
 
 
 class SeriesSync:
@@ -278,20 +278,20 @@ class SeriesSync:
     async def _rule_desired(
         self, rule: ClassRule, window: DateRange, ctx: _ClassContext
     ) -> list[Desired] | None:
-        """Вхождения правила пары в `window`; None — правило (или его семестр/предмет) удалено."""
+        """Вхождения правила пары в `window`; None — правило (или его семестр/сфера) удалено."""
         if rule.semester_id not in ctx.semesters:
             ctx.semesters[rule.semester_id] = await self.db.get(Semester, rule.semester_id)
             ctx.bells[rule.semester_id] = await self._bells(rule.semester_id)
-        if rule.subject_id not in ctx.subjects:
-            ctx.subjects[rule.subject_id] = await self.db.get(Subject, rule.subject_id)
+        if rule.area_id not in ctx.areas:
+            ctx.areas[rule.area_id] = await self.db.get(Area, rule.area_id)
         semester = ctx.semesters[rule.semester_id]
-        subject = ctx.subjects[rule.subject_id]
+        area = ctx.areas[rule.area_id]
         if (
             rule.deleted_at is not None
             or semester is None
             or semester.deleted_at is not None
-            or subject is None
-            or subject.deleted_at is not None
+            or area is None
+            or area.deleted_at is not None
         ):
             return None
 
@@ -308,11 +308,11 @@ class SeriesSync:
         )
         fields = {
             "kind": EventKind.class_,
-            "title": subject.name,
+            "title": area.name,
             "is_fixed": True,
             "location": rule.location,
-            "color": subject.color,
-            "subject_id": subject.id,
+            "color": area.color,
+            "area_id": area.id,
             "class_type": rule.class_type,
             "pair_number": rule.pair_number,
             "teacher": rule.teacher,
@@ -342,22 +342,20 @@ class SeriesSync:
         rules = await self._live_rules(ClassRule.semester_id == semester_id)
         return await self.sync_class_rules(rules)
 
-    async def sync_subject(self, subject: Subject) -> SyncStats:
-        stats = await self.sync_class_rules(
-            await self._live_rules(ClassRule.subject_id == subject.id)
-        )
-        # Название и цвет предмета обновляются и у правленных руками вхождений
+    async def sync_area(self, area: Area) -> SyncStats:
+        stats = await self.sync_class_rules(await self._live_rules(ClassRule.area_id == area.id))
+        # Название и цвет сферы обновляются и у правленных руками вхождений
         await self.db.execute(
             update(Event)
             .where(
                 Event.user_id == self.user_id,
-                Event.subject_id == subject.id,
+                Event.area_id == area.id,
                 Event.kind == EventKind.class_,
                 Event.detached.is_(True),
                 Event.occurrence_date >= self.today,
                 Event.deleted_at.is_(None),
             )
-            .values(title=subject.name, color=subject.color)
+            .values(title=area.name, color=area.color)
         )
         return stats
 

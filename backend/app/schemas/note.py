@@ -18,7 +18,7 @@ class NoteCreate(InputModel):
         default=None, description="null — «Пара · 6 окт» по паре или «Конспект 6 окт»"
     )
     kind: NoteKind = NoteKind.text
-    subject_id: uuid.UUID | None = Field(default=None, description="null — предмет пары")
+    area_id: uuid.UUID | None = Field(default=None, description="null — сфера пары")
     event_id: uuid.UUID | None = Field(default=None, description="Пара, к которой конспект")
     class_date: SaneDate | None = Field(default=None, description="null — дата пары или сегодня")
     body_md: Body = ""
@@ -28,7 +28,7 @@ class NoteCreate(InputModel):
 class NoteUpdate(InputModel):
     title: Title | None = None
     kind: NoteKind | None = None
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     event_id: uuid.UUID | None = None
     class_date: SaneDate | None = None
     body_md: Body | None = None
@@ -51,7 +51,7 @@ class NoteListItem(ReadModel):
     id: uuid.UUID
     title: str
     kind: NoteKind
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     event_id: uuid.UUID | None
     class_date: date | None
     url: str | None

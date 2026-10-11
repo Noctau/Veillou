@@ -11,7 +11,7 @@ from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc
 from app.domain.enums import AttachmentOwner, NoteKind
 from app.domain.notes import default_title, excerpt
-from app.models import Attachment, Event, Note, Subject, User
+from app.models import Area, Attachment, Event, Note, User
 from app.schemas.note import NoteCreate, NoteEvent, NoteListItem, NoteRead, NoteUpdate
 from app.services.attachments import delete_for_owners, file_url, is_inline_image
 from app.services.base import UserScopedRepository
@@ -27,9 +27,9 @@ class _EventRepo(UserScopedRepository[Event]):
     not_found_message = "Пара не найдена"
 
 
-class _SubjectRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class _AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
 _REQUIRED = {"title", "kind", "body_md"}
@@ -44,7 +44,7 @@ class NoteService:
         self.tz = get_tz(user.timezone)
         self.notes = NoteRepo(db, user.id)
         self.events = _EventRepo(db, user.id)
-        self.subjects = _SubjectRepo(db, user.id)
+        self.areas = _AreaRepo(db, user.id)
 
     # ---------- чтение ----------
 
@@ -83,13 +83,13 @@ class NoteService:
     async def list(
         self,
         *,
-        subject_id: uuid.UUID | None = None,
+        area_id: uuid.UUID | None = None,
         event_ids: Sequence[uuid.UUID] = (),
         limit: int = 100,
     ) -> list[NoteListItem]:
         where = []
-        if subject_id:
-            where.append(Note.subject_id == subject_id)
+        if area_id:
+            where.append(Note.area_id == area_id)
         if event_ids:
             where.append(Note.event_id.in_(list(event_ids)))
         notes = await self.notes.find_all(*where, order_by=NOTE_ORDER, limit=limit)
@@ -105,24 +105,24 @@ class NoteService:
 
     # ---------- запись ----------
 
-    async def _subject_name(self, subject_id: uuid.UUID | None) -> str | None:
-        if subject_id is None:
+    async def _subject_name(self, area_id: uuid.UUID | None) -> str | None:
+        if area_id is None:
             return None
-        return (await self.subjects.get_or_404(subject_id)).name
+        return (await self.areas.get_or_404(area_id)).name
 
     async def create(self, data: NoteCreate) -> NoteRead:
-        subject_id = data.subject_id
+        area_id = data.area_id
         class_date = data.class_date
         if data.event_id:
             event = await self.events.get_or_404(data.event_id)
-            subject_id = subject_id or event.subject_id
+            area_id = area_id or event.area_id
             class_date = class_date or local_date(event.start, self.tz)
         class_date = class_date or local_date(now_utc(), self.tz)
-        subject_name = await self._subject_name(subject_id)
+        subject_name = await self._subject_name(area_id)
         note = Note(
             title=data.title or default_title(class_date, subject_name),
             kind=data.kind,
-            subject_id=subject_id,
+            area_id=area_id,
             event_id=data.event_id,
             class_date=class_date,
             body_md=data.body_md,
@@ -153,10 +153,10 @@ class NoteService:
         if changes.get("event_id") and changes["event_id"] != note.event_id:
             # Новая пара задаёт предмет и дату, если их не прислали явно
             event = await self.events.get_or_404(changes["event_id"])
-            changes.setdefault("subject_id", event.subject_id or note.subject_id)
+            changes.setdefault("area_id", event.area_id or note.area_id)
             changes.setdefault("class_date", local_date(event.start, self.tz))
-        if changes.get("subject_id"):
-            await self.subjects.get_or_404(changes["subject_id"])
+        if changes.get("area_id"):
+            await self.areas.get_or_404(changes["area_id"])
         for name, value in changes.items():
             setattr(note, name, value)
         await self.db.commit()

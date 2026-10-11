@@ -197,9 +197,36 @@ async def build_student(client: AsyncClient) -> Student:
         "holidays",
     )
 
-    # ---------- предметы ----------
-    async def subject(key: str, **body: Any) -> str:
-        data = await post("/subjects", {"semester_id": sem["id"], **body}, key)
+    # ---------- сферы: тип «Предмет» (как его создаёт миграция M16) ----------
+    subject_type = await post(
+        "/area-types",
+        {
+            "name": "Предмет",
+            "name_plural": "Предметы",
+            "icon": "graduation-cap",
+            "fields": [
+                {"label": "Преподаватели", "type": "contact", "multiple": True},
+                {
+                    "label": "Форма контроля",
+                    "type": "select",
+                    "options": ["Экзамен", "Зачёт", "Дифзачёт", "Курсовая"],
+                },
+                {"label": "Ссылки", "type": "link", "multiple": True},
+            ],
+            "sections": ["schedule", "tasks", "notes", "materials", "prep"],
+        },
+        "subject_type",
+    )
+    # id полей выдаёт сервер — по порядку
+    teachers_f, control_f, links_f = (f["id"] for f in subject_type["fields"])
+
+    async def subject(key: str, control: str = "Экзамен", **body: Any) -> str:
+        fields = {control_f: control, **body.pop("fields", {})}
+        data = await post(
+            "/areas",
+            {"area_type_id": subject_type["id"], "period_id": sem["id"], "fields": fields, **body},
+            key,
+        )
         return str(data["id"])
 
     clim = await subject(
@@ -208,32 +235,32 @@ async def build_student(client: AsyncClient) -> Student:
         short_name="клим",
         synonyms=["климат"],
         color="#10b981",
-        teachers=[
-            {"name": "Иванов Пётр Сергеевич", "role": "лектор", "contact": "ivanov@example.com"},
-            {"name": "Смирнова Анна", "role": "семинарист"},
-        ],
-        links=[{"title": "Курс на сайте кафедры", "url": "https://example.com/clim"}],
+        fields={
+            teachers_f: [
+                {"name": "Иванов Пётр Сергеевич", "role": "лектор", "email": "ivanov@example.com"},
+                {"name": "Смирнова Анна", "role": "семинарист"},
+            ],
+            links_f: [{"title": "Курс на сайте кафедры", "url": "https://example.com/clim"}],
+        },
     )
     fiz = await subject("fiz", name="Физика атмосферы", short_name="физат", color="#3b82f6")
     dyn = await subject(
         "dyn", name="Динамическая метеорология", short_name="динмет", color="#8b5cf6"
     )
-    eng = await subject(
-        "eng", name="Английский язык", short_name="англ", color="#f59e0b", control_form="credit"
-    )
+    eng = await subject("eng", "Зачёт", name="Английский язык", short_name="англ", color="#f59e0b")
     matan = await subject(
         "matan",
+        "Дифзачёт",
         name="Математический анализ",
         short_name="матан",
         color="#ef4444",
-        control_form="graded_credit",
     )
     sat = await subject(
         "sat",
+        "Зачёт",
         name="Спутниковая метеорология",
         short_name="спутмет",
         color="#14b8a6",
-        control_form="credit",
         notes="Спецкурс, по выбору",
     )
 
@@ -242,7 +269,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_clim_mon",
             {
-                "subject_id": clim,
+                "area_id": clim,
                 "weekday": 1,
                 "pair_number": 1,
                 "class_type": "lecture",
@@ -253,7 +280,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_fiz_mon_odd",
             {
-                "subject_id": fiz,
+                "area_id": fiz,
                 "weekday": 1,
                 "pair_number": 2,
                 "parity": "odd",
@@ -264,7 +291,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_dyn_mon_even",
             {
-                "subject_id": dyn,
+                "area_id": dyn,
                 "weekday": 1,
                 "pair_number": 2,
                 "parity": "even",
@@ -275,7 +302,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_dyn_tue",
             {
-                "subject_id": dyn,
+                "area_id": dyn,
                 "weekday": 2,
                 "pair_number": 3,
                 "class_type": "lecture",
@@ -285,7 +312,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_eng_tue",
             {
-                "subject_id": eng,
+                "area_id": eng,
                 "weekday": 2,
                 "pair_number": 4,
                 "class_type": "seminar",
@@ -296,7 +323,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_matan_wed",
             {
-                "subject_id": matan,
+                "area_id": matan,
                 "weekday": 3,
                 "pair_number": 2,
                 "class_type": "lecture",
@@ -306,7 +333,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_fiz_thu_even",
             {
-                "subject_id": fiz,
+                "area_id": fiz,
                 "weekday": 4,
                 "pair_number": 1,
                 "parity": "even",
@@ -317,7 +344,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_clim_thu",
             {
-                "subject_id": clim,
+                "area_id": clim,
                 "weekday": 4,
                 "pair_number": 3,
                 "class_type": "seminar",
@@ -328,7 +355,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_sat_fri",
             {
-                "subject_id": sat,
+                "area_id": sat,
                 "weekday": 5,
                 "start_time": "18:30",
                 "end_time": "20:00",
@@ -339,7 +366,7 @@ async def build_student(client: AsyncClient) -> Student:
         (
             "r_eng_sat",
             {
-                "subject_id": eng,
+                "area_id": eng,
                 "weekday": 6,
                 "pair_number": 1,
                 "class_type": "seminar",
@@ -419,7 +446,7 @@ async def build_student(client: AsyncClient) -> Student:
         {
             "title": "Реферат по климатологии",
             "task_type_id": task_types["essay"],
-            "subject_id": clim,
+            "area_id": clim,
             "deadline": at(day(11), 23, 59),
             "priority": "high",
         },
@@ -457,7 +484,7 @@ async def build_student(client: AsyncClient) -> Student:
         {
             "title": "ДЗ по матану: ряды",
             "task_type_id": task_types["homework"],
-            "subject_id": matan,
+            "area_id": matan,
             "deadline": at(day(2), 23, 59),
             "estimate_min": 90,
         },
@@ -469,7 +496,7 @@ async def build_student(client: AsyncClient) -> Student:
         {
             "title": "Лабораторная №3",
             "task_type_id": task_types["lab"],
-            "subject_id": fiz,
+            "area_id": fiz,
             "deadline": at(day(17), 18),
             "description": "Обработка радиозондовых данных",
         },
@@ -490,7 +517,7 @@ async def build_student(client: AsyncClient) -> Student:
         {
             "title": "Прочитать главу 4 «Климат и циркуляция»",
             "task_type_id": task_types["reading"],
-            "subject_id": clim,
+            "area_id": clim,
             "deadline": at(day(6), 23, 59),
             "estimate_min": 60,
         },
@@ -591,7 +618,7 @@ async def build_student(client: AsyncClient) -> Student:
     exam = await post(
         "/exams",
         {
-            "subject_id": clim,
+            "area_id": clim,
             "starts_at": at(date(2027, 1, 12), 10),
             "duration_min": 180,
             "location": "1801",
@@ -626,14 +653,14 @@ async def build_student(client: AsyncClient) -> Student:
         "/notes",
         {
             "title": "Лекция 12: муссоны",
-            "subject_id": clim,
+            "area_id": clim,
             "body_md": "Муссон: $\\Delta T$ суша/океан",
         },
         "note",
     )
     await post(
         "/sources",
-        {"title": "Метеорология и климатология", "author": "Хромов С. П.", "subject_id": clim},
+        {"title": "Метеорология и климатология", "author": "Хромов С. П.", "area_id": clim},
         "source",
     )
 

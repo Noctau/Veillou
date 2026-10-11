@@ -48,7 +48,7 @@ export const KIND_SINGLE: Record<Schemas['EventKind'], string> = {
   project: 'Работа над проектом',
 }
 
-// ---------- расписание и предметы ----------
+// ---------- расписание ----------
 
 export const PARITY_LABEL: Record<Schemas['Parity'], string> = { odd: 'Числитель', even: 'Знаменатель' }
 
@@ -65,12 +65,127 @@ export const CLASS_TYPE_LABEL: Record<Schemas['ClassType'], string> = {
   other: 'Другое',
 }
 
-export const CONTROL_FORM_LABEL: Record<Schemas['ControlForm'], string> = {
-  exam: 'Экзамен',
-  credit: 'Зачёт',
-  graded_credit: 'Дифзачёт',
-  coursework: 'Курсовая',
-  none: 'Без контроля',
+// ---------- сферы и поля (M16) ----------
+
+/** Разделы страницы сферы — порядок задаёт тип сферы. */
+export const AREA_SECTION_LABEL: Record<Schemas['AreaSection'], string> = {
+  schedule: 'Расписание',
+  tasks: 'Задачи',
+  notes: 'Заметки',
+  materials: 'Материалы',
+  prep: 'Подготовка',
+  projects: 'Проекты',
+}
+
+export const FIELD_TYPE_LABEL: Record<Schemas['FieldType'], string> = {
+  text: 'Текст',
+  number: 'Число',
+  bool: 'Да / нет',
+  select: 'Один из списка',
+  multiselect: 'Несколько из списка',
+  date: 'Дата',
+  contact: 'Контакт',
+  link: 'Ссылка',
+  area_ref: 'Сфера',
+}
+
+export const CONTACT_LABEL = {
+  name: 'Имя',
+  role: 'Роль',
+  phone: 'Телефон',
+  email: 'Email',
+  link: 'Ссылка',
+  note: 'Заметка',
+} as const
+
+export const FIELDS_UI = {
+  yes: 'да',
+  no: 'нет',
+  none: 'Не выбрано',
+  add: 'Добавить',
+  remove: 'Убрать',
+  linkTitle: 'Название',
+  required: 'Обязательное поле',
+}
+
+export const AREAS_UI = {
+  title: 'Сферы',
+  /** Пункт меню и вкладка списка. */
+  tab: 'Сферы',
+  empty: 'Сфер пока нет. Сфера — всё, по чему хочется открыть занятия, задачи и заметки разом: предмет, ученик, клиент, секция.',
+  noTypes: 'Сначала заведите тип сферы — «Предмет», «Ученик», «Клиент».',
+  addType: 'Тип сферы',
+  archived: 'В архиве',
+  area: 'Сфера',
+  noArea: 'Без сферы',
+  newTitle: (typeName: string) => `Новая сфера: ${typeName.toLowerCase()}`,
+  type: 'Тип',
+  name: 'Название',
+  shortName: 'Коротко',
+  color: 'Цвет',
+  period: 'Период',
+  noPeriod: 'Всегда',
+  synonyms: 'Другие названия',
+  synonymsHint: 'Через запятую — чтобы узнавать сферу в быстром вводе.',
+  notes: 'Заметки',
+  archive: 'В архив',
+  unarchive: 'Из архива',
+  archivedToast: 'Сфера в архиве',
+  edit: 'Изменить сферу',
+  back: 'Назад',
+  notFound: 'Сфера не найдена.',
+  deleteTitle: (name: string) => `Удалить «${name}»?`,
+  deleteDescription: 'Занятия этой сферы исчезнут из расписания. Задачи и заметки останутся.',
+  deleteLabel: 'Удалить сферу',
+  deleted: 'Сфера удалена',
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
+  /** Вкладка «Расписание» сферы. */
+  rules: 'Сетка',
+  noRules: 'В сетке занятий нет — добавьте во вкладке',
+  scheduleLink: '«Расписание»',
+  upcoming: 'Ближайшие',
+  past: 'Прошедшие',
+  cancelled: 'отменено',
+  note: 'Конспект',
+  slot: (n: number) => `${n} пара`,
+}
+
+export const AREA_TYPES_UI = {
+  title: 'Типы сфер',
+  description: 'Какие бывают сферы: «Предмет», «Ученик», «Клиент». Тип задаёт поля и разделы страницы сферы.',
+  empty: 'Типов сфер нет — задачи и заметки живут без сфер.',
+  add: 'Тип сферы',
+  newTitle: 'Новый тип сферы',
+  name: 'Название',
+  namePlaceholder: 'Ученик',
+  plural: 'Во множественном числе',
+  pluralPlaceholder: 'Ученики',
+  icon: 'Иконка',
+  color: 'Цвет по умолчанию',
+  more: 'Подробнее',
+  less: 'Скрыть',
+  sections: 'Разделы страницы',
+  fields: 'Поля',
+  fieldsHint: 'Значения видны на карточке сферы. Поля не влияют на план.',
+  addField: 'Поле',
+  fieldLabel: 'Название поля',
+  fieldType: 'Тип',
+  options: 'Варианты',
+  optionsHint: 'Через запятую.',
+  multiple: 'Несколько значений',
+  required: 'Обязательное',
+  inReminder: 'Показывать в напоминании',
+  moveUp: 'Выше',
+  moveDown: 'Ниже',
+  removeField: 'Убрать поле',
+  removeFieldHint: 'Значения убранного поля не стираются: верните поле — они вернутся.',
+  fieldsCount: (n: number) => `полей: ${n}`,
+  deleteTitle: (name: string) => `Удалить тип «${name}»?`,
+  deleteDescription: 'Тип удаляется, только если у него нет сфер.',
+  deleteLabel: 'Удалить тип сферы',
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
 }
 
 // ---------- долгий ящик ----------

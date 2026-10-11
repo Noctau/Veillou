@@ -25,7 +25,7 @@ class SearchService:
         self.user = user
 
     async def search(
-        self, text: str, *, subject_id: uuid.UUID | None = None, limit: int = 20
+        self, text: str, *, area_id: uuid.UUID | None = None, limit: int = 20
     ) -> SearchResults:
         tsquery = build_tsquery(text)
         if tsquery is None:
@@ -45,8 +45,8 @@ class SearchService:
             .order_by(func.ts_rank(Note.search, query).desc(), Note.class_date.desc().nulls_last())
             .limit(limit)
         )
-        if subject_id:
-            note_stmt = note_stmt.where(Note.subject_id == subject_id)
+        if area_id:
+            note_stmt = note_stmt.where(Note.area_id == area_id)
         rows = (await self.db.execute(note_stmt)).all()
 
         items = await NoteService(self.db, self.user).list_items([r[0] for r in rows])
@@ -67,8 +67,8 @@ class SearchService:
             .order_by(func.ts_rank(Source.search, query).desc())
             .limit(limit)
         )
-        if subject_id:
-            source_stmt = source_stmt.where(Source.subject_id == subject_id)
+        if area_id:
+            source_stmt = source_stmt.where(Source.area_id == area_id)
         found = list(await self.db.scalars(source_stmt))
         sources = await SourceService(self.db, self.user).reads(found)
         return SearchResults(notes=notes, sources=sources)

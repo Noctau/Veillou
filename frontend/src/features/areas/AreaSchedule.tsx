@@ -10,22 +10,22 @@ import { useNotes } from '@/features/notes/useNotes'
 import { type ClassRule, useBells, useClassRules } from '@/features/schedule/useSchedule'
 import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
 import { useNow } from '@/features/today/useNow'
-import { CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
+import { AREAS_UI as T, CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
 import { addDaysIso, dayStartUtc, formatDay, WEEKDAYS_SHORT, wallDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-import type { Subject } from './useSubjects'
+import type { Area } from './useAreas'
 
 const PAST_DAYS = 21
 const AHEAD_DAYS = 14
 const PAST_SHOWN = 6
 const AHEAD_SHOWN = 3
 
-function RulesList({ subject }: { subject: Subject }) {
-  const { data: rules, isPending } = useClassRules(subject.semester_id ?? undefined)
-  const { data: bells } = useBells(subject.semester_id ?? undefined)
+function RulesList({ area }: { area: Area }) {
+  const { data: rules, isPending } = useClassRules(area.period_id ?? undefined)
+  const { data: bells } = useBells(area.period_id ?? undefined)
   const own = (rules ?? [])
-    .filter((r) => r.subject_id === subject.id)
+    .filter((r) => r.area_id === area.id)
     .sort((a, b) => a.weekday - b.weekday || (a.pair_number ?? 0) - (b.pair_number ?? 0))
 
   const time = (r: ClassRule) => {
@@ -35,14 +35,14 @@ function RulesList({ subject }: { subject: Subject }) {
     return slot ? `${slot.start}–${slot.end}` : ''
   }
 
-  if (!subject.semester_id) return null
+  if (!area.period_id) return null
   if (isPending) return <Skeleton className="h-16" />
   if (!own.length) {
     return (
       <p className="text-sm text-muted-foreground">
-        Пар в сетке нет — добавьте во вкладке{' '}
-        <Link to="/study?tab=schedule" className="text-primary underline-offset-4 hover:underline">
-          «Расписание»
+        {T.noRules}{' '}
+        <Link to="/areas?tab=schedule" className="text-primary underline-offset-4 hover:underline">
+          {T.scheduleLink}
         </Link>
         .
       </p>
@@ -53,7 +53,7 @@ function RulesList({ subject }: { subject: Subject }) {
       {own.map((r) => (
         <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
           <span className="w-6 font-medium">{WEEKDAYS_SHORT[r.weekday - 1]}</span>
-          {r.pair_number && <span>{r.pair_number} пара</span>}
+          {r.pair_number && <span>{T.slot(r.pair_number)}</span>}
           <span className="text-muted-foreground tabular-nums">{time(r)}</span>
           <span className="text-muted-foreground">
             {[
@@ -71,7 +71,7 @@ function RulesList({ subject }: { subject: Subject }) {
   )
 }
 
-function ClassRow({ event, tz, noteId }: { event: CalendarEvent; tz: string; noteId?: string }) {
+function OccurrenceRow({ event, tz, noteId }: { event: CalendarEvent; tz: string; noteId?: string }) {
   const cancelled = event.status === 'cancelled'
   return (
     <li className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2', cancelled && 'opacity-60')}>
@@ -87,7 +87,7 @@ function ClassRow({ event, tz, noteId }: { event: CalendarEvent; tz: string; not
               {event.location}
             </span>
           )}
-          <span>{cancelled ? 'отменена' : classDetails({ ...event, location: null })}</span>
+          <span>{cancelled ? T.cancelled : classDetails({ ...event, location: null })}</span>
         </div>
       </div>
       {noteId ? (
@@ -95,56 +95,57 @@ function ClassRow({ event, tz, noteId }: { event: CalendarEvent; tz: string; not
           to={`/notes/${noteId}`}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-primary hover:bg-muted"
         >
-          <CheckIcon className="size-4" /> Конспект
+          <CheckIcon className="size-4" /> {T.note}
         </Link>
       ) : (
-        !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" label="Конспект" />
+        !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" label={T.note} />
       )}
     </li>
   )
 }
 
-/** Вкладка «Пары»: сетка предмета, недавние пары (с конспектами) и ближайшие. */
-export function SubjectClasses({ subject }: { subject: Subject }) {
+/** Раздел «Расписание» сферы: сетка, недавние занятия (с конспектами) и ближайшие. */
+export function AreaSchedule({ area }: { area: Area }) {
   const { today, tz } = useCurrentSemester()
   const from = dayStartUtc(addDaysIso(today, -PAST_DAYS), tz)
   const to = dayStartUtc(addDaysIso(today, AHEAD_DAYS + 1), tz)
   const { data, isPending } = useCalendar(from, to)
-  const { data: notes } = useNotes({ subject_id: subject.id })
+  const { data: notes } = useNotes({ area_id: area.id })
   const noteByEvent = new Map(notes?.filter((n) => n.event_id).map((n) => [n.event_id!, n.id]))
 
   const now = useNow()
-  const classes = (data?.events ?? []).filter((e) => e.kind === 'class' && e.subject_id === subject.id)
-  const past = classes
+  // Жёсткие события сферы (занятия по сетке)
+  const occurrences = (data?.events ?? []).filter((e) => e.kind === 'class' && e.area_id === area.id)
+  const past = occurrences
     .filter((e) => parseISO(e.start) <= now)
     .reverse()
     .slice(0, PAST_SHOWN)
-  const ahead = classes.filter((e) => parseISO(e.start) > now).slice(0, AHEAD_SHOWN)
+  const ahead = occurrences.filter((e) => parseISO(e.start) > now).slice(0, AHEAD_SHOWN)
 
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-muted-foreground">Расписание</h3>
-        <RulesList subject={subject} />
+        <h3 className="text-sm font-medium text-muted-foreground">{T.rules}</h3>
+        <RulesList area={area} />
       </section>
 
       {isPending && <Skeleton className="h-24" />}
       {ahead.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Ближайшие</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">{T.upcoming}</h3>
           <ul className="flex flex-col gap-1">
             {ahead.map((e) => (
-              <ClassRow key={e.id} event={e} tz={tz} noteId={noteByEvent.get(e.id)} />
+              <OccurrenceRow key={e.id} event={e} tz={tz} noteId={noteByEvent.get(e.id)} />
             ))}
           </ul>
         </section>
       )}
       {past.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Прошедшие</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">{T.past}</h3>
           <ul className="flex flex-col gap-1">
             {past.map((e) => (
-              <ClassRow key={e.id} event={e} tz={tz} noteId={noteByEvent.get(e.id)} />
+              <OccurrenceRow key={e.id} event={e} tz={tz} noteId={noteByEvent.get(e.id)} />
             ))}
           </ul>
         </section>

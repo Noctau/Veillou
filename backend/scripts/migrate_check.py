@@ -93,6 +93,12 @@ INVARIANTS = (
         "AND a.user_id = u.id AND a.deleted_at IS NULL)",
     ),
     Invariant(
+        "у живой сферы живой тип",
+        frozenset({"areas", "area_types"}),
+        "SELECT count(*) FROM areas a JOIN area_types t ON t.id = a.area_type_id "
+        "WHERE a.deleted_at IS NULL AND t.deleted_at IS NOT NULL",
+    ),
+    Invariant(
         "подзадача — в задании того же пользователя",
         frozenset({"subtasks", "tasks"}),
         "SELECT count(*) FROM subtasks s JOIN tasks t ON t.id = s.task_id "

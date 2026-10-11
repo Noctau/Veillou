@@ -22,8 +22,8 @@ RunMin = Annotated[int, Field(ge=1, le=60, description="Общий прогон,
 
 
 class ExamCreate(InputModel):
-    subject_id: uuid.UUID
-    title: Title = Field(default="", description="Пусто — «Экзамен: <предмет>»")
+    area_id: uuid.UUID
+    title: Title = Field(default="", description="Пусто — «Экзамен: <сфера>»")
     starts_at: Moment
     duration_min: Duration = 180
     location: Location | None = None
@@ -48,8 +48,8 @@ class ExamUpdate(InputModel):
 
 class ExamRead(ReadModel):
     id: uuid.UUID
-    subject_id: uuid.UUID
-    title: str = Field(description="Готовое название (с предметом, если своё не задано)")
+    area_id: uuid.UUID
+    title: str = Field(description="Готовое название (со сферой, если своё не задано)")
     starts_at: UTCMoment
     duration_min: int
     location: str | None

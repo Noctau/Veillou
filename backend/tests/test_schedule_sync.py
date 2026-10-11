@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Event
 
-from .test_schedule_api import API, BELLS, make_semester, make_subject
+from .test_schedule_api import API, BELLS, make_area, make_semester
 
 # «Сейчас» — вторник 06.10.2026, 07:00 МСК
 NOW = datetime(2026, 10, 6, 4, 0, tzinfo=UTC)
@@ -42,12 +42,12 @@ async def setup(auth_client: AsyncClient, clock):
         f"{API}/semesters/{sem['id']}/bells",
         json={"schedules": [{"weekday": None, "slots": BELLS}]},
     )
-    subj = await make_subject(auth_client, sem["id"], color="#10b981")
+    subj = await make_area(auth_client, sem["id"], color="#10b981")
     resp = await auth_client.post(
         f"{API}/class-rules",
         json={
             "semester_id": sem["id"],
-            "subject_id": subj["id"],
+            "area_id": subj["id"],
             "weekday": 4,
             "pair_number": 2,
             "location": "1801",
@@ -176,7 +176,7 @@ async def test_subject_rename_updates_titles(
     target = (await live_events(session))[0]
     await auth_client.patch(f"{API}/events/{target.id}", json={"location": "А-4"})
     await auth_client.patch(
-        f"{API}/subjects/{setup['subject']['id']}", json={"name": "Климат", "color": "#ef4444"}
+        f"{API}/areas/{setup['subject']['id']}", json={"name": "Климат", "color": "#ef4444"}
     )
     events = await live_events(session)
     assert {(e.title, e.color) for e in events} == {("Климат", "#ef4444")}
@@ -213,7 +213,7 @@ async def test_rule_created_mid_semester_starts_today(
         f"{API}/class-rules",
         json={
             "semester_id": setup["semester"]["id"],
-            "subject_id": setup["subject"]["id"],
+            "area_id": setup["subject"]["id"],
             "weekday": 2,
             "pair_number": 1,
             "parity": "even",

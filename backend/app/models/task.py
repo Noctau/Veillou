@@ -31,8 +31,8 @@ class Task(UserOwnedMixin, Base):
         ForeignKey("task_types.id", ondelete="SET NULL"), index=True
     )
     description: Mapped[str] = mapped_column(Text, default="")
-    subject_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL"), index=True
+    area_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL")

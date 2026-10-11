@@ -27,8 +27,8 @@ class Note(UserOwnedMixin, Base):
     __tablename__ = "notes"
     __table_args__ = (Index("ix_notes_search", "search", postgresql_using="gin"),)
 
-    subject_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL"), index=True
+    area_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
     # Пара, к которой конспект (вхождение events.kind=class)
     event_id: Mapped[uuid.UUID | None] = mapped_column(

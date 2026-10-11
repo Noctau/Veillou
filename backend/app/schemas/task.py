@@ -118,7 +118,7 @@ class TaskCreate(InputModel):
     title: Title
     task_type_id: uuid.UUID | None = Field(default=None, description="null — без типа")
     description: Description = ""
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = Field(
         default=None, description="null — выводится: тип задачи → проект → тип действия"
     )
@@ -145,7 +145,7 @@ class TaskUpdate(InputModel):
     title: Title | None = None
     task_type_id: uuid.UUID | None = None
     description: Description | None = None
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
     action_type_id: uuid.UUID | None = None
     time_window: Windows | None = None
@@ -168,7 +168,7 @@ class TaskRead(ReadModel):
     title: str
     task_type_id: uuid.UUID | None
     description: str
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     category_id: uuid.UUID | None
     action_type_id: uuid.UUID | None
     time_window: list[TimeWindow] | None

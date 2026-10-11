@@ -69,7 +69,7 @@ class ParseDraft(BaseModel):
     title: str
     description: str
     task_type_id: uuid.UUID | None = None
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     deadline: UTCMoment | None
     action_type_id: uuid.UUID | None
     text: str = Field(description="Исходный текст")
@@ -83,7 +83,7 @@ class PhotoDraft(BaseModel):
     title: str
     text: str
     task_type_id: uuid.UUID | None = None
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     deadline: UTCMoment | None
     updated: list[str] = Field(description="Какие поля задания заполнены с фото")
 

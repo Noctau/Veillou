@@ -13,8 +13,9 @@ import { ProjectDialog } from './ProjectDialog'
 import { useProjects } from './useProjects'
 import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
 
-export function ProjectList() {
-  const { data: projects, isPending, isError, error } = useProjects()
+/** Активные проекты; с `areaId` — только проекты сферы. */
+export function ProjectList({ areaId }: { areaId?: string }) {
+  const { data: projects, isPending, isError, error } = useProjects(['active'], areaId)
   const [creating, setCreating] = useState(false)
 
   return (
@@ -23,7 +24,7 @@ export function ProjectList() {
         <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
           <PlusIcon /> Проект
         </Button>
-        <QuickTypeButtons />
+        {!areaId && <QuickTypeButtons />}
       </div>
       {isPending && <Skeleton className="h-28" />}
       {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
@@ -85,7 +86,7 @@ export function ProjectList() {
           )
         })}
       </ul>
-      <ProjectDialog open={creating} onOpenChange={setCreating} />
+      <ProjectDialog open={creating} onOpenChange={setCreating} areaId={areaId} />
     </div>
   )
 }

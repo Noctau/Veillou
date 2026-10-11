@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { useAreas } from '@/features/areas/useAreas'
 import { errorMessage } from '@/lib/errors'
 import { PARITY_LABEL } from '@/lib/terms'
 import { isoWeekday, WEEKDAYS_SHORT } from '@/lib/time'
@@ -139,7 +139,7 @@ function SemesterSchedule({
 }) {
   const { data: bells = [] } = useBells(semester.id)
   const { data: rules = [], isPending } = useClassRules(semester.id)
-  const { data: allSubjects = [] } = useSubjects()
+  const { data: allAreas = [] } = useAreas()
   const currentParity = weekParity(today, semester.start_date, semester.first_week_parity)
   const [parity, setParity] = useState<Parity>(currentParity)
   const todayWd = isoWeekday(today)
@@ -147,11 +147,11 @@ function SemesterSchedule({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dialog, setDialog] = useState<{ rule?: ClassRule; draft?: RuleDraft } | null>(null)
 
-  const subjects = useMemo(
-    () => allSubjects.filter((s) => s.semester_id === semester.id || !s.semester_id),
-    [allSubjects, semester.id],
+  const areas = useMemo(
+    () => allAreas.filter((s) => s.period_id === semester.id || !s.period_id),
+    [allAreas, semester.id],
   )
-  const subjectMap = useMemo(() => new Map(allSubjects.map((s) => [s.id, s])), [allSubjects])
+  const areaMap = useMemo(() => new Map(allAreas.map((s) => [s.id, s])), [allAreas])
 
   const bellsFor = (weekday: number): BellSlot[] =>
     (bells.find((b) => b.weekday === weekday) ?? bells.find((b) => b.weekday === null))?.slots ?? []
@@ -159,7 +159,7 @@ function SemesterSchedule({
   const weekdays = rules.some((r) => r.weekday === 7) ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6]
   const gridProps = {
     rules,
-    subjects: subjectMap,
+    areas: areaMap,
     bellsFor,
     parity,
     onCreate: (weekday: number, pair_number: number | null) =>
@@ -246,7 +246,7 @@ function SemesterSchedule({
         open={!!dialog}
         onOpenChange={(open) => !open && setDialog(null)}
         semesterId={semester.id}
-        subjects={subjects}
+        areas={areas}
         bellsFor={bellsFor}
         rule={dialog?.rule}
         draft={dialog?.draft}

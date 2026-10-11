@@ -264,7 +264,7 @@ class FreeService:
                 user_id=self.user_id,
                 kind=EventKind.subtask,
                 title=source.title,
-                subject_id=source.subject_id,
+                area_id=source.area_id,
                 source_type=SourceType.task,
                 source_id=id,
             )

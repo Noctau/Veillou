@@ -6,6 +6,7 @@ from fastapi.routing import APIRoute
 
 from app.api import (
     ai,
+    areas,
     attachments,
     auth,
     backlog,
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     api.include_router(me.router)
     api.include_router(telegram.router)
     api.include_router(schedule.router)
+    api.include_router(areas.router)
     api.include_router(events.router)
     api.include_router(events.calendar_router)
     api.include_router(events.recurring_router)

@@ -4,18 +4,33 @@ import datetime as dt
 import uuid
 from typing import Annotated
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, HttpUrl, StringConstraints, field_serializer
 
 from app.domain.enums import MilestoneStatus, ProjectStatus
 from app.schemas.common import InputModel, ReadModel, UTCMoment
-from app.schemas.schedule import SubjectLink, Teacher
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
 Description = Annotated[str, StringConstraints(max_length=20_000)]
 WeeklyNorm = Annotated[int, Field(ge=0, le=60 * 60, description="Минут в неделю")]
 
-# Контакт проекта (научный руководитель и т. п.) — та же форма, что у преподавателя
-Contact = Teacher
+ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+
+
+class Contact(InputModel):
+    """Контакт проекта: научный руководитель, заказчик."""
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    role: ShortText = ""
+    contact: ShortText = ""
+
+
+class Link(InputModel):
+    title: ShortText = ""
+    url: HttpUrl
+
+    @field_serializer("url")
+    def _url(self, url: HttpUrl) -> str:
+        return str(url)
 
 
 # ---------- этапы ----------
@@ -55,20 +70,22 @@ class MilestoneRead(ReadModel):
 class ProjectCreate(InputModel):
     title: Title
     category_id: uuid.UUID | None = Field(default=None, description="null — «Учёба»")
+    area_id: uuid.UUID | None = Field(default=None, description="Сфера проекта (необязательно)")
     deadline: dt.date | None = None
     description: Description = ""
     contacts: list[Contact] = Field(default_factory=list, max_length=20)
-    links: list[SubjectLink] = Field(default_factory=list, max_length=50)
+    links: list[Link] = Field(default_factory=list, max_length=50)
     weekly_norm_min: WeeklyNorm | None = None
 
 
 class ProjectUpdate(InputModel):
     title: Title | None = None
     category_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     deadline: dt.date | None = None
     description: Description | None = None
     contacts: list[Contact] | None = Field(default=None, max_length=20)
-    links: list[SubjectLink] | None = Field(default=None, max_length=50)
+    links: list[Link] | None = Field(default=None, max_length=50)
     weekly_norm_min: WeeklyNorm | None = None
     status: ProjectStatus | None = None
 
@@ -77,10 +94,11 @@ class ProjectRead(ReadModel):
     id: uuid.UUID
     title: str
     category_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     deadline: dt.date | None
     description: str
     contacts: list[Contact]
-    links: list[SubjectLink]
+    links: list[Link]
     weekly_norm_min: int | None
     status: ProjectStatus
     created_at: UTCMoment

@@ -29,7 +29,7 @@ from app.domain.enums import (
     SourceType,
 )
 from app.domain.exams import exam_title, parse_questions, session_title
-from app.models import Event, Exam, ExamQuestion, ExamSession, Subject, User
+from app.models import Area, Event, Exam, ExamQuestion, ExamSession, User
 from app.schemas.exam import (
     ExamCreate,
     ExamDetail,
@@ -58,9 +58,9 @@ class SessionRepo(UserScopedRepository[ExamSession]):
     not_found_message = "День подготовки не найден"
 
 
-class _SubjectRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class _AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
 class _EventRepo(UserScopedRepository[Event]):
@@ -90,15 +90,15 @@ class ExamService:
         self.exams = ExamRepo(db, user.id)
         self.questions = QuestionRepo(db, user.id)
         self.sessions = SessionRepo(db, user.id)
-        self.subjects = _SubjectRepo(db, user.id)
+        self.areas = _AreaRepo(db, user.id)
         self.events = _EventRepo(db, user.id)
 
     # ---------- чтение ----------
 
-    async def _subject_names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, Subject]:
+    async def _subject_names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, Area]:
         if not ids:
             return {}
-        return {s.id: s for s in await self.subjects.find_all(Subject.id.in_(ids))}
+        return {s.id: s for s in await self.areas.find_all(Area.id.in_(ids))}
 
     async def _counts(self, exam_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
         if not exam_ids:
@@ -118,18 +118,18 @@ class ExamService:
         )
         return {exam_id: (total, learned) for exam_id, total, learned in rows}
 
-    def _read(self, exam: Exam, subject: Subject | None, counts: tuple[int, int]) -> ExamRead:
+    def _read(self, exam: Exam, subject: Area | None, counts: tuple[int, int]) -> ExamRead:
         read = ExamRead.model_validate(exam)
         read.title = exam_title(exam.title, subject.name if subject else None)
         read.questions_total, read.questions_learned = counts
         return read
 
-    async def list_exams(self, subject_id: uuid.UUID | None = None) -> list[ExamRead]:
-        where = [Exam.subject_id == subject_id] if subject_id else []
+    async def list_exams(self, area_id: uuid.UUID | None = None) -> list[ExamRead]:
+        where = [Exam.area_id == area_id] if area_id else []
         exams = await self.exams.find_all(*where, order_by=[Exam.starts_at])
-        subjects = await self._subject_names({e.subject_id for e in exams})
+        subjects = await self._subject_names({e.area_id for e in exams})
         counts = await self._counts([e.id for e in exams])
-        return [self._read(e, subjects.get(e.subject_id), counts.get(e.id, (0, 0))) for e in exams]
+        return [self._read(e, subjects.get(e.area_id), counts.get(e.id, (0, 0))) for e in exams]
 
     async def _questions(self, exam_id: uuid.UUID) -> list[ExamQuestion]:
         return await self.questions.find_all(
@@ -138,7 +138,7 @@ class ExamService:
 
     async def get_detail(self, id: uuid.UUID) -> ExamDetail:
         exam = await self.exams.get_or_404(id)
-        subject = await self.subjects.get(exam.subject_id)
+        subject = await self.areas.get(exam.area_id)
         questions = await self._questions(exam.id)
         learned = sum(q.status != ExamQuestionStatus.not_started for q in questions)
         sessions = await self.sessions.find_all(
@@ -185,7 +185,7 @@ class ExamService:
     # ---------- экзамен ----------
 
     async def create(self, data: ExamCreate) -> ExamDetail:
-        await self.subjects.get_or_404(data.subject_id)
+        await self.areas.get_or_404(data.area_id)
         exam = Exam(**data.model_dump())
         self.exams.add(exam)
         await self.db.flush()
@@ -228,13 +228,13 @@ class ExamService:
             if event is not None:
                 self.events.soft_delete(event)
             return
-        subject = await self.subjects.get(exam.subject_id)
+        subject = await self.areas.get(exam.area_id)
         fields = {
             "title": exam_title(exam.title, subject.name if subject else None),
             "start": exam.starts_at,
             "end": exam.starts_at + timedelta(minutes=exam.duration_min),
             "location": exam.location,
-            "subject_id": exam.subject_id,
+            "area_id": exam.area_id,
             "note": exam.note,
         }
         if event is None:
@@ -430,7 +430,7 @@ class ExamService:
 
     async def _rename_events(self, exam: Exam, sessions: list[ExamSession]) -> None:
         """Название блока следует за вопросами дня."""
-        subject = await self.subjects.get(exam.subject_id)
+        subject = await self.areas.get(exam.area_id)
         name = (subject.short_name or subject.name) if subject else "Экзамен"
         numbers = {str(q.id): q.number for q in await self._questions(exam.id)}
         by_id = {x.id: x for x in sessions}
@@ -516,12 +516,10 @@ async def upcoming_exams(
     )
     subjects = {
         s.id: s
-        for s in await db.scalars(
-            select(Subject).where(Subject.id.in_({e.subject_id for e in exams}))
-        )
+        for s in await db.scalars(select(Area).where(Area.id.in_({e.area_id for e in exams})))
     }
     return [
-        (e, exam_title(e.title, subjects[e.subject_id].name if e.subject_id in subjects else None))
+        (e, exam_title(e.title, subjects[e.area_id].name if e.area_id in subjects else None))
         for e in exams
     ]
 

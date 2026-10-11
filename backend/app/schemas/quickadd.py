@@ -22,7 +22,7 @@ class QuickParseRead(BaseModel):
     duration_min: int | None
     deadline: UTCMoment | None
     is_deadline: bool
-    subject_id: uuid.UUID | None
+    area_id: uuid.UUID | None
     task_type_id: uuid.UUID | None = Field(description="Тип задачи из справочника по словам")
     action_type_id: uuid.UUID | None = Field(
         description="Тип действия по словам; похоже на задачу — тип по умолчанию"

@@ -16,9 +16,6 @@ from app.schemas.schedule import (
     SemesterCreate,
     SemesterRead,
     SemesterUpdate,
-    SubjectCreate,
-    SubjectRead,
-    SubjectUpdate,
 )
 from app.services.schedule import ScheduleService
 
@@ -96,34 +93,6 @@ async def update_day_off(day_off_id: uuid.UUID, patch: DayOffUpdate, svc: Servic
 @router.delete("/days-off/{day_off_id}", status_code=NO_CONTENT)
 async def delete_day_off(day_off_id: uuid.UUID, svc: Service) -> None:
     await svc.delete_day_off(day_off_id)
-
-
-# ---------- предметы ----------
-
-
-@router.get("/subjects")
-async def list_subjects(svc: Service, semester_id: uuid.UUID | None = None) -> list[SubjectRead]:
-    return [SubjectRead.model_validate(s) for s in await svc.list_subjects(semester_id)]
-
-
-@router.get("/subjects/{subject_id}")
-async def read_subject(subject_id: uuid.UUID, svc: Service) -> SubjectRead:
-    return SubjectRead.model_validate(await svc.get_subject(subject_id))
-
-
-@router.post("/subjects", status_code=status.HTTP_201_CREATED)
-async def create_subject(data: SubjectCreate, svc: Service) -> SubjectRead:
-    return SubjectRead.model_validate(await svc.create_subject(data))
-
-
-@router.patch("/subjects/{subject_id}")
-async def update_subject(subject_id: uuid.UUID, patch: SubjectUpdate, svc: Service) -> SubjectRead:
-    return SubjectRead.model_validate(await svc.update_subject(subject_id, patch))
-
-
-@router.delete("/subjects/{subject_id}", status_code=NO_CONTENT)
-async def delete_subject(subject_id: uuid.UUID, svc: Service) -> None:
-    await svc.delete_subject(subject_id)
 
 
 # ---------- правила пар ----------

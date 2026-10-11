@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/features/auth/RequireAuth'
+import { StudyRedirect, SubjectRedirect } from '@/pages/LegacyRedirects'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { TodayPage } from '@/pages/TodayPage'
 
@@ -23,13 +24,15 @@ export const router = createBrowserRouter([
           { index: true, element: <TodayPage /> },
           { path: 'calendar', lazy: page(() => import('@/pages/CalendarPage'), 'CalendarPage') },
           { path: 'add', lazy: page(() => import('@/pages/AddPage'), 'AddPage') },
-          { path: 'study', lazy: page(() => import('@/pages/StudyPage'), 'StudyPage') },
+          { path: 'areas', lazy: page(() => import('@/pages/AreasPage'), 'AreasPage') },
+          { path: 'study', element: <StudyRedirect /> },
           { path: 'tasks/:taskId', lazy: page(() => import('@/pages/TaskPage'), 'TaskPage') },
           {
             path: 'tasks/:taskId/breakdown',
             lazy: page(() => import('@/pages/BreakdownPage'), 'BreakdownPage'),
           },
-          { path: 'subjects/:subjectId', lazy: page(() => import('@/pages/SubjectPage'), 'SubjectPage') },
+          { path: 'areas/:areaId', lazy: page(() => import('@/pages/AreaPage'), 'AreaPage') },
+          { path: 'subjects/:subjectId', element: <SubjectRedirect /> },
           { path: 'notes/:noteId', lazy: page(() => import('@/pages/NotePage'), 'NotePage') },
           { path: 'projects/:projectId', lazy: page(() => import('@/pages/ProjectPage'), 'ProjectPage') },
           { path: 'inbox', lazy: page(() => import('@/pages/InboxPage'), 'InboxPage') },

@@ -2,16 +2,19 @@ import { useSearchParams } from 'react-router'
 
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SchedulePanel } from '@/features/schedule/SchedulePanel'
-import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
+import { AreaList } from '@/features/areas/AreaList'
 import { NoteList } from '@/features/notes/NoteList'
 import { ProjectList } from '@/features/projects/ProjectList'
-import { SubjectList } from '@/features/subjects/SubjectList'
+import { SchedulePanel } from '@/features/schedule/SchedulePanel'
+import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
 import { TaskList } from '@/features/tasks/TaskList'
+import { AREA_SECTION_LABEL, AREAS_UI } from '@/lib/terms'
 
-export function StudyPage() {
+const TABS = ['tasks', 'notes', 'projects', 'schedule'] as const
+
+export function AreasPage() {
   const [params, setParams] = useSearchParams()
-  const tab = (['schedule', 'tasks', 'notes', 'projects'] as const).find((t) => t === params.get('tab')) ?? 'subjects'
+  const tab = TABS.find((t) => t === params.get('tab')) ?? 'areas'
   const { semester } = useCurrentSemester()
 
   const setTab = (value: string) =>
@@ -26,23 +29,27 @@ export function StudyPage() {
 
   return (
     <>
-      <PageHeader title="Учёба" />
+      <PageHeader title={AREAS_UI.title} />
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="subjects">Предметы</TabsTrigger>
-          <TabsTrigger value="tasks">Задания</TabsTrigger>
-          <TabsTrigger value="notes">Конспекты</TabsTrigger>
-          <TabsTrigger value="projects">Проекты</TabsTrigger>
-          <TabsTrigger value="schedule">Расписание</TabsTrigger>
-        </TabsList>
-        <TabsContent value="subjects">
-          <SubjectList semesterId={semester?.id} />
+        {/* На 360 px вкладки не помещаются — прокрутка вбок */}
+        <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
+          <TabsList className="mb-4">
+            <TabsTrigger value="areas">{AREAS_UI.tab}</TabsTrigger>
+            {TABS.map((t) => (
+              <TabsTrigger key={t} value={t}>
+                {AREA_SECTION_LABEL[t]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <TabsContent value="areas">
+          <AreaList periodId={semester?.id} />
         </TabsContent>
         <TabsContent value="tasks">
           <TaskList />
         </TabsContent>
         <TabsContent value="notes">
-          <NoteList showSubject />
+          <NoteList showArea />
         </TabsContent>
         <TabsContent value="projects">
           <ProjectList />

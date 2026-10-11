@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AreaTypesSection } from '@/features/areas/AreaTypesSection'
 import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
 import { BudgetsSection } from '@/features/catalog/BudgetsSection'
 import { TaskTypesSection } from '@/features/catalog/TaskTypesSection'
@@ -44,6 +45,7 @@ export function SettingsPage() {
           <BudgetsSection />
           <CalibrationSection />
           <RestSection settings={settings} />
+          <AreaTypesSection />
           <ActionTypesSection />
           <TaskTypesSection />
           <CategoriesSection />

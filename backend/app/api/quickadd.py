@@ -16,10 +16,10 @@ QUICK_LEN = 500
 async def parse_quick_add(
     data: QuickParseRequest, user: CurrentUser, db: SessionDep
 ) -> QuickParseRead:
-    """Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, типы.
+    """Разбор строки быстрого ввода «на лету»: название, дата/время, сфера, типы.
 
     Ничего не сохраняет — клиент создаёт задание / дело / событие обычными запросами.
-    `needs_ai` — разбор неуверенный (длинный текст, задание без срока или предмета):
+    `needs_ai` — разбор неуверенный (длинный текст, задание без срока или сферы):
     стоит спросить ИИ (`POST /quick-add/ai-parse`).
     """
     parsed = await quickadd.parse_text(db, user, data.text[:QUICK_LEN])
@@ -32,7 +32,7 @@ async def parse_quick_add(
         duration_min=result.duration_min,
         deadline=result.deadline,
         is_deadline=result.is_deadline,
-        subject_id=result.subject_id if isinstance(result.subject_id, uuid.UUID) else None,
+        area_id=result.area_id if isinstance(result.area_id, uuid.UUID) else None,
         task_type_id=parsed.task_type_id,
         action_type_id=parsed.action_type_id,
         kind_hint=result.kind_hint,

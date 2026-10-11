@@ -26,12 +26,12 @@ from app.domain.enums import (
 from app.domain.tasks import find_cycle, progress
 from app.models import (
     ActionType,
+    Area,
     BreakdownTemplate,
     Category,
     Event,
     Milestone,
     Project,
-    Subject,
     Subtask,
     Task,
     TaskType,
@@ -69,9 +69,9 @@ class _EventRepo(UserScopedRepository[Event]):
     model = Event
 
 
-class _SubjectRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class _AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
 class _CategoryRepo(UserScopedRepository[Category]):
@@ -126,7 +126,7 @@ class TaskService:
         self.tasks = TaskRepo(db, user.id)
         self.subtasks = SubtaskRepo(db, user.id)
         self.events = _EventRepo(db, user.id)
-        self.subjects = _SubjectRepo(db, user.id)
+        self.areas = _AreaRepo(db, user.id)
         self.categories = _CategoryRepo(db, user.id)
         self.action_types = _ActionTypeRepo(db, user.id)
         self.task_types = _TaskTypeRepo(db, user.id)
@@ -168,15 +168,15 @@ class TaskService:
         self,
         *,
         statuses: Sequence[TaskStatus] = (),
-        subject_id: uuid.UUID | None = None,
+        area_id: uuid.UUID | None = None,
         project_id: uuid.UUID | None = None,
         due_before: Any = None,
     ) -> list[TaskRead]:
         where: list[ColumnElement[bool]] = []
         if statuses:
             where.append(Task.status.in_(statuses))
-        if subject_id:
-            where.append(Task.subject_id == subject_id)
+        if area_id:
+            where.append(Task.area_id == area_id)
         if project_id:
             where.append(Task.project_id == project_id)
         if due_before is not None:
@@ -238,8 +238,8 @@ class TaskService:
     async def _check_refs(self, data: dict[str, Any]) -> None:
         if data.get("task_type_id"):
             await self.task_types.get_or_404(data["task_type_id"])
-        if data.get("subject_id"):
-            await self.subjects.get_or_404(data["subject_id"])
+        if data.get("area_id"):
+            await self.areas.get_or_404(data["area_id"])
         if data.get("category_id"):
             await self.categories.get_or_404(data["category_id"])
         if data.get("action_type_id"):
@@ -393,7 +393,7 @@ class TaskService:
             changes["recurrence_start"] = self._today()
         for name, value in changes.items():
             setattr(task, name, value)
-        if changes.keys() & {"category_id", "subject_id"}:
+        if changes.keys() & {"category_id", "area_id"}:
             await self._refresh_events(task)
         if changes.keys() & RECURRENCE_FIELDS and (task.recurrence or "recurrence" in changes):
             await sync_recurring_task(self.db, task, self._today())
@@ -535,7 +535,7 @@ class TaskService:
         event.end = end
         event.is_pinned = True
         event.title = subtask.title
-        event.subject_id = task.subject_id
+        event.area_id = task.area_id
         event.color = await self._color(subtask, task)
         await self.db.commit()
         return await self.get_subtask(id)
@@ -560,7 +560,7 @@ class TaskService:
                 continue
             subtask = by_id[e.source_id]
             e.title = subtask.title
-            e.subject_id = task.subject_id
+            e.area_id = task.area_id
             e.color = await self._color(subtask, task)
 
 

@@ -26,8 +26,8 @@ class Source(UserOwnedMixin, Base):
     __tablename__ = "sources"
     __table_args__ = (Index("ix_sources_search", "search", postgresql_using="gin"),)
 
-    subject_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("subjects.id", ondelete="CASCADE"), index=True
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("areas.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(500))
     author: Mapped[str] = mapped_column(String(300), default="")

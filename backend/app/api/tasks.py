@@ -37,14 +37,14 @@ NO_CONTENT = status.HTTP_204_NO_CONTENT
 async def list_tasks(
     svc: Service,
     status: Annotated[list[TaskStatus], Query()] = [],  # noqa: B006
-    subject_id: uuid.UUID | None = None,
+    area_id: uuid.UUID | None = None,
     project_id: uuid.UUID | None = None,
     due_before: Moment | None = None,
 ) -> list[TaskRead]:
     """Сортировка: ближайший дедлайн первым, без дедлайна — в конце.
     `due_before` — только с дедлайном раньше этого момента (просроченные тоже)."""
     return await svc.list_tasks(
-        statuses=status, subject_id=subject_id, project_id=project_id, due_before=due_before
+        statuses=status, area_id=area_id, project_id=project_id, due_before=due_before
     )
 
 
