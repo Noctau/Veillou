@@ -6,7 +6,7 @@
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
 Дела из ящика (взятые на неделю), дни подготовки к экзаменам, недельная
-норма проекта и лимиты нагрузки — тоже.
+норма проекта, лимиты нагрузки и буферы типов занятости — тоже.
 
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
@@ -25,6 +25,7 @@ from app.models import (
     BacklogItem,
     BudgetDayOverride,
     Event,
+    EventType,
     Exam,
     ExamSession,
     LoadBudget,
@@ -57,12 +58,14 @@ BACKLOG_FIELDS = {
     "estimate_min",
     "conditions",
     "hours_action_type_id",
+    "days_event_type_id",
     "time_window",
     "action_type_id",
     "deleted_at",
 }
 EXAM_FIELDS = {"starts_at", "duration_min", "plan_enabled", "deleted_at"}
 SESSION_FIELDS = {"question_ids", "minutes", "date", "deleted_at"}
+EVENT_TYPE_FIELDS = {"buffer_before_min", "buffer_after_min", "merge_buffers", "deleted_at"}
 PROJECT_FIELDS = {"weekly_norm_min", "status", "deadline", "title", "deleted_at"}
 # Статусы события, переход в которые (или из которых) меняет занятость
 EVENT_STATUSES = {EventStatus.missed, EventStatus.cancelled}
@@ -116,6 +119,8 @@ def _relevant(obj: Any, is_new: bool) -> bool:
         if is_new:
             return bool(obj.weekly_norm_min)
         return bool(_changed(obj, PROJECT_FIELDS))
+    if isinstance(obj, EventType):
+        return not is_new and bool(_changed(obj, EVENT_TYPE_FIELDS))
     if isinstance(obj, LoadBudget):
         return is_new or bool(_changed(obj, {"minutes_per_day", "deleted_at"}))
     return isinstance(obj, LoadBudgetMember | BudgetDayOverride)

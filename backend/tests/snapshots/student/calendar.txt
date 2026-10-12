@@ -1,121 +1,121 @@
 выходной 2026-12-10…2026-12-10 День факультета
 
 == пн 2026-11-30 ==
-09:00–10:35 [class] Климатология  area_id=‹Климатология› class_type=lecture color=#10b981 is_fixed=true location=1801 occurrence_date=2026-11-30 pair_number=1 status=planned teacher=Иванов П. С. template_id=‹Климатология д1 пара 1› template_type=class_rule
-10:45–12:20 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=seminar color=#8b5cf6 is_fixed=true location=1805 occurrence_date=2026-11-30 pair_number=2 status=planned template_id=‹Динамическая метеорология д1 пара 2 even› template_type=class_rule
-14:00–15:30 [subtask] ДЗ по матану: ряды  area_id=‹Математический анализ› color=#3b82f6 source_id=‹ДЗ по матану: ряды› source_type=task status=planned
-15:45–16:45 [subtask] Прочитать главу 4 «Климат и циркуляция»  area_id=‹Климатология› color=#3b82f6 source_id=‹Прочитать главу 4 «Климат и циркуляция»› source_type=task status=planned
-16:45–17:45 [subtask] Подобрать литературу в библиотеке  area_id=‹Климатология› color=#3b82f6 source_id=‹Реферат по климатологии / Подобрать литературу в библиотеке› source_type=subtask status=planned
-17:45–18:00 [subtask] Согласовать план с преподавателем  area_id=‹Климатология› color=#3b82f6 source_id=‹Реферат по климатологии / Согласовать план с преподавателем› source_type=subtask status=planned
-18:00–19:30 [subtask] Обработать данные  area_id=‹Физика атмосферы› color=#3b82f6 source_id=‹Лабораторная №3 / Обработать данные› source_type=subtask status=planned
+09:00–10:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"teacher": "Иванов П. С.", "class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-11-30 slot=1 status=planned template_id=‹Климатология д1 пара 1› template_type=schedule_rule
+10:45–12:20 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-11-30 slot=2 status=planned template_id=‹Динамическая метеорология д1 пара 2 even› template_type=schedule_rule
+14:00–15:30 [subtask] ДЗ по матану: ряды  area_id=‹Математический анализ› color=#3b82f6 fields={} source_id=‹ДЗ по матану: ряды› source_type=task status=planned
+15:45–16:45 [subtask] Прочитать главу 4 «Климат и циркуляция»  area_id=‹Климатология› color=#3b82f6 fields={} source_id=‹Прочитать главу 4 «Климат и циркуляция»› source_type=task status=planned
+16:45–17:45 [subtask] Подобрать литературу в библиотеке  area_id=‹Климатология› color=#3b82f6 fields={} source_id=‹Реферат по климатологии / Подобрать литературу в библиотеке› source_type=subtask status=planned
+17:45–18:00 [subtask] Согласовать план с преподавателем  area_id=‹Климатология› color=#3b82f6 fields={} source_id=‹Реферат по климатологии / Согласовать план с преподавателем› source_type=subtask status=planned
+18:00–19:30 [subtask] Обработать данные  area_id=‹Физика атмосферы› color=#3b82f6 fields={} source_id=‹Лабораторная №3 / Обработать данные› source_type=subtask status=planned
 
 == вт 2026-12-01 ==
-08:00–11:14 [subtask] Написать черновик  area_id=‹Климатология› color=#3b82f6 source_id=‹Реферат по климатологии / Написать черновик› source_type=subtask status=planned
-11:30–12:00 [backlog] Сдать книги в библиотеку  color=#f59e0b source_id=‹Сдать книги в библиотеку› source_type=backlog_item status=planned
-13:00–14:35 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=lecture color=#8b5cf6 is_fixed=true location=1801 occurrence_date=2026-12-01 pair_number=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=class_rule
-14:45–16:20 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 note=Эссе распечатать⏎Словарь occurrence_date=2026-12-01 pair_number=4 status=planned teacher=Brown J. template_id=‹Английский язык д2 пара 4› template_type=class_rule
-16:30–18:00 [subtask] Написать отчёт  area_id=‹Физика атмосферы› color=#3b82f6 is_pinned=true source_id=‹Лабораторная №3 / Написать отчёт› source_type=subtask status=planned
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-01 status=planned template_id=‹Бассейн› template_type=recurring
+08:00–11:14 [subtask] Написать черновик  area_id=‹Климатология› color=#3b82f6 fields={} source_id=‹Реферат по климатологии / Написать черновик› source_type=subtask status=planned
+11:30–12:00 [backlog] Сдать книги в библиотеку  color=#f59e0b fields={} source_id=‹Сдать книги в библиотеку› source_type=backlog_item status=planned
+13:00–14:35 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-01 slot=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=schedule_rule
+14:45–16:20 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"teacher": "Brown J.", "class_type": "семинар"} is_fixed=true location=516 note=Эссе распечатать⏎Словарь occurrence_date=2026-12-01 slot=4 status=planned template_id=‹Английский язык д2 пара 4› template_type=schedule_rule
+16:30–18:00 [subtask] Написать отчёт  area_id=‹Физика атмосферы› color=#3b82f6 fields={} is_pinned=true source_id=‹Лабораторная №3 / Написать отчёт› source_type=subtask status=planned
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-01 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == ср 2026-12-02 ==
-08:00–09:04 [subtask] Оформить и сдать  area_id=‹Климатология› color=#3b82f6 source_id=‹Реферат по климатологии / Оформить и сдать› source_type=subtask status=planned
-09:30–11:30 [subtask] Собрать статьи  color=#3b82f6 source_id=‹Глава 1: обзор / Собрать статьи› source_type=subtask status=planned
-13:00–14:35 [class] Математический анализ  area_id=‹Математический анализ› class_type=lecture color=#ef4444 detached=true is_fixed=true location=П-13 occurrence_date=2026-12-02 pair_number=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=class_rule
-15:15–16:15 [backlog] Продлить студенческий  color=#f59e0b source_id=‹Продлить студенческий› source_type=backlog_item status=planned
-17:00–18:00 [personal] Врач  is_fixed=true location=Поликлиника №202 status=planned
+08:00–09:04 [subtask] Оформить и сдать  area_id=‹Климатология› color=#3b82f6 fields={} source_id=‹Реферат по климатологии / Оформить и сдать› source_type=subtask status=planned
+09:30–11:30 [subtask] Собрать статьи  color=#3b82f6 fields={} source_id=‹Глава 1: обзор / Собрать статьи› source_type=subtask status=planned
+13:00–14:35 [busy] Математический анализ  area_id=‹Математический анализ› color=#ef4444 detached=true event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=П-13 occurrence_date=2026-12-02 slot=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=schedule_rule
+15:15–16:15 [backlog] Продлить студенческий  color=#f59e0b fields={} source_id=‹Продлить студенческий› source_type=backlog_item status=planned
+17:00–18:00 [busy] Врач  event_type_id=‹Личное #3› fields={} is_fixed=true location=Поликлиника №202 status=planned
 
 == чт 2026-12-03 ==
-09:00–10:35 [class] Физика атмосферы  area_id=‹Физика атмосферы› class_type=lab color=#3b82f6 is_fixed=true location=1810 occurrence_date=2026-12-03 pair_number=1 status=planned template_id=‹Физика атмосферы д4 пара 1 even› template_type=class_rule
-10:45–11:45 [subtask] Встреча с научруком  color=#3b82f6 source_id=‹Встреча с научруком / Встреча с научруком 03.12› source_type=subtask status=planned
-13:00–14:35 [class] Климатология  area_id=‹Климатология› class_type=seminar color=#10b981 is_fixed=true location=1805 occurrence_date=2026-12-03 pair_number=3 status=planned template_id=‹Климатология д4 пара 3› template_type=class_rule
-15:15–18:15 [subtask] Написать раздел 1.1  color=#3b82f6 source_id=‹Глава 1: обзор / Написать раздел 1.1› source_type=subtask status=planned
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-03 status=planned template_id=‹Бассейн› template_type=recurring
+09:00–10:35 [busy] Физика атмосферы  area_id=‹Физика атмосферы› color=#3b82f6 event_type_id=‹Пара› fields={"class_type": "лаба"} is_fixed=true location=1810 occurrence_date=2026-12-03 slot=1 status=planned template_id=‹Физика атмосферы д4 пара 1 even› template_type=schedule_rule
+11:15–12:15 [subtask] Встреча с научруком  color=#3b82f6 fields={} source_id=‹Встреча с научруком / Встреча с научруком 03.12› source_type=subtask status=planned
+13:00–14:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-03 slot=3 status=planned template_id=‹Климатология д4 пара 3› template_type=schedule_rule
+15:15–18:15 [subtask] Написать раздел 1.1  color=#3b82f6 fields={} source_id=‹Глава 1: обзор / Написать раздел 1.1› source_type=subtask status=planned
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-03 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == пт 2026-12-04 ==
-18:30–20:00 [class] Спутниковая метеорология  area_id=‹Спутниковая метеорология› class_type=other color=#14b8a6 is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-04 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=class_rule
+18:30–20:00 [busy] Спутниковая метеорология  area_id=‹Спутниковая метеорология› color=#14b8a6 event_type_id=‹Пара› fields={} is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-04 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=schedule_rule
 
 == сб 2026-12-05 ==
-10:00–11:30 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-05 pair_number=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=class_rule
+10:00–11:30 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-05 slot=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=schedule_rule
 
 == вс 2026-12-06 ==
-15:00–18:00 [rest] Прогулка  is_fixed=true occurrence_date=2026-12-06 status=planned template_id=‹Прогулка› template_type=recurring
+15:00–18:00 [busy] Прогулка  event_type_id=‹Отдых› fields={} is_fixed=true occurrence_date=2026-12-06 status=planned template_id=‹Прогулка› template_type=schedule_rule
 
 == пн 2026-12-07 ==
-08:00–09:30 [project] ВКР: блокинги над Европой — работа над проектом  color=#3b82f6 source_id=‹ВКР: блокинги над Европой› source_type=project status=planned
-09:00–10:35 [class] Климатология  area_id=‹Климатология› class_type=lecture color=#10b981 detached=true is_fixed=true location=1801 occurrence_date=2026-12-07 pair_number=1 status=cancelled teacher=Иванов П. С. template_id=‹Климатология д1 пара 1› template_type=class_rule
-10:45–12:20 [class] Физика атмосферы  area_id=‹Физика атмосферы› class_type=seminar color=#3b82f6 is_fixed=true location=1805 occurrence_date=2026-12-07 pair_number=2 status=planned template_id=‹Физика атмосферы д1 пара 2 odd› template_type=class_rule
-14:00–15:30 [project] ВКР: блокинги над Европой — работа над проектом  color=#3b82f6 source_id=‹ВКР: блокинги над Европой› source_type=project status=planned
+08:00–09:30 [project] ВКР: блокинги над Европой — работа над проектом  color=#3b82f6 fields={} source_id=‹ВКР: блокинги над Европой› source_type=project status=planned
+09:00–10:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 detached=true event_type_id=‹Пара› fields={"teacher": "Иванов П. С.", "class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-07 slot=1 status=cancelled template_id=‹Климатология д1 пара 1› template_type=schedule_rule
+10:45–12:20 [busy] Физика атмосферы  area_id=‹Физика атмосферы› color=#3b82f6 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-07 slot=2 status=planned template_id=‹Физика атмосферы д1 пара 2 odd› template_type=schedule_rule
+14:00–15:30 [project] ВКР: блокинги над Европой — работа над проектом  color=#3b82f6 fields={} source_id=‹ВКР: блокинги над Европой› source_type=project status=planned
 
 == вт 2026-12-08 ==
-13:00–14:35 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=lecture color=#8b5cf6 is_fixed=true location=1801 occurrence_date=2026-12-08 pair_number=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=class_rule
-14:45–16:20 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-08 pair_number=4 status=planned teacher=Brown J. template_id=‹Английский язык д2 пара 4› template_type=class_rule
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-08 status=planned template_id=‹Бассейн› template_type=recurring
+13:00–14:35 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-08 slot=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=schedule_rule
+14:45–16:20 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"teacher": "Brown J.", "class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-08 slot=4 status=planned template_id=‹Английский язык д2 пара 4› template_type=schedule_rule
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-08 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == ср 2026-12-09 ==
-10:45–12:20 [class] Математический анализ  area_id=‹Математический анализ› class_type=lecture color=#ef4444 is_fixed=true location=02 occurrence_date=2026-12-09 pair_number=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=class_rule
+10:45–12:20 [busy] Математический анализ  area_id=‹Математический анализ› color=#ef4444 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=02 occurrence_date=2026-12-09 slot=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=schedule_rule
 
 == чт 2026-12-10 ==
-09:00–10:00 [subtask] Встреча с научруком  color=#3b82f6 source_id=‹Встреча с научруком / Встреча с научруком 10.12› source_type=subtask status=planned
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-10 status=planned template_id=‹Бассейн› template_type=recurring
+09:00–10:00 [subtask] Встреча с научруком  color=#3b82f6 fields={} source_id=‹Встреча с научруком / Встреча с научруком 10.12› source_type=subtask status=planned
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-10 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == пт 2026-12-11 ==
-18:30–20:00 [class] Спутниковая метеорология  area_id=‹Спутниковая метеорология› class_type=other color=#14b8a6 is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-11 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=class_rule
+18:30–20:00 [busy] Спутниковая метеорология  area_id=‹Спутниковая метеорология› color=#14b8a6 event_type_id=‹Пара› fields={} is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-11 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=schedule_rule
 
 == сб 2026-12-12 ==
-10:00–11:30 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-12 pair_number=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=class_rule
+10:00–11:30 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-12 slot=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=schedule_rule
 
 == вс 2026-12-13 ==
-15:00–18:00 [rest] Прогулка  is_fixed=true occurrence_date=2026-12-13 status=planned template_id=‹Прогулка› template_type=recurring
+15:00–18:00 [busy] Прогулка  event_type_id=‹Отдых› fields={} is_fixed=true occurrence_date=2026-12-13 status=planned template_id=‹Прогулка› template_type=schedule_rule
 
 == пн 2026-12-14 ==
-09:00–10:35 [class] Климатология  area_id=‹Климатология› class_type=lecture color=#10b981 is_fixed=true location=1801 occurrence_date=2026-12-14 pair_number=1 status=planned teacher=Иванов П. С. template_id=‹Климатология д1 пара 1› template_type=class_rule
-10:45–12:20 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=seminar color=#8b5cf6 is_fixed=true location=1805 occurrence_date=2026-12-14 pair_number=2 status=planned template_id=‹Динамическая метеорология д1 пара 2 even› template_type=class_rule
+09:00–10:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"teacher": "Иванов П. С.", "class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-14 slot=1 status=planned template_id=‹Климатология д1 пара 1› template_type=schedule_rule
+10:45–12:20 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-14 slot=2 status=planned template_id=‹Динамическая метеорология д1 пара 2 even› template_type=schedule_rule
 
 == вт 2026-12-15 ==
-13:00–14:35 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=lecture color=#8b5cf6 is_fixed=true location=1801 occurrence_date=2026-12-15 pair_number=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=class_rule
-14:45–16:20 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-15 pair_number=4 status=planned teacher=Brown J. template_id=‹Английский язык д2 пара 4› template_type=class_rule
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-15 status=planned template_id=‹Бассейн› template_type=recurring
+13:00–14:35 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-15 slot=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=schedule_rule
+14:45–16:20 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"teacher": "Brown J.", "class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-15 slot=4 status=planned template_id=‹Английский язык д2 пара 4› template_type=schedule_rule
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-15 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == ср 2026-12-16 ==
-10:45–12:20 [class] Математический анализ  area_id=‹Математический анализ› class_type=lecture color=#ef4444 is_fixed=true location=02 occurrence_date=2026-12-16 pair_number=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=class_rule
+10:45–12:20 [busy] Математический анализ  area_id=‹Математический анализ› color=#ef4444 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=02 occurrence_date=2026-12-16 slot=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=schedule_rule
 
 == чт 2026-12-17 ==
-09:00–10:35 [class] Физика атмосферы  area_id=‹Физика атмосферы› class_type=lab color=#3b82f6 is_fixed=true location=1810 occurrence_date=2026-12-17 pair_number=1 status=planned template_id=‹Физика атмосферы д4 пара 1 even› template_type=class_rule
-10:45–11:45 [subtask] Встреча с научруком  color=#3b82f6 source_id=‹Встреча с научруком / Встреча с научруком 17.12› source_type=subtask status=planned
-13:00–14:35 [class] Климатология  area_id=‹Климатология› class_type=seminar color=#10b981 is_fixed=true location=1805 occurrence_date=2026-12-17 pair_number=3 status=planned template_id=‹Климатология д4 пара 3› template_type=class_rule
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-17 status=planned template_id=‹Бассейн› template_type=recurring
+09:00–10:35 [busy] Физика атмосферы  area_id=‹Физика атмосферы› color=#3b82f6 event_type_id=‹Пара› fields={"class_type": "лаба"} is_fixed=true location=1810 occurrence_date=2026-12-17 slot=1 status=planned template_id=‹Физика атмосферы д4 пара 1 even› template_type=schedule_rule
+11:15–12:15 [subtask] Встреча с научруком  color=#3b82f6 fields={} source_id=‹Встреча с научруком / Встреча с научруком 17.12› source_type=subtask status=planned
+13:00–14:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-17 slot=3 status=planned template_id=‹Климатология д4 пара 3› template_type=schedule_rule
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-17 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == пт 2026-12-18 ==
-18:30–20:00 [class] Спутниковая метеорология  area_id=‹Спутниковая метеорология› class_type=other color=#14b8a6 is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-18 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=class_rule
+18:30–20:00 [busy] Спутниковая метеорология  area_id=‹Спутниковая метеорология› color=#14b8a6 event_type_id=‹Пара› fields={} is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-18 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=schedule_rule
 
 == сб 2026-12-19 ==
-10:00–11:30 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-19 pair_number=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=class_rule
+10:00–11:30 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-19 slot=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=schedule_rule
 
 == вс 2026-12-20 ==
-15:00–18:00 [rest] Прогулка  is_fixed=true occurrence_date=2026-12-20 status=planned template_id=‹Прогулка› template_type=recurring
+15:00–18:00 [busy] Прогулка  event_type_id=‹Отдых› fields={} is_fixed=true occurrence_date=2026-12-20 status=planned template_id=‹Прогулка› template_type=schedule_rule
 
 == пн 2026-12-21 ==
-09:00–10:35 [class] Климатология  area_id=‹Климатология› class_type=lecture color=#10b981 is_fixed=true location=1801 occurrence_date=2026-12-21 pair_number=1 status=planned teacher=Иванов П. С. template_id=‹Климатология д1 пара 1› template_type=class_rule
-10:45–12:20 [class] Физика атмосферы  area_id=‹Физика атмосферы› class_type=seminar color=#3b82f6 is_fixed=true location=1805 occurrence_date=2026-12-21 pair_number=2 status=planned template_id=‹Физика атмосферы д1 пара 2 odd› template_type=class_rule
+09:00–10:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"teacher": "Иванов П. С.", "class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-21 slot=1 status=planned template_id=‹Климатология д1 пара 1› template_type=schedule_rule
+10:45–12:20 [busy] Физика атмосферы  area_id=‹Физика атмосферы› color=#3b82f6 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-21 slot=2 status=planned template_id=‹Физика атмосферы д1 пара 2 odd› template_type=schedule_rule
 
 == вт 2026-12-22 ==
-13:00–14:35 [class] Динамическая метеорология  area_id=‹Динамическая метеорология› class_type=lecture color=#8b5cf6 is_fixed=true location=1801 occurrence_date=2026-12-22 pair_number=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=class_rule
-14:45–16:20 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-22 pair_number=4 status=planned teacher=Brown J. template_id=‹Английский язык д2 пара 4› template_type=class_rule
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-22 status=planned template_id=‹Бассейн› template_type=recurring
+13:00–14:35 [busy] Динамическая метеорология  area_id=‹Динамическая метеорология› color=#8b5cf6 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=1801 occurrence_date=2026-12-22 slot=3 status=planned template_id=‹Динамическая метеорология д2 пара 3› template_type=schedule_rule
+14:45–16:20 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"teacher": "Brown J.", "class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-22 slot=4 status=planned template_id=‹Английский язык д2 пара 4› template_type=schedule_rule
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-22 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == ср 2026-12-23 ==
-10:45–12:20 [class] Математический анализ  area_id=‹Математический анализ› class_type=lecture color=#ef4444 is_fixed=true location=02 occurrence_date=2026-12-23 pair_number=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=class_rule
+10:45–12:20 [busy] Математический анализ  area_id=‹Математический анализ› color=#ef4444 event_type_id=‹Пара› fields={"class_type": "лекция"} is_fixed=true location=02 occurrence_date=2026-12-23 slot=2 status=planned template_id=‹Математический анализ д3 пара 2› template_type=schedule_rule
 
 == чт 2026-12-24 ==
-09:00–10:00 [subtask] Встреча с научруком  color=#3b82f6 source_id=‹Встреча с научруком / Встреча с научруком 24.12› source_type=subtask status=planned
-13:00–14:35 [class] Климатология  area_id=‹Климатология› class_type=seminar color=#10b981 is_fixed=true location=1805 occurrence_date=2026-12-24 pair_number=3 status=planned template_id=‹Климатология д4 пара 3› template_type=class_rule
-19:00–20:30 [personal] Бассейн  is_fixed=true location=СК МГУ occurrence_date=2026-12-24 status=planned template_id=‹Бассейн› template_type=recurring
+09:00–10:00 [subtask] Встреча с научруком  color=#3b82f6 fields={} source_id=‹Встреча с научруком / Встреча с научруком 24.12› source_type=subtask status=planned
+13:00–14:35 [busy] Климатология  area_id=‹Климатология› color=#10b981 event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=1805 occurrence_date=2026-12-24 slot=3 status=planned template_id=‹Климатология д4 пара 3› template_type=schedule_rule
+19:00–20:30 [busy] Бассейн  event_type_id=‹Личное #3› fields={} is_fixed=true location=СК МГУ occurrence_date=2026-12-24 status=planned template_id=‹Бассейн› template_type=schedule_rule
 
 == пт 2026-12-25 ==
-18:30–20:00 [class] Спутниковая метеорология  area_id=‹Спутниковая метеорология› class_type=other color=#14b8a6 is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-25 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=class_rule
+18:30–20:00 [busy] Спутниковая метеорология  area_id=‹Спутниковая метеорология› color=#14b8a6 event_type_id=‹Пара› fields={} is_fixed=true location=ИКИ, к. 200 occurrence_date=2026-12-25 status=planned template_id=‹Спутниковая метеорология д5 18:30› template_type=schedule_rule
 
 == сб 2026-12-26 ==
-10:00–11:30 [class] Английский язык  area_id=‹Английский язык› class_type=seminar color=#f59e0b is_fixed=true location=516 occurrence_date=2026-12-26 pair_number=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=class_rule
+10:00–11:30 [busy] Английский язык  area_id=‹Английский язык› color=#f59e0b event_type_id=‹Пара› fields={"class_type": "семинар"} is_fixed=true location=516 occurrence_date=2026-12-26 slot=1 status=planned template_id=‹Английский язык д6 пара 1› template_type=schedule_rule
 
 == вс 2026-12-27 ==
-15:00–18:00 [rest] Прогулка  is_fixed=true occurrence_date=2026-12-27 status=planned template_id=‹Прогулка› template_type=recurring
+15:00–18:00 [busy] Прогулка  event_type_id=‹Отдых› fields={} is_fixed=true occurrence_date=2026-12-27 status=planned template_id=‹Прогулка› template_type=schedule_rule

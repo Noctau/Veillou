@@ -9,7 +9,6 @@ from app.core.db import session_factory
 from app.core.exceptions import InvalidDataError
 from app.core.time import now_utc
 from app.domain.enums import (
-    BacklogCondition,
     BacklogStatus,
     EventKind,
     EventStatus,
@@ -27,6 +26,7 @@ from .test_replan import (
     NOW,
     TZ,
     add_event,
+    add_event_type,
     at,
     call,
     ops_of,
@@ -196,10 +196,12 @@ async def test_backlog_goes_after_study_and_into_its_week(auth_client, user):
     assert not box.is_fixed
 
 
-async def test_on_class_days_condition(auth_client, user):
+async def test_on_event_days_condition(auth_client, user):
+    pair = await add_event_type(user)
     await add_event(
         user,
-        kind=EventKind.class_,
+        kind=EventKind.busy,
+        event_type_id=pair.id,
         title="Климатология",
         start=at(WED, 10, 45),
         end=at(WED, 12, 20),
@@ -210,7 +212,7 @@ async def test_on_class_days_condition(auth_client, user):
         "Забрать посылку",
         planned_week=MON,
         estimate_min=30,
-        conditions=[BacklogCondition.on_class_days],
+        days_event_type_id=pair.id,
     )
     rev = await call(user, "preview")
     [op] = [o for o in ops_of(rev, "add") if o["source_id"] == str(item.id)]

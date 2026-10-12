@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { eventColor, timeRange } from '@/features/calendar/eventUtils'
+import { timeRange, useEventView } from '@/features/calendar/eventUtils'
 import { type CalendarEvent, useUpdateEvent } from '@/features/calendar/useCalendar'
 import { useAskFeel } from '@/features/plan/useAskFeel'
 import { plural } from '@/features/plan/labels'
@@ -32,10 +32,11 @@ function Row({
   onDone: () => void
   onMove: () => void
 }) {
+  const view = useEventView()
   return (
     <li className={cn('flex items-center gap-3 rounded-lg px-2 py-2', done && 'opacity-60')}>
       <Checkbox aria-label="Сделано" className="size-5" checked={done} disabled={done || busy} onCheckedChange={onDone} />
-      <span className={cn('h-8 w-1 shrink-0 rounded-full', paletteColor(eventColor(event)).bg)} />
+      <span className={cn('h-8 w-1 shrink-0 rounded-full', paletteColor(view.color(event)).bg)} />
       <div className="min-w-0 flex-1">
         <div className={cn('truncate text-sm font-medium', done && 'line-through')}>{event.title}</div>
         <div className="text-xs text-muted-foreground tabular-nums">{timeRange(event, tz)}</div>

@@ -29,7 +29,7 @@ from app.domain.enums import (
     SourceType,
 )
 from app.domain.exams import exam_title, parse_questions, session_title
-from app.models import Area, Event, Exam, ExamQuestion, ExamSession, User
+from app.models import Area, Event, EventType, Exam, ExamQuestion, ExamSession, User
 from app.schemas.exam import (
     ExamCreate,
     ExamDetail,
@@ -217,6 +217,19 @@ class ExamService:
         await self._sync_event(exam)
         await self.db.commit()
 
+    async def _prep_event_type(self) -> uuid.UUID | None:
+        """Тип занятости самого экзамена — первый с подготовкой (до M20 — prep_plans)."""
+        return await self.db.scalar(
+            select(EventType.id)
+            .where(
+                EventType.user_id == self.user_id,
+                EventType.deleted_at.is_(None),
+                EventType.supports_prep.is_(True),
+            )
+            .order_by(EventType.position, EventType.created_at)
+            .limit(1)
+        )
+
     async def _sync_event(self, exam: Exam) -> None:
         """Сам экзамен — жёсткое событие в календаре."""
         event = await self.db.scalar(
@@ -239,7 +252,8 @@ class ExamService:
         }
         if event is None:
             event = Event(
-                kind=EventKind.exam,
+                kind=EventKind.busy,
+                event_type_id=await self._prep_event_type(),
                 is_fixed=True,
                 is_pinned=False,
                 status=EventStatus.planned,

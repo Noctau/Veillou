@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
 from app.core.time import get_tz, now_utc, wall_to_utc
-from app.domain.enums import EventKind
 from app.domain.quickparse import KindHint, ParseResult, parse
 from app.models import Area, User
 from app.schemas.backlog import BacklogCreate
@@ -112,7 +111,7 @@ async def create_from_text(
     if kind == KindHint.event:
         start, end = _event_bounds(p, tz)
         event = await EventService(db, user).create(
-            EventCreate(kind=EventKind.personal, title=title, start=start, end=end, area_id=area_id)
+            EventCreate(title=title, start=start, end=end, area_id=area_id)
         )
         return Created(
             kind, event.id, title, start=start, end=end, area=area.name if area else None

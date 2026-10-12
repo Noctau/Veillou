@@ -468,3 +468,26 @@ def render_values(
         if text:
             result.append((d.label, text))
     return result
+
+
+def render_split(
+    defs: Sequence[FieldDef],
+    values: Mapping[str, Any] | None,
+    *,
+    only_reminder: bool = False,
+    area_names: Mapping[str, str] | None = None,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Как `render_values`, но значения выбора (select, multiselect) — отдельно и без
+    подписи: в строке события они читаются сами по себе («лекция»), остальное —
+    парами «подпись, текст» в порядке полей."""
+    inline: list[str] = []
+    rest: list[tuple[str, str]] = []
+    for d in active(defs):
+        for label, text in render_values(
+            [d], values, only_reminder=only_reminder, area_names=area_names
+        ):
+            if d.type in CHOICE_TYPES:
+                inline.append(text)
+            else:
+                rest.append((label, text))
+    return inline, rest

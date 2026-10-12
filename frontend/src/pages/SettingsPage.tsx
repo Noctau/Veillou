@@ -10,6 +10,7 @@ import { CalibrationSection } from '@/features/plan/CalibrationSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
 import { AccountSection } from '@/features/settings/sections/AccountSection'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
+import { EventTypesSection } from '@/features/schedule/EventTypesSection'
 import { RemindersSection } from '@/features/settings/sections/RemindersSection'
 import { RestSection } from '@/features/settings/sections/RestSection'
 import { ScheduleSection } from '@/features/settings/sections/ScheduleSection'
@@ -42,6 +43,7 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           <DayModeSection settings={settings} />
           <StudySection settings={settings} />
+          <EventTypesSection />
           <BudgetsSection />
           <CalibrationSection />
           <RestSection settings={settings} />

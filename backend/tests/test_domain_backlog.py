@@ -79,7 +79,7 @@ def test_conditions_hours_of_action_type():
 
 def test_conditions_without_time_limits_keep_base():
     base = (w(ALL, "08:00", "22:00"),)
-    conds = [BacklogCondition.needs_laptop, BacklogCondition.on_class_days]
+    conds = [BacklogCondition.needs_laptop]
     assert condition_windows(base, conds) == base
 
 

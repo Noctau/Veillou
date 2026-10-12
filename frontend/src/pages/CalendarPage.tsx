@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { CalendarView } from '@/features/calendar/CalendarView'
-import { PersonalEventDialog } from '@/features/calendar/PersonalEventDialog'
+import { EventDialog } from '@/features/calendar/EventDialog'
 import { RecurringList } from '@/features/calendar/RecurringList'
 import { usePlanState, usePreviewPlan, useUndoPlan } from '@/features/plan/usePlan'
 import { todayIn } from '@/lib/time'
@@ -40,7 +40,7 @@ export function CalendarPage() {
         <CalendarView />
         <RecurringList />
       </div>
-      <PersonalEventDialog open={creating} onOpenChange={setCreating} draft={{ date: todayIn(tz) }} />
+      <EventDialog open={creating} onOpenChange={setCreating} draft={{ date: todayIn(tz) }} />
     </>
   )
 }

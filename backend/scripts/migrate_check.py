@@ -74,6 +74,36 @@ INVARIANTS = (
         "(SELECT 1 FROM recurring_events r WHERE r.id = e.template_id)",
     ),
     Invariant(
+        "вхождение ссылается на правило расписания",
+        frozenset({"events", "schedule_rules"}),
+        "SELECT count(*) FROM events e WHERE e.template_id IS NOT NULL "
+        "AND e.deleted_at IS NULL AND NOT EXISTS "
+        "(SELECT 1 FROM schedule_rules r WHERE r.id = e.template_id)",
+    ),
+    Invariant(
+        "у живого правила расписания живой тип занятости",
+        frozenset({"schedule_rules", "event_types"}),
+        "SELECT count(*) FROM schedule_rules r JOIN event_types t ON t.id = r.event_type_id "
+        "WHERE r.deleted_at IS NULL AND t.deleted_at IS NOT NULL",
+    ),
+    Invariant(
+        "сетка правила — общая строка (без дня недели)",
+        frozenset({"schedule_rules", "slot_grids"}),
+        "SELECT count(*) FROM schedule_rules r JOIN slot_grids g ON g.id = r.slot_grid_id "
+        "WHERE g.weekday IS NOT NULL",
+    ),
+    Invariant(
+        "у жёсткого события тип занятости — того же пользователя",
+        frozenset({"events", "event_types"}),
+        "SELECT count(*) FROM events e JOIN event_types t ON t.id = e.event_type_id "
+        "WHERE e.user_id <> t.user_id",
+    ),
+    Invariant(
+        "тип занятости — только у жёстких событий",
+        frozenset({"events"}),
+        "SELECT count(*) FROM events WHERE event_type_id IS NOT NULL AND kind <> 'busy'",
+    ),
+    Invariant(
         "гибкий блок ссылается на источник",
         frozenset({"events"}),
         "SELECT count(*) FROM events WHERE NOT is_fixed AND deleted_at IS NULL "

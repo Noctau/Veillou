@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from app.core.storage import LocalStorage, get_storage
 from app.main import app
 
-from .test_schedule_api import API, make_area, make_semester, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
 from .test_tasks import seed_task_type
 
 
@@ -26,7 +26,7 @@ async def make_source(client: AsyncClient, area_id: str, **over) -> dict:
 
 @pytest.fixture
 async def subject(auth_client: AsyncClient) -> dict:
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     return await make_area(auth_client, sem["id"])
 
 

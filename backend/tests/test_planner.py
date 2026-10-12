@@ -97,10 +97,12 @@ def test_late_evening_goes_to_next_morning():
     assert start(result, "a") == at(TUE, 9)
 
 
-def test_class_day_with_travel_buffer():
+def test_merged_day_with_travel_buffer():
     busy = (
-        Busy(at(MON, 9), at(MON, 10, 35), is_class=True),
-        Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),
+        Busy(at(MON, 9), at(MON, 10, 35), buffer_before=60, buffer_after=60, merge_key="class"),
+        Busy(
+            at(MON, 10, 45), at(MON, 12, 20), buffer_before=60, buffer_after=60, merge_key="class"
+        ),
     )
     # после пар 12:20 + дорога 60 = 13:20 → обед до 14:00
     assert start(plan(Block("a", 60), busy=busy), "a") == at(MON, 14)
@@ -496,7 +498,8 @@ def test_greedy_fallback_without_time():
 @pytest.mark.parametrize("limit", [0, 0.5])
 def test_engines_agree_on_feasibility(limit):
     busy = tuple(
-        Busy(at(d, 10, 45), at(d, 14, 35), is_class=True) for d in (MON, TUE, WED, THU, FRI)
+        Busy(at(d, 10, 45), at(d, 14, 35), buffer_before=60, buffer_after=60, merge_key="class")
+        for d in (MON, TUE, WED, THU, FRI)
     )
     blocks = [
         Block(

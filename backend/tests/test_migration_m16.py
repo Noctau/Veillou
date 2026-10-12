@@ -1,7 +1,7 @@
 """Миграции M16 «до/после» на фикстуре студентки (tests/fixtures/student.sql).
 
 Отдельная БД: схема до ревизии фикстуры → строки фикстуры (+ предмет без контроля
-с «грязным» контактом преподавателя) → `upgrade head` → проверки сфер →
+с «грязным» контактом преподавателя) → `upgrade` до M16 → проверки сфер →
 `downgrade` до ревизии фикстуры → предметы и ссылки на них на месте.
 """
 
@@ -25,6 +25,8 @@ from scripts.migrate_check import (
 from .test_migration_m15 import STUDENT, query, value
 
 EXTRA = "0b9e1f3c-6c43-4d2a-9d0e-6a3f1c2b7e01"
+# Ревизия M16 contract: дальше M17 переносит class_rules в schedule_rules
+M16_HEAD = "7ca8b1acd149"
 REFERRERS = ("events", "tasks", "notes", "sources", "exams", "class_rules")
 
 
@@ -71,7 +73,7 @@ def test_upgrade_then_downgrade(db: str):
     clim_id = value(db, "SELECT id FROM subjects WHERE name = 'Климатология'")
 
     cfg = _alembic()
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, M16_HEAD)
 
     # ---------- типы сфер ----------
     types = query(

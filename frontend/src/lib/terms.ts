@@ -25,44 +25,245 @@ export const FEEL_LABEL: Record<Schemas['Feel'], string> = {
 
 // ---------- календарь ----------
 
+/** Слои блоков плана; жёсткие события (busy) — слоями по типам занятости из данных. */
 export const KIND_LABEL: Record<Schemas['EventKind'], string> = {
-  class: 'Пары',
-  personal: 'Личное',
-  rest: 'Отдых',
-  subtask: 'Задания',
+  busy: 'Занятость',
+  subtask: 'Задачи',
   backlog: 'Ящик',
-  exam_prep: 'Подготовка',
-  exam: 'Экзамены',
+  prep: 'Подготовка',
   project: 'Проекты',
 }
 
-/** Тип одного события — для карточки. */
+/** Тип одного события — для карточки (у жёсткого — название типа занятости). */
 export const KIND_SINGLE: Record<Schemas['EventKind'], string> = {
-  class: 'Пара',
-  personal: 'Личное',
-  rest: 'Отдых',
-  subtask: 'Подзадача',
+  busy: 'Событие',
+  subtask: 'Шаг задачи',
   backlog: 'Дело из ящика',
-  exam_prep: 'Подготовка к экзамену',
-  exam: 'Экзамен',
+  prep: 'Подготовка',
   project: 'Работа над проектом',
 }
 
-// ---------- расписание ----------
+/** Слой событий без типа занятости. */
+export const UNTYPED_LAYER = 'Без типа'
 
-export const PARITY_LABEL: Record<Schemas['Parity'], string> = { odd: 'Числитель', even: 'Знаменатель' }
+// ---------- расписание (M17) ----------
 
-export const RULE_PARITY_LABEL: Record<Schemas['RuleParity'], string> = {
-  all: 'Каждую неделю',
-  odd: 'Числитель',
-  even: 'Знаменатель',
+export const PATTERN_LABEL: Record<Schemas['ScheduleRuleRead']['pattern']['kind'], string> = {
+  weekly: 'По дням недели',
+  day_cycle: 'Смены N через M',
+  once: 'Разово',
+  rrule: 'RRULE',
 }
 
-export const CLASS_TYPE_LABEL: Record<Schemas['ClassType'], string> = {
-  lecture: 'Лекция',
-  seminar: 'Семинар',
-  lab: 'Лаба',
-  other: 'Другое',
+export const CHANNEL_LABEL: Record<Schemas['Channel'], string> = { push: 'Push', telegram: 'Telegram' }
+
+export const SCHEDULE_UI = {
+  title: 'Расписание',
+  noPeriod: 'Без периода',
+  noPeriodHint: 'Правила без периода повторяются всегда (на 90 дней вперёд, окно докатывается).',
+  period: 'Период',
+  newPeriod: 'Период',
+  newPeriodTitle: 'Новый период',
+  periodSettings: 'Настройки периода',
+  periodCreated: 'Период создан',
+  saved: 'Сохранено',
+  startTitle: 'Начнём с правил',
+  startHint:
+    'Правило — «что и когда повторяется»: урок по вторникам, смена 2/2, стандап по будням. Период нужен, если есть границы и цикл недель (семестр, четверть).',
+  cycleWeek: (n: number) => `Неделя ${n}`,
+  currentCycleWeek: (n: number) => `сейчас неделя ${n}`,
+  everyWeek: 'Каждую неделю',
+  weeks: 'Недели цикла',
+  slots: 'Слоты',
+  slotsHint: 'Сетка слотов — номера и время (звонки, пары, уроки).',
+  slot: (n: number) => `№ ${n}`,
+  ownTime: 'Своё время',
+  otherRules: 'Другие повторы',
+  addRule: 'Правило',
+  newRule: 'Новое правило',
+  editRule: 'Правило расписания',
+  addRuleCell: 'Добавить правило',
+  noGrid: 'Сетки слотов нет — правила со своим временем. Сетку можно завести в настройках периода.',
+  noTypes: 'Сначала заведите тип занятости — «Урок», «Смена», «Встреча».',
+  noRules: 'Правил пока нет.',
+  eventType: 'Тип занятости',
+  area: 'Сфера',
+  noArea: 'Без сферы',
+  newArea: (typeName: string) => `＋ ${typeName}`,
+  pattern: 'Как повторяется',
+  weekdays: 'Дни недели',
+  on: 'Рабочих дней',
+  off: 'Выходных',
+  anchor: 'Первый рабочий день',
+  date: 'Дата',
+  rrule: 'Правило RRULE',
+  rruleHint: 'Без DTSTART и времени: FREQ=MONTHLY;BYDAY=2TU.',
+  time: 'Время',
+  byTime: 'Время',
+  bySlots: 'Слоты',
+  start: 'Начало',
+  end: 'Конец',
+  overnightHint: 'Конец раньше начала — до следующего дня.',
+  slotFrom: 'С',
+  slotTo: 'по',
+  grid: 'Сетка',
+  ruleTitle: 'Название',
+  titleHint: 'Пусто — название сферы, без неё — типа занятости.',
+  location: 'Где',
+  validity: 'Только часть периода…',
+  validFrom: 'Действует с',
+  validTo: 'по',
+  note: 'Заметка к правилу',
+  copy: 'Копировать',
+  copyToDay: 'На день',
+  copyToWeek: 'На неделю цикла',
+  copied: 'Скопировано',
+  deleteTitle: 'Удалить правило?',
+  deleteDescription: 'Будущие вхождения исчезнут из календаря. Прошедшие останутся.',
+  deleteLabel: 'Удалить правило',
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
+  required: 'Обязательно',
+  timeRequired: 'Укажите время',
+  sameTime: 'Конец совпадает с началом',
+  slotRequired: 'Выберите слот',
+  daysRequired: 'Выберите дни',
+  // периоды
+  name: 'Название',
+  startDate: 'Начало',
+  endDate: 'Последний день',
+  cycle: 'Цикл недель',
+  cycleHint: '1 — без цикла; 2 — бывшие числитель и знаменатель.',
+  firstWeek: 'Первая неделя — неделя цикла',
+  pauses: 'Паузы',
+  pausesHint: 'Сессия, каникулы: правила периода в эти дни не повторяются.',
+  addPause: 'Пауза',
+  pauseTitle: 'Каникулы, сессия…',
+  createPeriod: 'Создать период',
+  deletePeriodTitle: (name: string) => `Удалить «${name}»?`,
+  deletePeriodDescription: 'Правила, сетки и исключения периода удалятся. Сферы останутся без периода.',
+  deletePeriodLabel: 'Удалить период',
+  // сетки
+  defaultGrid: 'Звонки',
+  gridName: 'Название сетки',
+  allDays: 'Все дни',
+  ownForDay: 'Свои для дня…',
+  addSlot: 'Слот',
+  removeSlot: 'Убрать слот',
+  likeAllDays: 'Как во все дни',
+  saveGrid: 'Сохранить сетку',
+  gridSaved: 'Сетка сохранена',
+  slotStart: (n: number) => `${n}: начало`,
+  slotEnd: (n: number) => `${n}: конец`,
+  // исключения
+  daysOff: 'Исключения',
+  daysOffHint: 'Дни без правил периода: праздники, практика. Правила без периода исключения не трогают.',
+  noDaysOff: 'Исключений пока нет.',
+  dayOffFrom: 'С',
+  dayOffTo: 'По (необязательно)',
+  dayOffTitle: 'Праздник, практика…',
+  allPeriods: 'Во всех периодах',
+  add: 'Добавить',
+  remove: 'Удалить',
+  dates: 'Даты',
+}
+
+export const EVENT_TYPES_UI = {
+  title: 'Типы занятости',
+  description:
+    'Жёсткие события: уроки, смены, встречи. Тип задаёт дорогу, напоминание и поля; план в это время ничего не ставит.',
+  empty: 'Типов занятости нет — разовые события в календаре просто занимают время.',
+  add: 'Тип занятости',
+  newTitle: 'Новый тип занятости',
+  name: 'Название',
+  namePlaceholder: 'Смена',
+  plural: 'Во множественном числе',
+  pluralHint: 'Заголовок в утренней сводке.',
+  icon: 'Иконка',
+  color: 'Цвет',
+  remind: 'Напоминать за',
+  remindOff: 'Не напоминать',
+  channels: 'Куда',
+  buffer: 'Дорога',
+  bufferBefore: 'до',
+  bufferAfter: 'после',
+  minutes: 'мин',
+  more: 'Подробнее',
+  less: 'Скрыть',
+  merge: 'Склеивать дорогу',
+  mergeHint: 'Подряд в день с тем же местом — дорога только до первого и после последнего.',
+  budgets: 'Входит в лимиты',
+  budgetsHint: 'Время событий этого типа засчитывается в лимит дня.',
+  noBudgets: 'Лимитов нет — завести можно в разделе «Лимиты».',
+  rest: 'Это отдых',
+  restHint: 'Защищённое время: план туда ничего не ставит.',
+  prep: 'Нужна подготовка',
+  prepHint: 'Экзамен, выступление: подготовка распределяется до события.',
+  nowNext: 'Карточка «Сейчас / Дальше»',
+  nowNextHint: 'На экране «Сегодня» и отдельной секцией в утренней сводке.',
+  locationLabel: 'Подпись места',
+  locationLabelHint: 'В текстах перед местом: «ауд.» → «ауд. 1801».',
+  fields: 'Поля событий',
+  fieldsHint: 'С флагом «в напоминании» видны в сводке и напоминании. Поля не влияют на план.',
+  deleteTitle: (name: string) => `Удалить тип «${name}»?`,
+  deleteDescription: 'Правила этого типа и их будущие события удалятся. Прошедшие останутся.',
+  deleteLabel: 'Удалить тип занятости',
+  remindChip: (m: number) => `за ${m} мин`,
+  bufferChip: (m: number) => `дорога ${m} мин`,
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
+}
+
+export const EVENT_UI = {
+  newTitle: 'Новое событие',
+  type: 'Тип занятости',
+  noType: 'Без типа',
+  title: 'Что',
+  titlePlaceholder: 'Врач, встреча, кино…',
+  when: 'Когда',
+  from: 'Начиная с',
+  start: 'Начало',
+  end: 'Конец',
+  repeat: 'Повтор',
+  repeatOn: 'Повторяется в выбранные дни — правило без периода.',
+  noRepeat: (day: string | null) =>
+    `Не повторяется. Нажмите дни, чтобы повторять${day ? ` (например, ${day})` : ''}.`,
+  until: 'До (необязательно)',
+  area: 'Сфера',
+  where: 'Где',
+  color: 'Цвет',
+  note: 'Заметка',
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
+  titleRequired: 'Как назвать?',
+  dateRequired: 'Укажите дату',
+  sameTime: 'Конец совпадает с началом',
+  endBeforeStart: 'Конец раньше начала',
+  typeForRepeat: 'Для повтора выберите тип занятости',
+  recurring: 'Повторяющиеся',
+  // карточка
+  slot: (n: number) => `№ ${n}`,
+  cancelled: 'Отменено',
+  done: 'Сделано',
+  missed: 'Не сделано',
+  pinned: 'Закреплено',
+  detached: 'Изменено вручную',
+  edit: 'Изменить',
+  move: 'Перенести',
+  skip: 'Отменить',
+  asScheduled: 'Как в расписании',
+  series: 'Всё правило',
+}
+
+export const NOW_NEXT_UI = {
+  now: 'Сейчас',
+  next: 'Дальше',
+  upcoming: 'Следующее',
+  left: (t: string) => `ещё ${t}`,
+  inTime: (t: string) => `через ${t}`,
+  dayOff: (title: string) => `Сегодня исключение: ${title}`,
+  over: 'На сегодня всё закончилось',
+  empty: 'Сегодня событий нет',
 }
 
 // ---------- сферы и поля (M16) ----------
@@ -141,14 +342,14 @@ export const AREAS_UI = {
   save: 'Сохранить',
   saving: 'Сохраняем…',
   /** Вкладка «Расписание» сферы. */
-  rules: 'Сетка',
-  noRules: 'В сетке занятий нет — добавьте во вкладке',
+  rules: 'Правила',
+  noRules: 'Правил нет — добавьте во вкладке',
   scheduleLink: '«Расписание»',
   upcoming: 'Ближайшие',
   past: 'Прошедшие',
   cancelled: 'отменено',
   note: 'Конспект',
-  slot: (n: number) => `${n} пара`,
+  slot: (n: number) => `№ ${n}`,
 }
 
 export const AREA_TYPES_UI = {
@@ -192,8 +393,14 @@ export const AREA_TYPES_UI = {
 
 export const CONDITION_LABEL: Record<Schemas['BacklogCondition'], string> = {
   weekday_daytime: 'В будни днём',
-  on_class_days: 'В дни пар',
   needs_laptop: 'Нужен ноутбук',
+}
+
+/** «В дни событий типа» (бывший чип «в дни пар»). */
+export const BACKLOG_DAYS = {
+  label: 'Только в дни',
+  any: 'В любой день',
+  chip: (plural: string) => `В дни: ${plural.toLowerCase()}`,
 }
 
 /** «Только в часы типа действия» (бывший чип «часы учреждений»). */
@@ -237,8 +444,7 @@ export const NOTE_KIND_LABEL: Record<Schemas['NoteKind'], string> = {
 
 /** Порядок ключей — порядок строк в Настройках. */
 export const REMINDER_LABEL: Record<keyof Schemas['Reminders'], { title: string; description: string }> = {
-  morning_digest: { title: 'Утренняя сводка', description: 'Пары, дела и дедлайны на день.' },
-  before_class: { title: 'Перед парой', description: 'С аудиторией.' },
+  morning_digest: { title: 'Утренняя сводка', description: 'События, дела и дедлайны на день.' },
   deadlines: { title: 'Дедлайны', description: 'Во время утренней сводки, одним сообщением с ней.' },
   evening_review: { title: 'Вечерний разбор', description: 'Что сделано, что перенести.' },
   weekly_review: { title: 'Недельный разбор', description: 'Итоги недели и дела из ящика.' },
@@ -326,6 +532,8 @@ export const BUDGETS_UI = {
   hours: 'Часов в день',
   members: 'Какие дела входят',
   membersHint: 'Типы действий, время которых идёт в лимит.',
+  eventMembers: 'Какая занятость входит',
+  eventMembersHint: 'Время событий этих типов тоже идёт в лимит.',
   perDay: (hours: number) => `до ${hours} ч в день`,
   deleteTitle: (name: string) => `Удалить лимит «${name}»?`,
   deleteDescription: 'План перестанет ограничивать эти дела по часам.',

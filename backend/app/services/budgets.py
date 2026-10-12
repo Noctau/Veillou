@@ -1,4 +1,4 @@
-"""Лимиты нагрузки (M15.3): CRUD, состав (типы действий) и разовые лимиты дня.
+"""Лимиты нагрузки (M15.3): CRUD, состав (типы действий и занятости) и разовые лимиты дня.
 
 Разовый лимит — вариант «расширить часы в этот день» при угрозе дедлайну.
 """
@@ -16,7 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc
 from app.domain.planner import Budget
-from app.models import ActionType, BudgetDayOverride, LoadBudget, LoadBudgetMember, User
+from app.models import (
+    ActionType,
+    BudgetDayOverride,
+    EventType,
+    LoadBudget,
+    LoadBudgetMember,
+    User,
+)
 from app.schemas.budget import (
     BudgetOverrideRead,
     LoadBudgetCreate,
@@ -45,6 +52,11 @@ class _ActionTypeRepo(UserScopedRepository[ActionType]):
     not_found_message = "Тип действия не найден"
 
 
+class _EventTypeRepo(UserScopedRepository[EventType]):
+    model = EventType
+    not_found_message = "Тип занятости не найден"
+
+
 class BudgetService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
@@ -54,15 +66,19 @@ class BudgetService:
         self.members = _MemberRepo(db, user.id)
         self.overrides = _OverrideRepo(db, user.id)
         self.action_types = _ActionTypeRepo(db, user.id)
+        self.event_types = _EventTypeRepo(db, user.id)
 
     async def _read(self, budgets: list[LoadBudget]) -> list[LoadBudgetRead]:
         ids = [b.id for b in budgets]
         members: dict[uuid.UUID, list[uuid.UUID]] = defaultdict(list)
+        event_members: dict[uuid.UUID, list[uuid.UUID]] = defaultdict(list)
         for m in await self.members.find_all(
             LoadBudgetMember.budget_id.in_(ids), order_by=[LoadBudgetMember.created_at]
         ):
             if m.action_type_id is not None:
                 members[m.budget_id].append(m.action_type_id)
+            if m.event_type_id is not None:
+                event_members[m.budget_id].append(m.event_type_id)
         today = local_date(now_utc(), self.tz)
         overrides: dict[uuid.UUID, list[BudgetOverrideRead]] = defaultdict(list)
         for o in await self.overrides.find_all(
@@ -78,6 +94,7 @@ class BudgetService:
                 minutes_per_day=b.minutes_per_day,
                 position=b.position,
                 action_type_ids=members.get(b.id, []),
+                event_type_ids=event_members.get(b.id, []),
                 overrides=overrides.get(b.id, []),
             )
             for b in budgets
@@ -91,18 +108,36 @@ class BudgetService:
     async def get(self, id: uuid.UUID) -> LoadBudgetRead:
         return (await self._read([await self.budgets.get_or_404(id)]))[0]
 
-    async def _set_members(self, budget: LoadBudget, action_type_ids: list[uuid.UUID]) -> None:
-        for type_id in action_type_ids:
-            await self.action_types.get_or_404(type_id)
+    async def _set_members(
+        self,
+        budget: LoadBudget,
+        action_type_ids: list[uuid.UUID] | None,
+        event_type_ids: list[uuid.UUID] | None,
+    ) -> None:
+        """Состав правится целиком по каждому виду участников (None — не трогать)."""
         current = await self.members.find_all(LoadBudgetMember.budget_id == budget.id)
-        keep = set(action_type_ids)
-        for m in current:
-            if m.action_type_id not in keep:
-                self.members.soft_delete(m)
-        have = {m.action_type_id for m in current}
-        for type_id in action_type_ids:
-            if type_id not in have:
-                self.members.add(LoadBudgetMember(budget_id=budget.id, action_type_id=type_id))
+        if action_type_ids is not None:
+            for type_id in action_type_ids:
+                await self.action_types.get_or_404(type_id)
+            keep = set(action_type_ids)
+            have = {m.action_type_id for m in current if m.action_type_id is not None}
+            for m in current:
+                if m.action_type_id is not None and m.action_type_id not in keep:
+                    self.members.soft_delete(m)
+            for type_id in action_type_ids:
+                if type_id not in have:
+                    self.members.add(LoadBudgetMember(budget_id=budget.id, action_type_id=type_id))
+        if event_type_ids is not None:
+            for type_id in event_type_ids:
+                await self.event_types.get_or_404(type_id)
+            keep = set(event_type_ids)
+            have = {m.event_type_id for m in current if m.event_type_id is not None}
+            for m in current:
+                if m.event_type_id is not None and m.event_type_id not in keep:
+                    self.members.soft_delete(m)
+            for type_id in event_type_ids:
+                if type_id not in have:
+                    self.members.add(LoadBudgetMember(budget_id=budget.id, event_type_id=type_id))
 
     async def create(self, data: LoadBudgetCreate) -> LoadBudgetRead:
         last = await self.db.scalar(
@@ -117,18 +152,21 @@ class BudgetService:
         )
         self.budgets.add(budget)
         await self.db.flush()
-        await self._set_members(budget, data.action_type_ids)
+        await self._set_members(budget, data.action_type_ids, data.event_type_ids)
         await self.db.commit()
         return await self.get(budget.id)
 
     async def update(self, id: uuid.UUID, patch: LoadBudgetUpdate) -> LoadBudgetRead:
         budget = await self.budgets.get_or_404(id)
         changes = patch.model_dump(exclude_unset=True)
-        for name in changes.keys() & {"name", "minutes_per_day", "position", "action_type_ids"}:
+        members = {"action_type_ids", "event_type_ids"}
+        for name in changes.keys() & {"name", "minutes_per_day", "position", *members}:
             if changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
-        if (ids := changes.pop("action_type_ids", None)) is not None:
-            await self._set_members(budget, ids)
+        if changes.keys() & members:
+            await self._set_members(
+                budget, changes.pop("action_type_ids", None), changes.pop("event_type_ids", None)
+            )
         for name, value in changes.items():
             setattr(budget, name, value)
         await self.db.commit()
@@ -182,13 +220,18 @@ class BudgetService:
 
 @dataclass(frozen=True)
 class BudgetIndex:
-    """Лимиты пользователя для `PlanInput` и в какие лимиты идёт каждый тип действия."""
+    """Лимиты пользователя для `PlanInput` и в какие лимиты идёт каждый тип действия
+    и тип занятости."""
 
     budgets: tuple[Budget, ...]
     by_action: dict[uuid.UUID, frozenset[uuid.UUID]]
+    by_event: dict[uuid.UUID, frozenset[uuid.UUID]]
 
     def of(self, action_type_id: uuid.UUID | None) -> frozenset[uuid.UUID]:
         return self.by_action.get(action_type_id, frozenset()) if action_type_id else frozenset()
+
+    def of_event(self, event_type_id: uuid.UUID | None) -> frozenset[uuid.UUID]:
+        return self.by_event.get(event_type_id, frozenset()) if event_type_id else frozenset()
 
 
 async def budget_index(db: AsyncSession, user_id: uuid.UUID, today: date) -> BudgetIndex:
@@ -198,9 +241,14 @@ async def budget_index(db: AsyncSession, user_id: uuid.UUID, today: date) -> Bud
     budgets = list(await db.scalars(alive(LoadBudget).order_by(LoadBudget.position, LoadBudget.id)))
     ids = {b.id for b in budgets}
     by_action: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+    by_event: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
     for m in await db.scalars(alive(LoadBudgetMember)):
-        if m.budget_id in ids and m.action_type_id is not None:
+        if m.budget_id not in ids:
+            continue
+        if m.action_type_id is not None:
             by_action[m.action_type_id].add(m.budget_id)
+        if m.event_type_id is not None:
+            by_event[m.event_type_id].add(m.budget_id)
     overrides: dict[uuid.UUID, list[tuple[date, int]]] = defaultdict(list)
     for o in await db.scalars(
         alive(BudgetDayOverride)
@@ -211,4 +259,5 @@ async def budget_index(db: AsyncSession, user_id: uuid.UUID, today: date) -> Bud
     return BudgetIndex(
         tuple(Budget(b.id, b.minutes_per_day, tuple(overrides.get(b.id, []))) for b in budgets),
         {k: frozenset(v) for k, v in by_action.items()},
+        {k: frozenset(v) for k, v in by_event.items()},
     )

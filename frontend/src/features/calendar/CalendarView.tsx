@@ -11,13 +11,13 @@ import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useNow } from '@/features/today/useNow'
-import { KIND_LABEL } from '@/lib/terms'
+import { KIND_LABEL, UNTYPED_LAYER } from '@/lib/terms'
 import { addDaysIso, toWallIso } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 
 import { EventDetailsDialog } from './EventDetailsDialog'
-import { classDetails, eventColor } from './eventUtils'
-import { type PersonalDraft, PersonalEventDialog } from './PersonalEventDialog'
+import { type EventDraft, EventDialog } from './EventDialog'
+import { type EventView, useEventView } from './eventUtils'
 import { type CalendarEvent, type EventKind, useCalendar, useUpdateEvent } from './useCalendar'
 
 /*
@@ -32,12 +32,17 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'timeGridWeek', label: 'Неделя' },
   { value: 'dayGridMonth', label: 'Месяц' },
 ]
-const LAYERS: EventKind[] = ['class', 'exam', 'personal', 'rest', 'subtask', 'backlog', 'exam_prep', 'project']
-// Слои, которые видны всегда; остальные — только когда в них есть события
-const BASE_LAYERS: ReadonlySet<EventKind> = new Set(['class', 'personal', 'rest'])
+// Слои: типы занятости (`type:<id>`), жёсткие без типа и блоки плана по виду
+const FLEX_LAYERS: EventKind[] = ['subtask', 'backlog', 'prep', 'project']
+const UNTYPED = 'untyped'
 const STORAGE_KEY = 'veillou.calendar'
 
-type Prefs = { view?: View; hidden?: EventKind[] }
+type Prefs = { view?: View; hidden?: string[] }
+
+function layerOf(e: CalendarEvent): string {
+  if (e.kind !== 'busy') return e.kind
+  return e.event_type_id ? `type:${e.event_type_id}` : UNTYPED
+}
 
 function loadPrefs(): Prefs {
   try {
@@ -69,10 +74,10 @@ function isMovable(e: CalendarEvent): boolean {
   return !e.is_fixed && e.status === 'planned'
 }
 
-function EventContent({ arg }: { arg: EventContentArg }) {
+function EventContent({ arg, view }: { arg: EventContentArg; view: EventView }) {
   const event = arg.event.extendedProps.source as CalendarEvent | undefined
   if (!event) return null
-  const details = event.kind === 'class' ? classDetails(event) : event.location
+  const details = view.details(event)
   return (
     <div className="flex h-full flex-col overflow-hidden px-1 py-0.5 text-xs leading-tight">
       <span className="flex items-center gap-1 truncate font-medium">
@@ -94,7 +99,8 @@ export function CalendarView() {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs)
   const [range, setRange] = useState<{ from: string; to: string; title: string } | null>(null)
   const [opened, setOpened] = useState<CalendarEvent | null>(null)
-  const [draft, setDraft] = useState<PersonalDraft | null>(null)
+  const [draft, setDraft] = useState<EventDraft | null>(null)
+  const eventView = useEventView()
 
   const view = prefs.view ?? defaultView()
   const hidden = useMemo(() => new Set(prefs.hidden ?? []), [prefs.hidden])
@@ -109,9 +115,9 @@ export function CalendarView() {
   const events = useMemo<EventInput[]>(() => {
     if (!data) return []
     const items: EventInput[] = data.events
-      .filter((e) => !hidden.has(e.kind))
+      .filter((e) => !hidden.has(layerOf(e)))
       .map((e) => {
-        const color = eventColor(e)
+        const color = eventView.color(e)
         const muted = e.status === 'cancelled' || e.status === 'done' || e.status === 'missed'
         return {
           id: e.id,
@@ -142,11 +148,15 @@ export function CalendarView() {
       })
     }
     return items
-  }, [data, hidden, tz])
+  }, [data, hidden, tz, eventView])
 
-  const layers = LAYERS.filter(
-    (k) => BASE_LAYERS.has(k) || hidden.has(k) || data?.events.some((e) => e.kind === k),
-  )
+  // Типы занятости видны всегда, остальные слои — когда в них есть события (или скрыты)
+  const present = new Set((data?.events ?? []).map(layerOf))
+  const layers: { key: string; label: string }[] = [
+    ...[...eventView.types.values()].map((t) => ({ key: `type:${t.id}`, label: t.name_plural })),
+    ...(present.has(UNTYPED) || hidden.has(UNTYPED) ? [{ key: UNTYPED, label: UNTYPED_LAYER }] : []),
+    ...FLEX_LAYERS.filter((k) => present.has(k) || hidden.has(k)).map((k) => ({ key: k, label: KIND_LABEL[k] })),
+  ]
 
   const api = () => calendarRef.current?.getApi()
 
@@ -179,7 +189,7 @@ export function CalendarView() {
   }
 
   const toggleLayers = (visible: string[]) =>
-    updatePrefs({ ...prefs, hidden: LAYERS.filter((k) => !visible.includes(k)) })
+    updatePrefs({ ...prefs, hidden: layers.map((l) => l.key).filter((k) => !visible.includes(k)) })
 
   return (
     <div className="flex flex-col gap-3">
@@ -218,12 +228,12 @@ export function CalendarView() {
         variant="outline"
         className="flex-wrap"
         aria-label="Слои"
-        value={LAYERS.filter((k) => !hidden.has(k))}
+        value={layers.map((l) => l.key).filter((k) => !hidden.has(k))}
         onValueChange={toggleLayers}
       >
-        {layers.map((k) => (
-          <ToggleGroupItem key={k} value={k}>
-            {KIND_LABEL[k]}
+        {layers.map((l) => (
+          <ToggleGroupItem key={l.key} value={l.key}>
+            {l.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -256,12 +266,12 @@ export function CalendarView() {
           eventResize={onEventMove}
           snapDuration="00:15:00"
           eventLongPressDelay={400}
-          eventContent={(arg) => (arg.event.display === 'background' ? undefined : <EventContent arg={arg} />)}
+          eventContent={(arg) => (arg.event.display === 'background' ? undefined : <EventContent arg={arg} view={eventView} />)}
         />
       </div>
 
       <EventDetailsDialog event={opened} onOpenChange={(open) => !open && setOpened(null)} />
-      <PersonalEventDialog open={!!draft} onOpenChange={(open) => !open && setDraft(null)} draft={draft ?? undefined} />
+      <EventDialog open={!!draft} onOpenChange={(open) => !open && setDraft(null)} draft={draft ?? undefined} />
     </div>
   )
 }

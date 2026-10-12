@@ -3,7 +3,7 @@ import uuid
 from httpx import AsyncClient
 
 from .test_catalog import action_types, categories
-from .test_schedule_api import API, make_area, make_semester, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
 
 
 async def make_task_type(client: AsyncClient, **over) -> dict:
@@ -136,7 +136,7 @@ async def test_reorder(auth_client):
 
 
 async def test_list_filters_and_deadline_order(auth_client):
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     subj = await make_area(auth_client, sem["id"])
     late = await make_task(auth_client, title="Поздно", deadline="2026-11-01T12:00:00Z")
     soon = await make_task(

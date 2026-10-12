@@ -20,7 +20,6 @@ from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain import backlog as box
 from app.domain.calibration import calibrated
 from app.domain.enums import (
-    BacklogCondition,
     BacklogStatus,
     EventKind,
     EventStatus,
@@ -148,7 +147,7 @@ class FreeService:
             ),
             Window(frozenset({6, 7}), s.work_hours.weekends.start, s.work_hours.weekends.end),
         )
-        classes_today = await self._classes_today()
+        types_today = await self._event_types_today()
         week = box.week_start(self.today)
         for item in await self._all(BacklogItem, BacklogItem.status == BacklogStatus.active):
             at = type_of(item.action_type_id)
@@ -159,8 +158,9 @@ class FreeService:
             )
             hours = type_of(item.hours_action_type_id)
             days = None
-            if BacklogCondition.on_class_days in item.conditions:
-                days = frozenset({self.today}) if classes_today else frozenset()
+            if item.days_event_type_id is not None:
+                today = item.days_event_type_id in types_today
+                days = frozenset({self.today}) if today else frozenset()
             created = local_date(item.created_at, self.tz)
             result.append(
                 FreeCandidate(
@@ -182,16 +182,17 @@ class FreeService:
             meta[("backlog", item.id)] = ("Из ящика", None, None)
         return result, meta
 
-    async def _classes_today(self) -> bool:
+    async def _event_types_today(self) -> set[uuid.UUID]:
+        """Типы занятости, события которых есть сегодня (условие «в дни событий типа»)."""
         start = wall_to_utc(self.today, time(0), self.tz)
         rows = await self._all(
             Event,
-            Event.kind == EventKind.class_,
+            Event.kind == EventKind.busy,
             Event.status != EventStatus.cancelled,
             Event.start >= start,
             Event.start < start + timedelta(days=1),
         )
-        return bool(rows)
+        return {e.event_type_id for e in rows if e.event_type_id is not None}
 
     async def suggest(self, minutes: int) -> list[FreeSuggestion]:
         candidates, meta = await self.candidates()

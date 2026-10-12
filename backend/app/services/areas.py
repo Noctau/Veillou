@@ -13,7 +13,7 @@ from app.core.time import get_tz, now_utc
 from app.domain.fields import FieldError, area_refs, dump_defs, merge_defs, parse_defs
 from app.domain.fields import validate_values as clean_values
 from app.domain.quickparse import AreaRef
-from app.models import Area, AreaType, ClassRule, Semester, User
+from app.models import Area, AreaType, Period, ScheduleRule, User
 from app.schemas.area import AreaCreate, AreaTypeCreate, AreaTypeUpdate, AreaUpdate
 from app.services.base import UserScopedRepository
 from app.services.schedule_sync import SeriesSync
@@ -29,13 +29,13 @@ class AreaRepo(UserScopedRepository[Area]):
     not_found_message = "Сфера не найдена"
 
 
-class _PeriodRepo(UserScopedRepository[Semester]):
-    model = Semester
+class _PeriodRepo(UserScopedRepository[Period]):
+    model = Period
     not_found_message = "Период не найден"
 
 
-class _RuleRepo(UserScopedRepository[ClassRule]):
-    model = ClassRule
+class _RuleRepo(UserScopedRepository[ScheduleRule]):
+    model = ScheduleRule
 
 
 def _sections(values: list[Any]) -> list[str]:
@@ -46,14 +46,11 @@ async def area_refs_for_parse(db: AsyncSession, user: User, today: date) -> list
     """Сферы для быстрого ввода и ИИ: не в архиве, в активном периоде или без периода.
     Если таких нет — все неархивные: одинаковые названия из прошлых периодов не делают
     разбор неоднозначным, пока есть текущие."""
-    active_periods = select(Semester.id).where(
-        Semester.user_id == user.id,
-        Semester.deleted_at.is_(None),
-        Semester.start_date <= today,
-        or_(
-            Semester.session_end >= today,
-            Semester.session_end.is_(None) & (Semester.classes_end >= today),
-        ),
+    active_periods = select(Period.id).where(
+        Period.user_id == user.id,
+        Period.deleted_at.is_(None),
+        Period.start_date <= today,
+        Period.end_date >= today,
     )
     base = select(Area).where(
         Area.user_id == user.id, Area.deleted_at.is_(None), Area.archived_at.is_(None)
@@ -213,10 +210,10 @@ class AreaService:
         return area
 
     async def delete_area(self, id: uuid.UUID) -> None:
-        """Удаляет сферу и её правила пар (вхождения с сегодняшнего дня)."""
+        """Удаляет сферу и её правила расписания (вхождения с сегодняшнего дня)."""
         area = await self.areas.get_or_404(id)
-        for rule in await self.rules.find_all(ClassRule.area_id == id):
+        for rule in await self.rules.find_all(ScheduleRule.area_id == id):
             self.rules.soft_delete(rule)
-            await self.sync.remove_series(rule)
+            await self.sync.remove_series(rule.id)
         self.areas.soft_delete(area)
         await self.db.commit()

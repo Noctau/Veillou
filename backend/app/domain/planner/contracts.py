@@ -41,8 +41,6 @@ class PlanSettings:
     work_weekends: TimeRange = TimeRange(time(11, 0), time(19, 0))
     sleep: TimeRange = TimeRange(time(23, 30), time(7, 30))
     lunch: TimeRange | None = TimeRange(time(13, 0), time(14, 0))
-    # Вычитается целиком до первой и после последней пары дня
-    travel_buffer_min: int = 60
     deadline_buffer_days: int = 1
     max_subtasks_per_task_per_day: int = 2
     # Минимум отдыха в неделю: свободные вечера (evening_start → сон, любой день)
@@ -74,12 +72,16 @@ class Budget:
 
 @dataclass(frozen=True)
 class Busy:
-    """Жёсткий интервал (пара, личное, отдых): планировщик туда ничего не ставит."""
+    """Жёсткий интервал (событие типа занятости): планировщик туда ничего не ставит."""
 
     start: datetime
     end: datetime
-    # Пара: в её день вычитается буфер дороги до первой и после последней пары
-    is_class: bool = False
+    # Дорога, мин: вычитается до начала и после конца
+    buffer_before: int = 0
+    buffer_after: int = 0
+    # Склейка: интервалы одного дня с одним ключом получают буфер только до первого
+    # и после последнего (тип занятости + место). None — буфер у каждого свой
+    merge_key: str | None = None
     # Лимиты, в которые засчитывается (по типу занятости, M17)
     budgets: frozenset[BlockId] = frozenset()
 

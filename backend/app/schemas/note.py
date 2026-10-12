@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import Field, HttpUrl, StringConstraints
 
-from app.domain.enums import ClassType, NoteKind
+from app.domain.enums import NoteKind
 from app.schemas.common import InputModel, ReadModel, SaneDate, UTCMoment
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
@@ -36,15 +36,14 @@ class NoteUpdate(InputModel):
 
 
 class NoteEvent(ReadModel):
-    """Пара конспекта — коротко, для подписи «2 пара, ауд. 1801»."""
+    """Событие конспекта — коротко, для подписи «слот 2 · 1801»."""
 
     id: uuid.UUID
     title: str
     start: UTCMoment
     end: UTCMoment
     location: str | None
-    pair_number: int | None
-    class_type: ClassType | None
+    slot: int | None
 
 
 class NoteListItem(ReadModel):

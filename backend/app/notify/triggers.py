@@ -2,7 +2,7 @@
 
 Вместо вызовов в каждом сервисе — один обработчик `after_flush` на всех
 сессиях: если в транзакции менялись события, задания, подзадачи, типы действий
-или сам пользователь (настройки, TZ, Telegram), ставится джоба
+и занятости или сам пользователь (настройки, TZ, Telegram), ставится джоба
 `reminders.sync` для этого пользователя. Джоба дедуплицируется и стартует с
 небольшой паузой, так что серия правок — одна пересборка. Откат транзакции
 откатывает и джобу.
@@ -13,10 +13,10 @@ import uuid
 from sqlalchemy import event
 from sqlalchemy.orm import Session, UOWTransaction
 
-from app.models import ActionType, Event, Subtask, Task, User
+from app.models import ActionType, Event, EventType, Subtask, Task, User
 from app.services.jobs import enqueue_reminders_sync_sync
 
-WATCHED = (Event, Task, Subtask, ActionType)
+WATCHED = (Event, Task, Subtask, ActionType, EventType)
 
 
 def _changed_users(session: Session) -> set[uuid.UUID]:

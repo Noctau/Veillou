@@ -107,10 +107,12 @@ def test_now_cuts_today():
 # ---------- дорога и жёсткие события ----------
 
 
-def test_travel_buffer_around_class_day():
+def test_travel_buffer_around_merged_day():
     busy = (
-        Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),
-        Busy(at(MON, 13, 0), at(MON, 14, 35), is_class=True),
+        Busy(
+            at(MON, 10, 45), at(MON, 12, 20), buffer_before=60, buffer_after=60, merge_key="class"
+        ),
+        Busy(at(MON, 13, 0), at(MON, 14, 35), buffer_before=60, buffer_after=60, merge_key="class"),
     )
     data = inp(Block("b", 30), busy=busy)
     # 09:00–09:45 (до 10:45 − 60), окно между парами 12:20→12:30–13:00 обед, после — 15:35→15:45
@@ -130,10 +132,39 @@ def test_no_travel_buffer_around_personal_events():
     ]
 
 
-def test_travel_buffer_setting_zero():
-    busy = (Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),)
-    data = inp(Block("b", 30), busy=busy, settings=PlanSettings(travel_buffer_min=0))
+def test_zero_buffer_and_merge_key():
+    busy = (Busy(at(MON, 10, 45), at(MON, 12, 20), merge_key="class"),)
+    data = inp(Block("b", 30), busy=busy)
     assert free_on(data, MON)[:2] == [(time(9), time(10, 45)), (time(12, 30), time(13))]
+
+
+def test_buffers_without_merge_per_event():
+    # Без склейки дорога — вокруг каждого события; до и после — разной длины
+    busy = (
+        Busy(at(MON, 10), at(MON, 11), buffer_before=30, buffer_after=15),
+        Busy(at(MON, 15), at(MON, 16), buffer_before=30, buffer_after=15),
+    )
+    assert free_on(inp(Block("b", 30), busy=busy), MON) == [
+        (time(9), time(9, 30)),
+        (time(11, 15), time(13)),
+        (time(14), time(14, 30)),
+        (time(16, 15), time(21)),
+    ]
+
+
+def test_merge_only_same_key():
+    # Разные места (ключи) — буфер у каждой группы свой, в том числе между ними
+    busy = (
+        Busy(at(MON, 10), at(MON, 11), buffer_before=60, buffer_after=60, merge_key="A"),
+        Busy(at(MON, 16), at(MON, 17), buffer_before=60, buffer_after=60, merge_key="A"),
+        Busy(at(MON, 12), at(MON, 12, 30), buffer_before=60, buffer_after=60, merge_key="B"),
+    )
+    # A — одна группа на день: дорога до 10:00 и после 17:00, между событиями A её нет;
+    # у B своя дорога 11:00–12:00 и 12:30–13:30
+    assert free_on(inp(Block("b", 30), busy=busy), MON) == [
+        (time(14), time(16)),
+        (time(18), time(21)),
+    ]
 
 
 def test_fixed_block_is_busy():

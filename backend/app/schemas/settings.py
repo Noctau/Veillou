@@ -68,10 +68,6 @@ class ReminderRule(_Model):
         return list(dict.fromkeys(value)) if isinstance(value, list) and len(value) <= 10 else value
 
 
-class BeforeClassRule(ReminderRule):
-    minutes_before: int = Field(default=15, ge=0, le=180)
-
-
 DaysBefore = Annotated[int, Field(ge=0, le=14)]
 
 
@@ -92,7 +88,6 @@ class DeadlineRule(ReminderRule):
 
 class Reminders(_Model):
     morning_digest: ReminderRule = ReminderRule()
-    before_class: BeforeClassRule = BeforeClassRule()
     deadlines: DeadlineRule = DeadlineRule()
     evening_review: ReminderRule = ReminderRule()
     weekly_review: ReminderRule = ReminderRule()
@@ -119,9 +114,6 @@ class UserSettings(_Model):
     work_hours: WorkHours = WorkHours()
     sleep: TimeRange = TimeRange(start=time(23, 30), end=time(7, 30))
     lunch: DayRange = DayRange(start=time(13, 0), end=time(14, 0))
-    travel_buffer_min: int = Field(
-        default=60, ge=0, le=240, description="Дорога до университета и обратно, мин"
-    )
     default_action_type_id: uuid.UUID | None = Field(
         default=None, description="Тип действия задач и дел без своего типа; null — без типа"
     )

@@ -48,8 +48,6 @@ from app.domain import backlog as box
 from app.domain import projects as proj
 from app.domain.calibration import calibrated
 from app.domain.enums import (
-    FIXED_KINDS,
-    BacklogCondition,
     BacklogStatus,
     EventKind,
     EventStatus,
@@ -83,6 +81,7 @@ from app.models import (
     BacklogItem,
     Category,
     Event,
+    EventType,
     Exam,
     ExamQuestion,
     ExamSession,
@@ -97,8 +96,9 @@ from app.models.base import UserOwnedMixin
 from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
 from app.services import exams
-from app.services.budgets import budget_index
+from app.services.budgets import BudgetIndex, budget_index
 from app.services.calibration import coefficients
+from app.services.event_types import event_types_by_id
 from app.services.settings import effective_settings
 
 log = logging.getLogger(__name__)
@@ -136,10 +136,28 @@ def plan_settings(s: UserSettings) -> PlanSettings:
         work_weekends=TimeRange(s.work_hours.weekends.start, s.work_hours.weekends.end),
         sleep=TimeRange(s.sleep.start, s.sleep.end),
         lunch=TimeRange(s.lunch.start, s.lunch.end),
-        travel_buffer_min=s.travel_buffer_min,
         deadline_buffer_days=s.deadline_buffer_days,
         free_evenings_per_week=s.rest.free_evenings_per_week,
         weekend_half_days=s.rest.weekend_half_days,
+    )
+
+
+def busy_of(e: Event, event_type: EventType | None, budgets: BudgetIndex) -> Busy:
+    """Жёсткое событие → занятость планировщика: дорога, склейка и лимиты — по типу.
+
+    Склейка: события дня с тем же типом и местом получают буфер только до первого
+    и после последнего. Без типа — просто занято.
+    """
+    if event_type is None:
+        return Busy(e.start, e.end)
+    place = (e.location or "").strip().casefold()
+    return Busy(
+        e.start,
+        e.end,
+        buffer_before=event_type.buffer_before_min,
+        buffer_after=event_type.buffer_after_min,
+        merge_key=f"{event_type.id}|{place}" if event_type.merge_buffers else None,
+        budgets=budgets.of_event(event_type.id),
     )
 
 
@@ -256,20 +274,26 @@ class _Builder:
 
         hard = await self._scalars(
             Event,
-            Event.kind.in_(FIXED_KINDS),
+            Event.kind == EventKind.busy,
             Event.status != EventStatus.cancelled,
             Event.end > self.day_start,
             Event.start < self.horizon_end,
             order_by=[Event.start, Event.id],
         )
-        busy = tuple(Busy(e.start, e.end, is_class=e.kind == EventKind.class_) for e in hard)
-        class_days = frozenset(
-            local_date(e.start, self.tz) for e in hard if e.kind == EventKind.class_
+        event_types = await event_types_by_id(self.db, self.user_id)
+        busy = tuple(
+            busy_of(e, event_types.get(e.event_type_id) if e.event_type_id else None, budgets)
+            for e in hard
         )
+        # Дни событий каждого типа — условие ящика «в дни событий типа»
+        event_days: dict[uuid.UUID, set[date]] = defaultdict(set)
+        for e in hard:
+            if e.event_type_id is not None and e.event_type_id in event_types:
+                event_days[e.event_type_id].add(local_date(e.start, self.tz))
 
         flexible = await self._scalars(
             Event,
-            Event.kind.not_in(FIXED_KINDS),
+            Event.kind != EventKind.busy,
             Event.status.in_([EventStatus.planned, EventStatus.done]),
             or_(Event.status == EventStatus.planned, Event.start >= self.day_start),
             Event.start < self.horizon_end,
@@ -576,7 +600,11 @@ class _Builder:
                     windows=box.condition_windows(
                         base, item.conditions, type_windows(item.hours_action_type_id)
                     ),
-                    days=class_days if BacklogCondition.on_class_days in item.conditions else None,
+                    days=(
+                        frozenset(event_days.get(item.days_event_type_id, ()))
+                        if item.days_event_type_id
+                        else None
+                    ),
                     budgets=budgets.of(act),
                     prefer_morning=prefers_morning(act),
                     filler=True,
@@ -624,13 +652,13 @@ class _Builder:
                 Source(
                     SourceType.exam_session,
                     sess.id,
-                    EventKind.exam_prep,
+                    EventKind.prep,
                     session_title(
                         ExamSessionKind(sess.kind),
                         name,
                         [numbers[q] for q in sess.question_ids if q in numbers],
                     ),
-                    None,  # цвет слоя «Экзамены», чтобы не путать с парами
+                    None,  # цвет слоя подготовки, чтобы не путать с занятостью
                     "exam",
                     exam.id,
                     exam_title(exam.title, subject.name if subject else None),
@@ -1220,7 +1248,7 @@ async def mark_missed(db: AsyncSession, user_id: uuid.UUID, before: datetime) ->
             select(Event).where(
                 Event.user_id == user_id,
                 Event.deleted_at.is_(None),
-                Event.kind.not_in(FIXED_KINDS),
+                Event.kind != EventKind.busy,
                 Event.source_type.in_(PLANNED_SOURCES),
                 Event.status == EventStatus.planned,
                 Event.end <= before,

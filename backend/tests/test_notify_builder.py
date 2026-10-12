@@ -6,16 +6,16 @@ from app.domain.enums import ReminderKind
 from app.notify.builder import (
     BlockInfo,
     Candidate,
-    ClassInfo,
     DeadlineInfo,
+    EventInfo,
     Planned,
     TimeRange,
     Window,
     adjust,
     build,
-    class_candidates,
     deadline_candidates,
     digest_candidates,
+    event_candidates,
     merge_close,
     next_allowed,
     subtask_candidates,
@@ -175,19 +175,26 @@ def test_deadline_merges_with_digest():
 # ---------- кандидаты ----------
 
 
-def test_before_class_15_min():
+def test_before_event_by_type_minutes():
     eid = uuid.uuid4()
-    [p] = build(class_candidates([ClassInfo(eid, at(TUE, 10, 45))], 15, CH), QUIET, TZ)
+    [p] = build(event_candidates([EventInfo(eid, at(TUE, 10, 45), 15, CH)]), QUIET, TZ)
     assert p.fire_at == at(TUE, 10, 30)
     assert p.expires_at == at(TUE, 10, 45)
     assert p.entity_id == eid
-    assert p.key.startswith(f"before_class:{eid}:")
+    assert p.key.startswith(f"before_event:{eid}:")
+    # Минуты и каналы — свои у каждого события (по его типу занятости)
+    [shift] = event_candidates([EventInfo(eid, at(TUE, 20), 60, ("telegram",))])
+    assert (shift.fire_at, shift.channels) == (at(TUE, 19), ("telegram",))
 
 
-def test_moved_class_gets_new_key():
+def test_before_event_without_channels_skipped():
+    assert event_candidates([EventInfo(uuid.uuid4(), at(TUE, 9), 15, ())]) == []
+
+
+def test_moved_event_gets_new_key():
     eid = uuid.uuid4()
-    a = class_candidates([ClassInfo(eid, at(TUE, 9))], 15, CH)[0]
-    b = class_candidates([ClassInfo(eid, at(TUE, 12))], 15, CH)[0]
+    a = event_candidates([EventInfo(eid, at(TUE, 9), 15, CH)])[0]
+    b = event_candidates([EventInfo(eid, at(TUE, 12), 15, CH)])[0]
     assert a.key != b.key
 
 

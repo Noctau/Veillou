@@ -15,10 +15,8 @@ import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { REMINDER_LABEL } from '@/lib/terms'
 
-import { NumberField } from '../fields'
 import { SettingsSection } from '../SettingsSection'
 import { useUpdateSettings, type UserSettings } from '../useSettings'
-import { intIn } from '../zod'
 
 const channel = z.enum(['push', 'telegram'])
 
@@ -32,12 +30,6 @@ const rule = z
 const schema = z.object({
   reminders: z.object({
     morning_digest: rule,
-    before_class: z
-      .object({ enabled: z.boolean(), channels: z.array(channel), minutes_before: intIn(0, 180) })
-      .refine((r) => !r.enabled || r.channels.length > 0, {
-        message: 'Выберите хотя бы один канал',
-        path: ['channels'],
-      }),
     deadlines: z
       .object({
         enabled: z.boolean(),
@@ -118,8 +110,7 @@ function ChannelPicker({ control, name }: { control: Control<FormValues>; name: 
 export function RemindersSection({ settings }: { settings: UserSettings }) {
   const update = useUpdateSettings()
   const form = useForm({ resolver: zodResolver(schema), values: { reminders: settings.reminders } })
-  const { errors, isDirty } = form.formState
-  const beforeClassEnabled = useWatch({ control: form.control, name: 'reminders.before_class.enabled' })
+  const { isDirty } = form.formState
   const deadlinesEnabled = useWatch({ control: form.control, name: 'reminders.deadlines.enabled' })
 
   return (
@@ -171,18 +162,6 @@ export function RemindersSection({ settings }: { settings: UserSettings }) {
                   {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
                 </div>
               )}
-            />
-          )}
-          {r.key === 'before_class' && (
-            <NumberField
-              id="minutes_before"
-              label="За сколько до пары"
-              suffix="мин"
-              step={5}
-              min={0}
-              disabled={!beforeClassEnabled}
-              error={errors.reminders?.before_class?.minutes_before?.message}
-              {...form.register('reminders.before_class.minutes_before', { valueAsNumber: true })}
             />
           )}
         </div>

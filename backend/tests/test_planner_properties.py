@@ -92,11 +92,20 @@ def plan_inputs(draw) -> PlanInput:
             )
         )
     busy = []
+    buf = draw(st.sampled_from([0, 30, 60]))
     for day in range(14):
         d = MON + timedelta(days=day)
         if d.isoweekday() <= 5 and draw(st.booleans()):
             for start, end in CLASSES[: draw(st.integers(1, 3))]:
-                busy.append(Busy(at(d, start), at(d, end), is_class=True))
+                busy.append(
+                    Busy(
+                        at(d, start),
+                        at(d, end),
+                        buffer_before=buf,
+                        buffer_after=buf,
+                        merge_key="class",
+                    )
+                )
     if draw(st.booleans()):
         d = MON + timedelta(days=draw(st.integers(0, 10)))
         busy.append(Busy(at(d, time(17)), at(d, time(19)), budgets=draw(some_budgets)))
@@ -115,7 +124,6 @@ def plan_inputs(draw) -> PlanInput:
         )
     plan_settings = PlanSettings(
         deadline_buffer_days=draw(st.integers(0, 2)),
-        travel_buffer_min=draw(st.sampled_from([0, 30, 60])),
         free_evenings_per_week=draw(st.integers(0, 3)),
         weekend_half_days=draw(st.integers(0, 2)),
     )
@@ -291,7 +299,7 @@ def benchmark_input(
             )
         task += 1
     busy = [
-        Busy(at(d, start), at(d, end), is_class=True)
+        Busy(at(d, start), at(d, end), buffer_before=60, buffer_after=60, merge_key="class")
         for week in range(days // 7 + 1)
         for wd in range(5)
         for d in [MON + timedelta(days=7 * week + wd)]

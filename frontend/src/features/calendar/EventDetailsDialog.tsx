@@ -27,18 +27,19 @@ import { useAskFeel } from '@/features/plan/useAskFeel'
 import { usePreviewPlan } from '@/features/plan/usePlan'
 import { api } from '@/lib/api'
 import { paletteColor } from '@/lib/colors'
-import { KIND_SINGLE } from '@/lib/terms'
+import { FieldValuesView } from '@/features/areas/FieldValuesView'
+import { ScheduleRuleDialog } from '@/features/schedule/ScheduleRuleDialog'
+import { useScheduleRules } from '@/features/schedule/useSchedule'
+import { EVENT_UI as E, KIND_SINGLE } from '@/lib/terms'
 import { addDaysIso, formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
-import { classDetails, eventColor, isDoable } from './eventUtils'
-import { PersonalEventDialog } from './PersonalEventDialog'
+import { placeOf, useEventView } from './eventUtils'
 import {
   type CalendarEvent,
   type EventUpdate,
   useDeleteEvent,
-  useRecurringEvents,
   useResetEvent,
   useUpdateEvent,
 } from './useCalendar'
@@ -60,11 +61,11 @@ type Props = {
   onOpenChange: (open: boolean) => void
 }
 
-/** Карточка события: детали и действия. Для пары — отменить / перенести / аудитория. */
+/** Карточка события: детали, поля типа и действия (отменить / перенести / место). */
 export function EventDetailsDialog({ event, onOpenChange }: Props) {
   const [seriesId, setSeriesId] = useState<string | null>(null)
-  const { data: recurring = [] } = useRecurringEvents()
-  const series = recurring.find((r) => r.id === seriesId)
+  const { data: rules = [] } = useScheduleRules({}, !!seriesId)
+  const series = rules.find((r) => r.id === seriesId)
 
   return (
     <>
@@ -83,10 +84,11 @@ export function EventDetailsDialog({ event, onOpenChange }: Props) {
           )}
         </DialogContent>
       </Dialog>
-      <PersonalEventDialog
+      <ScheduleRuleDialog
         open={!!series}
         onOpenChange={(open) => !open && setSeriesId(null)}
-        recurring={series}
+        periodId={series?.period_id ?? null}
+        rule={series}
       />
     </>
   )
@@ -123,9 +125,13 @@ function EventDetails({
   const askFeel = useAskFeel()
   const [editing, setEditing] = useState(false)
 
-  const isClass = event.kind === 'class'
+  const view = useEventView()
+  const type = view.typeOf(event)
+  const isDoable = view.isDoable(event)
+  // Вхождение правила со сферой: название — от сферы, правится место и время
+  const isClass = event.kind === 'busy' && !!event.template_id && !!event.area_id
   // Сам экзамен правится на его карточке (раздел «Подготовка» сферы)
-  const isExam = event.kind === 'exam'
+  const isExam = event.source_type === 'exam'
   const fromTemplate = !!event.template_id
   const cancelled = event.status === 'cancelled'
   const done = event.status === 'done'
@@ -185,7 +191,7 @@ function EventDetails({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <span className={cn('size-3 shrink-0 rounded-full', paletteColor(eventColor(event)).bg)} />
+          <span className={cn('size-3 shrink-0 rounded-full', paletteColor(view.color(event)).bg)} />
           <span className={cn(cancelled && 'line-through')}>{event.title}</span>
         </DialogTitle>
         <DialogDescription>
@@ -195,19 +201,16 @@ function EventDetails({
 
       <div className="flex flex-col gap-2 text-sm">
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary">{KIND_SINGLE[event.kind]}</Badge>
-          {event.pair_number && <Badge variant="outline">{event.pair_number} пара</Badge>}
-          {cancelled && <Badge variant="destructive">Отменено</Badge>}
-          {done && <Badge variant="outline">Сделано</Badge>}
-          {missed && <Badge variant="destructive">Не сделано</Badge>}
-          {flexible && event.is_pinned && <Badge variant="outline">Закреплено</Badge>}
-          {event.detached && !cancelled && <Badge variant="outline">Изменено вручную</Badge>}
+          <Badge variant="secondary">{type?.name ?? KIND_SINGLE[event.kind]}</Badge>
+          {event.slot && <Badge variant="outline">{E.slot(event.slot)}</Badge>}
+          {cancelled && <Badge variant="destructive">{E.cancelled}</Badge>}
+          {done && <Badge variant="outline">{E.done}</Badge>}
+          {missed && <Badge variant="destructive">{E.missed}</Badge>}
+          {flexible && event.is_pinned && <Badge variant="outline">{E.pinned}</Badge>}
+          {event.detached && !cancelled && <Badge variant="outline">{E.detached}</Badge>}
         </div>
-        {isClass ? (
-          classDetails(event) && <p>{classDetails(event)}</p>
-        ) : (
-          event.location && <p>{event.location}</p>
-        )}
+        {placeOf(event, type) && <p>{placeOf(event, type)}</p>}
+        {type && <FieldValuesView defs={type.fields} values={event.fields} />}
         {event.note && <p className="whitespace-pre-wrap text-muted-foreground">{event.note}</p>}
       </div>
 
@@ -230,7 +233,7 @@ function EventDetails({
             </div>
             {errors.end && <FieldError>{errors.end.message}</FieldError>}
             <Field>
-              <FieldLabel htmlFor="ev-location">{isClass ? 'Аудитория' : 'Где'}</FieldLabel>
+              <FieldLabel htmlFor="ev-location">{type?.location_label || 'Где'}</FieldLabel>
               <Input id="ev-location" {...form.register('location')} />
             </Field>
           </FieldGroup>
@@ -245,17 +248,17 @@ function EventDetails({
         </form>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {isDoable(event) && !done && (
+          {isDoable && !done && (
             <Button onClick={markDone}>
               <CheckIcon /> Сделано
             </Button>
           )}
-          {isDoable(event) && flexible && event.status === 'planned' && (
+          {isDoable && flexible && event.status === 'planned' && (
             <Button variant="outline" onClick={markMissed}>
               <XIcon /> Не сделано
             </Button>
           )}
-          {isDoable(event) && (done || missed) && (
+          {isDoable && (done || missed) && (
             <Button variant="outline" onClick={() => patch({ status: 'planned' })}>
               <Undo2Icon /> Снять отметку
             </Button>
@@ -267,22 +270,22 @@ function EventDetails({
           )}
           {!cancelled && !isExam && (
             <Button variant="outline" onClick={() => setEditing(true)}>
-              <PencilIcon /> {isClass ? 'Перенести / аудитория' : 'Изменить'}
+              <PencilIcon /> {fromTemplate ? E.move : E.edit}
             </Button>
           )}
           {fromTemplate && !cancelled && (
             <Button variant="outline" onClick={() => remove.mutate(event.id, { onSuccess: onClose })}>
-              <BanIcon /> {isClass ? 'Отменить пару' : 'Пропустить'}
+              <BanIcon /> {E.skip}
             </Button>
           )}
           {fromTemplate && event.detached && (
             <Button variant="ghost" onClick={() => reset.mutate(event.id, { onSuccess: onClose })}>
-              <RotateCcwIcon /> Как в расписании
+              <RotateCcwIcon /> {E.asScheduled}
             </Button>
           )}
-          {event.template_type === 'recurring' && event.template_id && (
+          {event.template_type === 'schedule_rule' && event.template_id && (
             <Button variant="ghost" onClick={() => onEditSeries(event.template_id!)}>
-              <RepeatIcon /> Вся серия
+              <RepeatIcon /> {E.series}
             </Button>
           )}
           {event.source_type === 'subtask' && event.source_id && (
@@ -316,7 +319,7 @@ function EventDetails({
               </Link>
             </Button>
           )}
-          {isClass && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
+          {event.kind === 'busy' && !!event.area_id && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
           {!fromTemplate && !isExam && (
             <ConfirmButton title="Удалить событие?" onConfirm={() => remove.mutate(event.id, { onSuccess: onClose })}>
               <Button variant="ghost" className="text-destructive">

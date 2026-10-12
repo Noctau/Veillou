@@ -5,9 +5,14 @@
 `make migrate-check` (M14.2, tests/fixtures/student.sql).
 
 Состав:
-- семестр с чётностью и сессией, общие звонки и свои на субботу, праздник и каникулы;
-- 6 предметов и 10 правил пар (в т. ч. «по числителю», «по знаменателю», «своё
-  время», правило с `valid_from`), отменённая и перенесённая пара, пара с заметкой;
+- типы занятости, как их создаёт миграция M17.1: «Пара» (дорога 40 мин со склейкой,
+  напоминание за 20 мин, поля «Вид занятия» и «Преподаватель»), «Личное», «Отдых»,
+  «Экзамен»;
+- период с циклом 2 недели и паузами «Перерыв» / «Сессия» (бывший семестр с
+  чётностью и сессией), сетка «Звонки» с общими слотами и своими на субботу,
+  праздник и каникулы;
+- 6 предметов и 10 правил «Пары» (в т. ч. неделя цикла 1 / 2, «своё время»,
+  правило с `valid_from`), отменённая и перенесённая пара, пара с заметкой;
 - личный повтор (бассейн) и отдых, разовое личное событие;
 - типы задач, как их создала миграция M15.1 (с ключами сида и синонимами), в т. ч.
   «Задание с работы» (срок + 14 дней, проект «Работа в лаборатории»);
@@ -16,10 +21,10 @@
 - ящик: дела с чипом «в дни пар» и «в часы учреждений», взятые на неделю, и старое;
 - экзамен с билетами и планом подготовки;
 - проект с недельной нормой (ВКР) и проект для заданий с работы;
-- лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); переопределённые настройки
-  (сон, дорога, напоминание перед парой).
+- лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); переопределённые настройки (сон).
 """
 
+import json
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
@@ -50,6 +55,31 @@ TASK_TYPES: list[tuple[str, str, str, list[str]]] = [
         ["экзамен", "зачёт", "коллоквиум", "контрольная"],
     ),
 ]
+
+# Поля «Пары» — как их создаёт миграция M17.1 (id полей сида, а не f1, f2)
+CLASS_FIELDS = [
+    {
+        "id": "class_type",
+        "label": "Вид занятия",
+        "type": "select",
+        "options": ["лекция", "семинар", "лаба"],
+        "multiple": False,
+        "show_in_reminder": True,
+        "required": False,
+        "deleted": False,
+    },
+    {
+        "id": "teacher",
+        "label": "Преподаватель",
+        "type": "text",
+        "options": [],
+        "multiple": False,
+        "show_in_reminder": True,
+        "required": False,
+        "deleted": False,
+    },
+]
+CLASS_TYPES = {"lecture": "лекция", "seminar": "семинар", "lab": "лаба"}
 
 # «Сейчас» фикстуры — понедельник 30.11.2026, 07:00 МСК (до утренней сводки)
 TODAY = date(2026, 11, 30)
@@ -127,8 +157,6 @@ async def build_student(client: AsyncClient) -> Student:
         {
             "sleep": {"start": "00:00", "end": "08:00"},
             "work_hours": {"weekdays": {"start": "09:00", "end": "22:00"}},
-            "travel_buffer_min": 40,
-            "reminders": {"before_class": {"minutes_before": 20}},
             "onboarding_done": True,
         },
     )
@@ -149,22 +177,74 @@ async def build_student(client: AsyncClient) -> Student:
         )
         task_types[key] = data["id"]
 
-    # ---------- семестр, звонки, выходные ----------
+    # ---------- типы занятости (как после миграции M17.1) ----------
+    event_types = {}
+    for key, body in (
+        (
+            "class",
+            {
+                "name": "Пара",
+                "name_plural": "Пары",
+                "icon": "graduation-cap",
+                "color": "#3b82f6",
+                "buffer_before_min": 40,
+                "buffer_after_min": 40,
+                "merge_buffers": True,
+                "remind_before_min": 20,
+                "show_now_next": True,
+                "location_label": "ауд.",
+            },
+        ),
+        ("personal", {"name": "Личное", "icon": "user", "color": "#64748b"}),
+        ("rest", {"name": "Отдых", "icon": "coffee", "color": "#22c55e", "is_rest": True}),
+        (
+            "exam",
+            {
+                "name": "Экзамен",
+                "name_plural": "Экзамены",
+                "icon": "clipboard-check",
+                "color": "#ef4444",
+                "show_now_next": True,
+                "supports_prep": True,
+                "location_label": "ауд.",
+            },
+        ),
+    ):
+        event_types[key] = (await post("/event-types", body, f"et_{key}"))["id"]
+    # Ключи сида и id полей «Пары» — как после миграции (через API их не задать)
+    async with session_factory() as db:
+        for key in event_types:
+            await db.execute(
+                text("UPDATE event_types SET key = :key WHERE id = :id"),
+                {"key": key, "id": event_types[key]},
+            )
+        await db.execute(
+            text("UPDATE event_types SET fields = CAST(:fields AS jsonb) WHERE id = :id"),
+            {"fields": json.dumps(CLASS_FIELDS, ensure_ascii=False), "id": event_types["class"]},
+        )
+        await db.commit()
+
+    # ---------- период, звонки, исключения ----------
     sem = await post(
-        "/semesters",
+        "/periods",
         {
             "name": "Осень 2026",
             "start_date": "2026-09-01",
-            "classes_end": "2026-12-27",
-            "session_start": "2027-01-09",
-            "session_end": "2027-01-25",
-            "first_week_parity": "odd",
+            "end_date": "2027-01-25",
+            "cycle_weeks": 2,
+            "first_cycle_week": 1,
+            "pauses": [
+                {"from": "2026-12-28", "to": "2027-01-08", "title": "Перерыв"},
+                {"from": "2027-01-09", "to": "2027-01-25", "title": "Сессия"},
+            ],
         },
         "semester",
     )
-    await put(
-        f"/semesters/{sem['id']}/bells",
+    grid = await put(
+        "/slot-grids",
         {
+            "period_id": sem["id"],
+            "name": "Звонки",
             "schedules": [
                 {
                     "weekday": None,
@@ -183,9 +263,10 @@ async def build_student(client: AsyncClient) -> Student:
                         {"number": 2, "start": "11:40", "end": "13:10"},
                     ],
                 },
-            ]
+            ],
         },
     )
+    grid_id = next(g["id"] for g in grid if g["weekday"] is None)
     await post(
         "/days-off",
         {"date_from": "2026-12-10", "date_to": "2026-12-10", "title": "День факультета"},
@@ -264,7 +345,7 @@ async def build_student(client: AsyncClient) -> Student:
         notes="Спецкурс, по выбору",
     )
 
-    # ---------- 10 правил пар ----------
+    # ---------- 10 правил «Пары» (как после миграции M17.4) ----------
     rules: list[tuple[str, dict[str, Any]]] = [
         (
             "r_clim_mon",
@@ -375,16 +456,32 @@ async def build_student(client: AsyncClient) -> Student:
         ),
     ]
     for key, body in rules:
-        await post("/class-rules", {"semester_id": sem["id"], **body}, key)
+        mask = {"odd": [1], "even": [2]}.get(body.pop("parity", "all"))
+        fields = {}
+        if (kind := body.pop("class_type")) in CLASS_TYPES:
+            fields["class_type"] = CLASS_TYPES[kind]
+        if teacher := body.pop("teacher", None):
+            fields["teacher"] = teacher
+        slot = body.pop("pair_number", None)
+        rule = {
+            "event_type_id": event_types["class"],
+            "period_id": sem["id"],
+            "pattern": {"kind": "weekly", "weekdays": [body.pop("weekday")], "cycle_weeks": mask},
+            "fields": fields,
+            **body,
+        }
+        if slot:
+            rule |= {"slot_from": slot, "slot_grid_id": grid_id}
+        await post("/schedule-rules", rule, key)
 
     # ---------- личное и отдых ----------
     await post(
-        "/recurring-events",
+        "/schedule-rules",
         {
-            "kind": "personal",
+            "event_type_id": event_types["personal"],
             "title": "Бассейн",
-            "rrule": "FREQ=WEEKLY;BYDAY=TU,TH",
-            "start_date": "2026-09-01",
+            "pattern": {"kind": "weekly", "weekdays": [2, 4]},
+            "valid_from": "2026-09-01",
             "start_time": "19:00",
             "end_time": "20:30",
             "location": "СК МГУ",
@@ -392,12 +489,12 @@ async def build_student(client: AsyncClient) -> Student:
         "pool",
     )
     await post(
-        "/recurring-events",
+        "/schedule-rules",
         {
-            "kind": "rest",
+            "event_type_id": event_types["rest"],
             "title": "Прогулка",
-            "rrule": "FREQ=WEEKLY;BYDAY=SU",
-            "start_date": "2026-09-06",
+            "pattern": {"kind": "weekly", "weekdays": [7]},
+            "valid_from": "2026-09-06",
             "start_time": "15:00",
             "end_time": "18:00",
         },
@@ -406,7 +503,7 @@ async def build_student(client: AsyncClient) -> Student:
     await post(
         "/events",
         {
-            "kind": "personal",
+            "event_type_id": event_types["personal"],
             "title": "Врач",
             "start": at(day(2), 17),
             "end": at(day(2), 18),
@@ -595,7 +692,11 @@ async def build_student(client: AsyncClient) -> Student:
     # ---------- долгий ящик ----------
     books = await post(
         "/backlog",
-        {"title": "Сдать книги в библиотеку", "estimate_min": 30, "conditions": ["on_class_days"]},
+        {
+            "title": "Сдать книги в библиотеку",
+            "estimate_min": 30,
+            "days_event_type_id": event_types["class"],
+        },
         "books",
     )
     mfc = await post(

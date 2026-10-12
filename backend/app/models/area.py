@@ -49,9 +49,9 @@ class Area(UserOwnedMixin, Base):
     area_type_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("area_types.id", ondelete="CASCADE"), index=True
     )
-    # Период, в котором сфера живёт (до M17.2 — семестр); NULL — всегда
+    # Период, в котором сфера живёт; NULL — всегда
     period_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
+        ForeignKey("periods.id", ondelete="SET NULL"), index=True
     )
     name: Mapped[str] = mapped_column(String(200))
     short_name: Mapped[str | None] = mapped_column(String(50))

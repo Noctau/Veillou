@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ExamPanel } from '@/features/exams/ExamPanel'
 import { NoteList } from '@/features/notes/NoteList'
 import { ProjectList } from '@/features/projects/ProjectList'
-import { useSemesters } from '@/features/schedule/useSchedule'
+import { usePeriods } from '@/features/schedule/useSchedule'
 import { SourceList } from '@/features/sources/SourceList'
 import { TaskList } from '@/features/tasks/TaskList'
 import { paletteColor } from '@/lib/colors'
@@ -24,7 +24,7 @@ import { type Area, type AreaSection, type AreaType, useAreas, useAreaTypes } fr
 
 function Header({ area, areaType, areas, onEdit }: { area: Area; areaType?: AreaType; areas: Area[]; onEdit: () => void }) {
   const navigate = useNavigate()
-  const { data: periods } = useSemesters()
+  const { data: periods } = usePeriods()
   const period = periods?.find((p) => p.id === area.period_id)
   return (
     <div className="flex flex-col gap-2">
@@ -48,7 +48,7 @@ function Header({ area, areaType, areas, onEdit }: { area: Area; areaType?: Area
           <PencilIcon />
         </Button>
       </div>
-      {areaType && <FieldValuesView defs={areaType.fields} area={area} areas={areas} className="pl-9" />}
+      {areaType && <FieldValuesView defs={areaType.fields} values={area.fields} areas={areas} className="pl-9" />}
       {area.notes && <p className="pl-9 text-sm whitespace-pre-line text-muted-foreground">{area.notes}</p>}
     </div>
   )

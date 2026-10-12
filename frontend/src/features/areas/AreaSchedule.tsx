@@ -3,17 +3,19 @@ import { CheckIcon, MapPinIcon } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { classDetails, timeRange } from '@/features/calendar/eventUtils'
+import { timeRange, useEventView } from '@/features/calendar/eventUtils'
 import { type CalendarEvent, useCalendar } from '@/features/calendar/useCalendar'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useNotes } from '@/features/notes/useNotes'
-import { type ClassRule, useBells, useClassRules } from '@/features/schedule/useSchedule'
-import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
+import { describePattern } from '@/features/schedule/pattern'
+import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
+import { groupGrids, type ScheduleRule, slotsFor, useScheduleRules, useSlotGrids } from '@/features/schedule/useSchedule'
 import { useNow } from '@/features/today/useNow'
-import { AREAS_UI as T, CLASS_TYPE_LABEL, RULE_PARITY_LABEL } from '@/lib/terms'
-import { addDaysIso, dayStartUtc, formatDay, WEEKDAYS_SHORT, wallDate } from '@/lib/time'
+import { AREAS_UI as T } from '@/lib/terms'
+import { addDaysIso, dayStartUtc, formatDay, wallDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
+import { renderFields } from './fields'
 import type { Area } from './useAreas'
 
 const PAST_DAYS = 21
@@ -22,22 +24,20 @@ const PAST_SHOWN = 6
 const AHEAD_SHOWN = 3
 
 function RulesList({ area }: { area: Area }) {
-  const { data: rules, isPending } = useClassRules(area.period_id ?? undefined)
-  const { data: bells } = useBells(area.period_id ?? undefined)
-  const own = (rules ?? [])
-    .filter((r) => r.area_id === area.id)
-    .sort((a, b) => a.weekday - b.weekday || (a.pair_number ?? 0) - (b.pair_number ?? 0))
+  const { data: rules, isPending } = useScheduleRules({ area_id: area.id })
+  const { data: gridRows = [] } = useSlotGrids()
+  const view = useEventView()
+  const grids = groupGrids(gridRows)
 
-  const time = (r: ClassRule) => {
+  const time = (r: ScheduleRule) => {
     if (r.start_time && r.end_time) return `${r.start_time}–${r.end_time}`
-    const schedule = bells?.find((b) => b.weekday === r.weekday) ?? bells?.find((b) => b.weekday === null)
-    const slot = schedule?.slots.find((s) => s.number === r.pair_number)
+    const weekday = r.pattern.kind === 'weekly' ? r.pattern.weekdays[0] : 1
+    const slot = slotsFor(grids.find((g) => g.id === r.slot_grid_id), weekday).find((s) => s.number === r.slot_from)
     return slot ? `${slot.start}–${slot.end}` : ''
   }
 
-  if (!area.period_id) return null
   if (isPending) return <Skeleton className="h-16" />
-  if (!own.length) {
+  if (!rules?.length) {
     return (
       <p className="text-sm text-muted-foreground">
         {T.noRules}{' '}
@@ -50,28 +50,24 @@ function RulesList({ area }: { area: Area }) {
   }
   return (
     <ul className="flex flex-col gap-1 text-sm">
-      {own.map((r) => (
-        <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
-          <span className="w-6 font-medium">{WEEKDAYS_SHORT[r.weekday - 1]}</span>
-          {r.pair_number && <span>{T.slot(r.pair_number)}</span>}
-          <span className="text-muted-foreground tabular-nums">{time(r)}</span>
-          <span className="text-muted-foreground">
-            {[
-              r.parity !== 'all' && RULE_PARITY_LABEL[r.parity].toLowerCase(),
-              CLASS_TYPE_LABEL[r.class_type],
-              r.location,
-              r.teacher,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </span>
-        </li>
-      ))}
+      {rules.map((r) => {
+        const type = view.types.get(r.event_type_id)
+        const fields = type ? renderFields(type.fields, r.fields, { onlyReminder: true }).map((f) => f.text) : []
+        return (
+          <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium">{describePattern(r.pattern)}</span>
+            {r.slot_from && <span>{T.slot(r.slot_from)}</span>}
+            <span className="text-muted-foreground tabular-nums">{time(r)}</span>
+            <span className="text-muted-foreground">{[type?.name, ...fields, r.location].filter(Boolean).join(' · ')}</span>
+          </li>
+        )
+      })}
     </ul>
   )
 }
 
 function OccurrenceRow({ event, tz, noteId }: { event: CalendarEvent; tz: string; noteId?: string }) {
+  const view = useEventView()
   const cancelled = event.status === 'cancelled'
   return (
     <li className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2', cancelled && 'opacity-60')}>
@@ -87,7 +83,7 @@ function OccurrenceRow({ event, tz, noteId }: { event: CalendarEvent; tz: string
               {event.location}
             </span>
           )}
-          <span>{cancelled ? T.cancelled : classDetails({ ...event, location: null })}</span>
+          <span>{cancelled ? T.cancelled : view.details(event, { withPlace: false })}</span>
         </div>
       </div>
       {noteId ? (
@@ -106,7 +102,7 @@ function OccurrenceRow({ event, tz, noteId }: { event: CalendarEvent; tz: string
 
 /** Раздел «Расписание» сферы: сетка, недавние занятия (с конспектами) и ближайшие. */
 export function AreaSchedule({ area }: { area: Area }) {
-  const { today, tz } = useCurrentSemester()
+  const { today, tz } = useCurrentPeriod()
   const from = dayStartUtc(addDaysIso(today, -PAST_DAYS), tz)
   const to = dayStartUtc(addDaysIso(today, AHEAD_DAYS + 1), tz)
   const { data, isPending } = useCalendar(from, to)
@@ -114,8 +110,8 @@ export function AreaSchedule({ area }: { area: Area }) {
   const noteByEvent = new Map(notes?.filter((n) => n.event_id).map((n) => [n.event_id!, n.id]))
 
   const now = useNow()
-  // Жёсткие события сферы (занятия по сетке)
-  const occurrences = (data?.events ?? []).filter((e) => e.kind === 'class' && e.area_id === area.id)
+  // Жёсткие события сферы (вхождения её правил и разовые)
+  const occurrences = (data?.events ?? []).filter((e) => e.kind === 'busy' && e.area_id === area.id)
   const past = occurrences
     .filter((e) => parseISO(e.start) <= now)
     .reverse()

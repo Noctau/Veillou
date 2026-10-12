@@ -104,7 +104,7 @@ async def send_test(db: AsyncSession, user: User) -> list[ChannelState]:
 
 KIND_LABEL = {
     ReminderKind.morning_digest: "Утренняя сводка",
-    ReminderKind.before_class: "Перед парой",
+    ReminderKind.before_event: "Перед событием",
     ReminderKind.deadline: "Дедлайн",
     ReminderKind.subtask_start: "Начало",
     ReminderKind.evening_review: "Вечерний разбор",

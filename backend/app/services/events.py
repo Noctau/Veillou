@@ -1,4 +1,4 @@
-"""События календаря: разовые личные блоки и правка вхождений шаблонов."""
+"""События календаря: разовые жёсткие события и правка вхождений правил расписания."""
 
 import uuid
 from datetime import datetime, timedelta
@@ -8,19 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz
-from app.domain.enums import FIXED_KINDS, EventStatus, SourceType
-from app.models import Area, DayOff, Event, RecurringEvent, User
-from app.schemas.event import (
-    EventCreate,
-    EventUpdate,
-    RecurringEventCreate,
-    RecurringEventUpdate,
-    check_event_bounds,
-)
+from app.domain.enums import EventKind, EventStatus, SourceType
+from app.domain.fields import FieldError, parse_defs
+from app.domain.fields import validate_values as clean_values
+from app.models import Area, DayOff, Event, EventType, User
+from app.schemas.event import EventCreate, EventUpdate, check_event_bounds
 from app.services.backlog import on_backlog_event_status
-from app.services.base import UserScopedRepository, apply_fields, validate_patch
+from app.services.base import UserScopedRepository
 from app.services.exams import ExamService
-from app.services.recurring_tasks import ensure_has_occurrences
 from app.services.schedule_sync import SeriesSync
 from app.services.tasks import on_subtask_event_status
 
@@ -35,9 +30,9 @@ class AreaRefRepo(UserScopedRepository[Area]):
     not_found_message = "Сфера не найдена"
 
 
-class RecurringRepo(UserScopedRepository[RecurringEvent]):
-    model = RecurringEvent
-    not_found_message = "Повтор не найден"
+class EventTypeRefRepo(UserScopedRepository[EventType]):
+    model = EventType
+    not_found_message = "Тип занятости не найден"
 
 
 class DayOffRefRepo(UserScopedRepository[DayOff]):
@@ -54,7 +49,7 @@ class NotFromTemplateError(InvalidDataError):
 
 def _is_manual_edit(changes: dict[str, Any]) -> bool:
     """Отметки «сделано / не сделано», закрепление и заметка — не правка вхождения:
-    серия по-прежнему обновляет время, аудиторию и т. п. (статус она не трогает)."""
+    серия по-прежнему обновляет время, место и т. п. (статус она не трогает)."""
     if changes.get("status") == EventStatus.cancelled:
         return True
     return bool(changes.keys() - {"status", "is_pinned", "note"})
@@ -67,7 +62,7 @@ class EventService:
         self.user_id = user.id
         self.tz = get_tz(user.timezone)
         self.events = EventRepo(db, user.id)
-        self.recurring = RecurringRepo(db, user.id)
+        self.types = EventTypeRefRepo(db, user.id)
         self.sync = SeriesSync(db, user.id, self.tz)
 
     # ---------- календарь ----------
@@ -92,11 +87,28 @@ class EventService:
     async def get(self, id: uuid.UUID) -> Event:
         return await self.events.get_or_404(id)
 
+    async def _fields(
+        self, event_type_id: uuid.UUID | None, values: dict[str, Any], stored: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Значения полей по типу занятости; без типа полей нет."""
+        if event_type_id is None:
+            return {}
+        event_type = await self.types.get_or_404(event_type_id)
+        try:
+            return clean_values(parse_defs(event_type.fields), values, stored=stored)
+        except FieldError as exc:
+            raise InvalidDataError(str(exc)) from exc
+
     async def create(self, data: EventCreate) -> Event:
         if data.area_id:
             await AreaRefRepo(self.db, self.user_id).get_or_404(data.area_id)
-        event = Event(is_fixed=data.kind in FIXED_KINDS, status=EventStatus.planned)
-        apply_fields(event, data)
+        event = Event(
+            kind=EventKind.busy,
+            is_fixed=True,
+            status=EventStatus.planned,
+            **data.model_dump(exclude={"fields"}),
+            fields=await self._fields(data.event_type_id, data.fields, {}),
+        )
         self.events.add(event)
         await self.db.commit()
         return event
@@ -104,13 +116,22 @@ class EventService:
     async def update(self, id: uuid.UUID, patch: EventUpdate) -> Event:
         event = await self.events.get_or_404(id)
         changes = patch.model_dump(exclude_unset=True)
-        for name in ("title", "start", "end", "status", "is_pinned", "note"):
+        for name in ("title", "start", "end", "status", "is_pinned", "note", "fields"):
             if name in changes and changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
         try:
             check_event_bounds(changes.get("start", event.start), changes.get("end", event.end))
         except ValueError as exc:
             raise InvalidDataError(str(exc)) from exc
+        if changes.keys() & {"event_type_id", "area_id", "fields"} and event.kind != EventKind.busy:
+            raise InvalidDataError("Тип, сфера и поля — только у жёстких событий")
+        if changes.get("area_id"):
+            await AreaRefRepo(self.db, self.user_id).get_or_404(changes["area_id"])
+        if changes.keys() & {"event_type_id", "fields"}:
+            type_id = changes.get("event_type_id", event.event_type_id)
+            changes["fields"] = await self._fields(
+                type_id, changes.get("fields", event.fields), event.fields
+            )
         for name, value in changes.items():
             setattr(event, name, value)
         if event.template_id is not None and _is_manual_edit(changes):
@@ -144,38 +165,6 @@ class EventService:
         await self.db.commit()
         await self.db.refresh(event)
         return event
-
-    # ---------- личные повторы ----------
-
-    async def list_recurring(self) -> list[RecurringEvent]:
-        return await self.recurring.find_all(order_by=[RecurringEvent.start_time])
-
-    async def create_recurring(self, data: RecurringEventCreate) -> RecurringEvent:
-        await ensure_has_occurrences(data.rrule)
-        rec = RecurringEvent()
-        apply_fields(rec, data)
-        self.recurring.add(rec)
-        await self.db.flush()
-        await self.sync.sync_recurring(rec)
-        await self.db.commit()
-        return rec
-
-    async def update_recurring(self, id: uuid.UUID, patch: RecurringEventUpdate) -> RecurringEvent:
-        rec = await self.recurring.get_or_404(id)
-        data = validate_patch(rec, patch, RecurringEventCreate)
-        if data.rrule != rec.rrule:
-            await ensure_has_occurrences(data.rrule)
-        apply_fields(rec, data)
-        await self.db.flush()
-        await self.sync.sync_recurring(rec)
-        await self.db.commit()
-        return rec
-
-    async def delete_recurring(self, id: uuid.UUID) -> None:
-        rec = await self.recurring.get_or_404(id)
-        self.recurring.soft_delete(rec)
-        await self.sync.remove_series(rec)
-        await self.db.commit()
 
 
 async def on_event_status(db: AsyncSession, user: User, event: Event) -> None:

@@ -55,7 +55,7 @@ function useInvalidateAreas() {
   return () =>
     Promise.all(
       // Название и цвет сферы видны в занятиях и календаре
-      [queryKeys.areas, queryKeys.classRulesAll, queryKeys.calendarAll].map((queryKey) =>
+      [queryKeys.areas, queryKeys.scheduleRulesAll, queryKeys.calendarAll].map((queryKey) =>
         queryClient.invalidateQueries({ queryKey }),
       ),
     )

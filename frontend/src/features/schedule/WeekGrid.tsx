@@ -1,37 +1,58 @@
 import { PlusIcon } from 'lucide-react'
 
+import { renderFields } from '@/features/areas/fields'
 import type { Area } from '@/features/areas/useAreas'
 import { paletteColor } from '@/lib/colors'
-import { CLASS_TYPE_LABEL } from '@/lib/terms'
+import { SCHEDULE_UI as T } from '@/lib/terms'
 import { WEEKDAYS_SHORT } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
-import type { BellSlot, ClassRule, Parity } from './useSchedule'
+import { minutes, onWeekCell, ruleLabel } from './pattern'
+import type { EventType, ScheduleRule, Slot } from './useSchedule'
 
 type Props = {
-  rules: ClassRule[]
+  rules: ScheduleRule[]
   areas: Map<string, Area>
-  bellsFor: (weekday: number) => BellSlot[]
-  parity: Parity
+  types: Map<string, EventType>
+  /** Слоты дня недели; пусто — сетки нет, строки — шкала времени. */
+  slotsFor: (weekday: number) => Slot[]
+  cycleWeek: number
   /** Дни недели, которые показываем (на телефоне — один). */
   weekdays: number[]
-  onCreate: (weekday: number, pairNumber: number | null) => void
-  onEdit: (rule: ClassRule) => void
+  onCreate: (weekday: number, slot: number | null) => void
+  onEdit: (rule: ScheduleRule) => void
 }
 
 // Литералы, чтобы Tailwind их увидел
 const COLS: Record<number, string> = {
   1: 'grid-cols-[4rem_1fr]',
+  5: 'grid-cols-[4rem_repeat(5,minmax(0,1fr))]',
   6: 'grid-cols-[4rem_repeat(6,minmax(0,1fr))]',
   7: 'grid-cols-[4rem_repeat(7,minmax(0,1fr))]',
 }
 
-function visible(rule: ClassRule, parity: Parity) {
-  return rule.parity === 'all' || rule.parity === parity
-}
 
-function RuleChip({ rule, area, onClick }: { rule: ClassRule; area?: Area; onClick: () => void }) {
-  const color = paletteColor(area?.color)
+function RuleChip({
+  rule,
+  area,
+  type,
+  showTime,
+  onClick,
+}: {
+  rule: ScheduleRule
+  area?: Area
+  type?: EventType
+  showTime: boolean
+  onClick: () => void
+}) {
+  const color = paletteColor(rule.color ?? area?.color ?? type?.color)
+  const inline = type ? renderFields(type.fields, rule.fields, { onlyReminder: true }).filter((f) => f.def.type === 'select' || f.def.type === 'multiselect') : []
+  const details = [
+    ...inline.map((f) => f.text),
+    rule.location,
+    showTime && rule.start_time && `${rule.start_time}–${rule.end_time}`,
+  ].filter(Boolean)
+  const weeks = rule.pattern.kind === 'weekly' ? rule.pattern.cycle_weeks : null
   return (
     <button
       type="button"
@@ -42,17 +63,11 @@ function RuleChip({ rule, area, onClick }: { rule: ClassRule; area?: Area; onCli
         color.soft,
       )}
     >
-      <span className="line-clamp-2 font-medium leading-tight text-foreground">
-        {area?.short_name || area?.name || '—'}
-      </span>
-      <span className="text-muted-foreground">
-        {CLASS_TYPE_LABEL[rule.class_type]}
-        {rule.location && ` · ${rule.location}`}
-        {rule.start_time && ` · ${rule.start_time}–${rule.end_time}`}
-      </span>
-      {rule.parity !== 'all' && (
+      <span className="line-clamp-2 font-medium leading-tight text-foreground">{ruleLabel(rule, area, type)}</span>
+      {details.length > 0 && <span className="text-muted-foreground">{details.join(' · ')}</span>}
+      {!!weeks?.length && (
         <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
-          {rule.parity === 'odd' ? 'числ.' : 'знам.'}
+          {weeks.map(T.cycleWeek).join(', ')}
         </span>
       )}
     </button>
@@ -65,7 +80,7 @@ function EmptyCell({ onClick, disabled }: { onClick: () => void; disabled?: bool
     <button
       type="button"
       onClick={onClick}
-      aria-label="Добавить пару"
+      aria-label={T.addRuleCell}
       className="flex h-full min-h-12 w-full items-center justify-center rounded-md border border-dashed border-border/40 text-muted-foreground/30 transition hover:border-border hover:text-muted-foreground focus-visible:border-border focus-visible:text-muted-foreground"
     >
       <PlusIcon className="size-4" />
@@ -73,35 +88,40 @@ function EmptyCell({ onClick, disabled }: { onClick: () => void; disabled?: bool
   )
 }
 
-/** Сетка «дни × номер пары» для выбранной чётности. */
-export function WeekGrid({ rules, areas, bellsFor, parity, weekdays, onCreate, onEdit }: Props) {
-  const numbers = [...new Set(weekdays.flatMap((wd) => bellsFor(wd).map((s) => s.number)))].sort((a, b) => a - b)
-  // Время пары в заголовке строки — по первому показанному дню, где эта пара есть
+/**
+ * Неделя цикла: строки — слоты сетки (если она есть), иначе шкала времени
+ * (правила дня по началу). Правила не «по дням недели» — отдельным списком у экрана.
+ */
+export function WeekGrid({ rules, areas, types, slotsFor, cycleWeek, weekdays, onCreate, onEdit }: Props) {
+  const numbers = [...new Set(weekdays.flatMap((wd) => slotsFor(wd).map((s) => s.number)))].sort((a, b) => a - b)
+  const bySlots = numbers.length > 0
+  const shown = rules.filter((r) => r.pattern.kind === 'weekly')
+  const at = (wd: number) => shown.filter((r) => onWeekCell(r, wd, cycleWeek))
+  const single = weekdays.length === 1
+  const chip = (r: ScheduleRule, showTime: boolean) => (
+    <RuleChip
+      key={r.id}
+      rule={r}
+      area={r.area_id ? areas.get(r.area_id) : undefined}
+      type={types.get(r.event_type_id)}
+      showTime={showTime}
+      onClick={() => onEdit(r)}
+    />
+  )
+  // Время слота в заголовке строки — по первому показанному дню, где он есть
   const rowTime = (n: number) => {
     for (const wd of weekdays) {
-      const slot = bellsFor(wd).find((s) => s.number === n)
+      const slot = slotsFor(wd).find((s) => s.number === n)
       if (slot) return slot
     }
   }
-  const shown = rules.filter((r) => visible(r, parity))
-  const custom = shown.filter((r) => r.start_time)
-  const single = weekdays.length === 1
-
-  const cell = (wd: number, n: number) => {
-    const here = shown.filter((r) => r.weekday === wd && !r.start_time && r.pair_number === n)
-    const hasSlot = bellsFor(wd).some((s) => s.number === n)
-    return (
-      <div key={`${wd}-${n}`} className="flex flex-col gap-1">
-        {here.map((r) => (
-          <RuleChip key={r.id} rule={r} area={areas.get(r.area_id)} onClick={() => onEdit(r)} />
-        ))}
-        {here.length === 0 && <EmptyCell disabled={!hasSlot} onClick={() => onCreate(wd, n)} />}
-      </div>
-    )
-  }
+  const timed = (wd: number) =>
+    at(wd)
+      .filter((r) => r.start_time)
+      .sort((a, b) => minutes(a.start_time!) - minutes(b.start_time!))
 
   return (
-    <div className={cn('grid gap-1.5', COLS[weekdays.length] ?? COLS[6], !single && 'min-w-[640px]')}>
+    <div className={cn('grid gap-1.5', COLS[weekdays.length] ?? COLS[7], !single && 'min-w-[640px]')}>
       {!single && (
         <>
           <div />
@@ -112,38 +132,43 @@ export function WeekGrid({ rules, areas, bellsFor, parity, weekdays, onCreate, o
           ))}
         </>
       )}
-      {numbers.map((n) => {
-        const slot = rowTime(n)
-        return (
-          <div key={n} className="contents">
-            <div className="flex flex-col pt-1 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{n}</span>
-              {slot && (
-                <span>
-                  {slot.start}
-                  <br />
-                  {slot.end}
-                </span>
-              )}
+      {bySlots &&
+        numbers.map((n) => {
+          const slot = rowTime(n)
+          return (
+            <div key={n} className="contents">
+              <div className="flex flex-col pt-1 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{n}</span>
+                {slot && (
+                  <span>
+                    {slot.start}
+                    <br />
+                    {slot.end}
+                  </span>
+                )}
+              </div>
+              {weekdays.map((wd) => {
+                const here = at(wd).filter((r) => !r.start_time && r.slot_from === n)
+                const hasSlot = slotsFor(wd).some((s) => s.number === n)
+                return (
+                  <div key={`${wd}-${n}`} className="flex flex-col gap-1">
+                    {here.map((r) => chip(r, false))}
+                    {here.length === 0 && <EmptyCell disabled={!hasSlot} onClick={() => onCreate(wd, n)} />}
+                  </div>
+                )
+              })}
             </div>
-            {weekdays.map((wd) => cell(wd, n))}
+          )
+        })}
+      <div className="contents">
+        <div className="pt-1 text-xs text-muted-foreground">{bySlots ? T.ownTime : T.time}</div>
+        {weekdays.map((wd) => (
+          <div key={wd} className="flex flex-col gap-1">
+            {timed(wd).map((r) => chip(r, true))}
+            {!bySlots && <EmptyCell onClick={() => onCreate(wd, null)} />}
           </div>
-        )
-      })}
-      {custom.length > 0 && (
-        <div className="contents">
-          <div className="pt-1 text-xs text-muted-foreground">Своё время</div>
-          {weekdays.map((wd) => (
-            <div key={wd} className="flex flex-col gap-1">
-              {custom
-                .filter((r) => r.weekday === wd)
-                .map((r) => (
-                  <RuleChip key={r.id} rule={r} area={areas.get(r.area_id)} onClick={() => onEdit(r)} />
-                ))}
-            </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   )
 }

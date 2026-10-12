@@ -6,7 +6,7 @@ import { AreaList } from '@/features/areas/AreaList'
 import { NoteList } from '@/features/notes/NoteList'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { SchedulePanel } from '@/features/schedule/SchedulePanel'
-import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
+import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
 import { TaskList } from '@/features/tasks/TaskList'
 import { AREA_SECTION_LABEL, AREAS_UI } from '@/lib/terms'
 
@@ -15,7 +15,7 @@ const TABS = ['tasks', 'notes', 'projects', 'schedule'] as const
 export function AreasPage() {
   const [params, setParams] = useSearchParams()
   const tab = TABS.find((t) => t === params.get('tab')) ?? 'areas'
-  const { semester } = useCurrentSemester()
+  const { period } = useCurrentPeriod()
 
   const setTab = (value: string) =>
     setParams(
@@ -43,7 +43,7 @@ export function AreasPage() {
           </TabsList>
         </div>
         <TabsContent value="areas">
-          <AreaList periodId={semester?.id} />
+          <AreaList periodId={period?.id} />
         </TabsContent>
         <TabsContent value="tasks">
           <TaskList />

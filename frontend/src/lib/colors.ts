@@ -25,12 +25,9 @@ export function paletteColor(hex: string | null | undefined): PaletteColor {
 
 /** Цвета слоёв календаря для событий без своего цвета. */
 export const KIND_COLORS: Record<string, string> = {
-  class: '#3b82f6',
-  personal: '#8b5cf6',
-  rest: '#10b981',
+  busy: '#64748b',
   subtask: '#f59e0b',
   backlog: '#64748b',
-  exam_prep: '#ef4444',
-  exam: '#ec4899',
+  prep: '#ef4444',
   project: '#0ea5e9',
 }

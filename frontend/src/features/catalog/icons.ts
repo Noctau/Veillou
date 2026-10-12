@@ -1,7 +1,10 @@
 import {
   BookOpenIcon,
   BriefcaseIcon,
+  CalendarIcon,
   ClipboardCheckIcon,
+  ClockIcon,
+  CoffeeIcon,
   DumbbellIcon,
   FileTextIcon,
   FlaskConicalIcon,
@@ -15,6 +18,7 @@ import {
   StarIcon,
   StethoscopeIcon,
   TagIcon,
+  UserIcon,
   UsersIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,4 +43,8 @@ export const CATEGORY_ICONS: Record<CategoryIconName, LucideIcon> = {
   'flask-conical': FlaskConicalIcon,
   'book-open': BookOpenIcon,
   'clipboard-check': ClipboardCheckIcon,
+  user: UserIcon,
+  coffee: CoffeeIcon,
+  calendar: CalendarIcon,
+  clock: ClockIcon,
 }

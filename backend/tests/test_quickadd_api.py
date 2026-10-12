@@ -7,7 +7,7 @@ from sqlalchemy import update
 from app.models import TaskType
 
 from .test_catalog import action_types
-from .test_schedule_api import API, make_area, make_semester
+from .test_schedule_api import API, make_area, make_period
 from .test_tasks import make_task_type
 
 
@@ -27,7 +27,7 @@ async def test_parse_with_user_subjects(auth_client, frozen, session):
         update(TaskType).where(TaskType.id == uuid.UUID(essay["id"])).values(key="essay")
     )
     await session.commit()
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     subj = await make_area(auth_client, sem["id"], synonyms=["климатуха"])
     resp = await auth_client.post(
         f"{API}/quick-add/parse", json={"text": "реферат по климатухе до 15 окт"}
@@ -51,17 +51,16 @@ async def test_parse_with_user_subjects(auth_client, frozen, session):
     }
 
 
-async def test_old_semester_subjects_do_not_clash(auth_client, frozen):
-    old = await make_semester(
+async def test_old_period_areas_do_not_clash(auth_client, frozen):
+    old = await make_period(
         auth_client,
         name="Весна 2026",
         start_date="2026-02-01",
-        classes_end="2026-05-31",
-        session_start="2026-06-01",
-        session_end="2026-06-30",
+        end_date="2026-06-30",
+        pauses=[{"from": "2026-06-01", "to": "2026-06-30", "title": "Сессия"}],
     )
     await make_area(auth_client, old["id"])
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     current = await make_area(auth_client, sem["id"])
     resp = await auth_client.post(f"{API}/quick-add/parse", json={"text": "дз клим"})
     assert resp.json()["area_id"] == current["id"]

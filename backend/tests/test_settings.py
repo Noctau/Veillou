@@ -44,7 +44,9 @@ async def test_defaults(auth_client: AsyncClient):
     assert {**data, "default_action_type_id": None} == UserSettings().model_dump(mode="json")
     assert data["sleep"] == {"start": "23:30", "end": "07:30"}
     assert data["schedule"]["morning_digest"] == "08:00"
-    assert data["reminders"]["before_class"]["minutes_before"] == 15
+    # Дорога и «перед парой» — флаги типов занятости (M17), не настройки
+    assert "travel_buffer_min" not in data
+    assert "before_class" not in data["reminders"]
     assert data["reminders"]["subtask_start"]["enabled"] is False
 
 
@@ -53,18 +55,14 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
         URL,
         json={
             "work_hours": {"weekdays": {"end": "19:00"}},
-            "reminders": {"before_class": {"minutes_before": 20, "channels": ["telegram"]}},
+            "reminders": {"evening_review": {"channels": ["telegram"]}},
         },
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["work_hours"]["weekdays"] == {"start": "09:00", "end": "19:00"}
     assert data["work_hours"]["weekends"] == {"start": "11:00", "end": "19:00"}
-    assert data["reminders"]["before_class"] == {
-        "enabled": True,
-        "channels": ["telegram"],
-        "minutes_before": 20,
-    }
+    assert data["reminders"]["evening_review"] == {"enabled": True, "channels": ["telegram"]}
     assert data["reminders"]["deadlines"]["enabled"] is True
 
     # Второй PATCH не затирает первый
@@ -78,7 +76,7 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
     assert stored.pop("default_action_type_id")
     assert stored == {
         "work_hours": {"weekdays": {"end": "19:00"}},
-        "reminders": {"before_class": {"minutes_before": 20, "channels": ["telegram"]}},
+        "reminders": {"evening_review": {"channels": ["telegram"]}},
         "deadline_buffer_days": 2,
     }
     assert (await auth_client.get(URL)).json() == data
@@ -124,13 +122,13 @@ async def test_settings_are_per_user(auth_client: AsyncClient, client: AsyncClie
 
     from .conftest import PASSWORD
 
-    await auth_client.patch(URL, json={"travel_buffer_min": 30})
+    await auth_client.patch(URL, json={"deadline_buffer_days": 3})
     await create_user(session, email="other@example.com", password=PASSWORD)
     async with AsyncClient(transport=client._transport, base_url="http://test") as other:
         await other.post(
             "/api/v1/auth/login", json={"email": "other@example.com", "password": PASSWORD}
         )
-        assert (await other.get(URL)).json()["travel_buffer_min"] == 60
+        assert (await other.get(URL)).json()["deadline_buffer_days"] == 1
 
 
 async def test_onboarding_flag(auth_client: AsyncClient):

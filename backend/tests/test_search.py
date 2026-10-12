@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from app.domain.search import HIT_END, HIT_START
 
 from .test_notes import make_note
-from .test_schedule_api import API, make_area, make_semester, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
 from .test_sources import make_source
 
 
@@ -18,7 +18,7 @@ async def test_requires_auth(client: AsyncClient):
 
 
 async def test_search_notes_by_title_and_text(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     clim = await make_area(auth_client, sem["id"])
     phys = await make_area(auth_client, sem["id"], name="Физика атмосферы", short_name="фа")
     by_title = await make_note(auth_client, area_id=phys["id"], title="Уравнения состояния")
@@ -61,7 +61,7 @@ async def test_search_reflects_edits_and_deletes(auth_client: AsyncClient):
 
 
 async def test_search_sources(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     subject = await make_area(auth_client, sem["id"])
     book = await make_source(auth_client, subject["id"], author="Матвеев Л. Т.")
     found = await search(auth_client, "матвеев")

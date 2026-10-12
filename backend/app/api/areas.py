@@ -79,5 +79,5 @@ async def update_area(area_id: uuid.UUID, patch: AreaUpdate, svc: Service) -> Ar
 
 @router.delete("/areas/{area_id}", status_code=NO_CONTENT)
 async def delete_area(area_id: uuid.UUID, svc: Service) -> None:
-    """Удаляет сферу и её правила пар; задачи и заметки остаются."""
+    """Удаляет сферу и её правила расписания; задачи и заметки остаются."""
     await svc.delete_area(area_id)

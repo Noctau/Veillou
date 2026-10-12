@@ -62,23 +62,24 @@ async def test_create_exam_puts_it_in_calendar(auth_client):
         5,
         7,
     )
-    [event] = await calendar(auth_client, "exam")
+    [event] = await calendar(auth_client, "busy")
     assert event["is_fixed"]
     assert event["location"] == "1801"
     assert event["title"] == "Экзамен: Климатология"
+    assert event["event_type_id"] is None  # типа с подготовкой у пользователя нет
 
     new_start = in_days(6, 9)
     resp = await auth_client.patch(
         f"{API}/exams/{exam['id']}", json={"starts_at": new_start.isoformat()}
     )
     assert resp.status_code == 200
-    [event] = await calendar(auth_client, "exam")
+    [event] = await calendar(auth_client, "busy")
     assert datetime.fromisoformat(event["start"]) == new_start
 
     resp = await auth_client.get(f"{API}/exams", params={"area_id": subj["id"]})
     assert [e["id"] for e in resp.json()] == [exam["id"]]
     assert (await auth_client.delete(f"{API}/exams/{exam['id']}")).status_code == 204
-    assert await calendar(auth_client, "exam") == []
+    assert await calendar(auth_client, "busy") == []
 
 
 async def test_import_questions(auth_client):
@@ -129,10 +130,10 @@ async def test_build_plan_and_schedule(auth_client, user):
     assert proposal is not None
     adds = [c for c in proposal["changes"] if c["op"] == "add"]
     assert adds
-    assert all(c["kind"] == "exam_prep" for c in adds)
+    assert all(c["kind"] == "prep" for c in adds)
     resp = await auth_client.post(f"{API}/plan/revisions/{proposal['id']}/apply")
     assert resp.status_code == 200, resp.text
-    prep = await calendar(auth_client, "exam_prep")
+    prep = await calendar(auth_client, "prep")
     by_session = {e["source_id"]: e for e in prep}
     for s in sessions:
         if s["id"] in by_session:
@@ -150,7 +151,7 @@ async def test_session_done_marks_questions_learned(auth_client, user):
     await auth_client.post(f"{API}/plan/revisions/{proposal['id']}/apply")
     first_learn = next(s for s in detail["sessions"] if s["kind"] == "learn")
     [event] = [
-        e for e in await calendar(auth_client, "exam_prep") if e["source_id"] == first_learn["id"]
+        e for e in await calendar(auth_client, "prep") if e["source_id"] == first_learn["id"]
     ]
 
     resp = await auth_client.patch(f"{API}/events/{event['id']}", json={"status": "done"})
@@ -247,7 +248,17 @@ async def test_exam_blocks_are_busy_for_planner(auth_client, user):
     async with session_factory() as db:
         u = await db.get(User, user.id)
         snap = await ReplanService(db, u).snapshot()
-        events = list(await db.scalars(select(Event).where(Event.kind == EventKind.exam)))
+        events = list(await db.scalars(select(Event).where(Event.kind == EventKind.busy)))
     assert events
     assert events[0].status == EventStatus.planned
     assert any(b.start == events[0].start for b in snap.inp.busy)
+
+
+async def test_exam_event_gets_prep_event_type(auth_client):
+    from .test_schedule_api import make_event_type
+
+    await make_event_type(auth_client, name="Смена", fields=[])
+    exam_type = await make_event_type(auth_client, name="Экзамен", supports_prep=True, fields=[])
+    await make_exam(auth_client, (await subject(auth_client))["id"])
+    [event] = await calendar(auth_client, "busy")
+    assert event["event_type_id"] == exam_type["id"]

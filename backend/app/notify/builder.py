@@ -1,11 +1,12 @@
 """Когда присылать напоминания. Чистая логика, без БД.
 
-На входе — простые описания пар, заданий и блоков; на выходе — список
+На входе — простые описания событий, заданий и блоков; на выходе — список
 `Planned` с итоговым временем и ключом дедупликации. Сервис
 (services/reminders.py) сверяет этот список с таблицей `reminders`.
 
 Правила:
-- перед парой — за N минут (по умолчанию 15), позже начала пары смысла нет;
+- перед событием — за N минут по типу занятости (`remind_before_min`), позже
+  начала события смысла нет;
 - дедлайны — за 3 дня, за 1 день и в день сдачи, во время утренней сводки
   (склеиваются с ней в одно сообщение);
 - утренняя сводка — каждый день в заданное время;
@@ -89,9 +90,13 @@ class Planned:
 
 
 @dataclass(frozen=True)
-class ClassInfo:
+class EventInfo:
+    """Жёсткое событие типа с напоминанием: за сколько минут и куда."""
+
     event_id: uuid.UUID
     start: datetime
+    minutes_before: int
+    channels: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -125,21 +130,20 @@ def _stamp(dt: datetime) -> str:
     return dt.strftime("%Y%m%dT%H%MZ")
 
 
-def class_candidates(
-    classes: Iterable[ClassInfo], minutes_before: int, channels: Sequence[str]
-) -> list[Candidate]:
+def event_candidates(events: Iterable[EventInfo]) -> list[Candidate]:
     return [
         Candidate(
-            kind=ReminderKind.before_class,
-            key=f"before_class:{c.event_id}:{_stamp(c.start)}",
-            fire_at=c.start - timedelta(minutes=minutes_before),
-            channels=tuple(channels),
+            kind=ReminderKind.before_event,
+            key=f"before_event:{e.event_id}:{_stamp(e.start)}",
+            fire_at=e.start - timedelta(minutes=e.minutes_before),
+            channels=e.channels,
             entity_type="event",
-            entity_id=c.event_id,
-            expires_at=c.start,
-            payload={"start": c.start.isoformat()},
+            entity_id=e.event_id,
+            expires_at=e.start,
+            payload={"start": e.start.isoformat()},
         )
-        for c in classes
+        for e in events
+        if e.channels
     ]
 
 

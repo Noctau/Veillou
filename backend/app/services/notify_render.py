@@ -1,6 +1,6 @@
 """Текст напоминания — собирается в момент отправки по актуальной сущности.
 
-None — напоминание устарело (пару отменили или перенесли, задание сделано или
+None — напоминание устарело (событие отменили или перенесли, задание сделано или
 дедлайн сдвинут): отправитель его пропускает, а пересборка уже создала новое.
 """
 
@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import day_bounds_utc, get_tz, local_date
 from app.domain.enums import (
-    ClassType,
     EventKind,
     EventStatus,
     ReminderAction,
@@ -21,9 +20,10 @@ from app.domain.enums import (
     SubtaskStatus,
     TaskStatus,
 )
-from app.models import Area, Event, Reminder, Subtask, Task, User
+from app.models import Area, Event, EventType, Reminder, Subtask, Task, User
 from app.notify.message import Message, Section, fmt_moment, fmt_range, lines, plural
-from app.services.digest import CLASS_TYPE_SHORT, Digest, deadline_line, task_progress
+from app.services.digest import Digest, deadline_line, task_progress
+from app.services.event_text import event_parts
 
 ACTIONS = (ReminderAction.done, ReminderAction.snooze, ReminderAction.tomorrow)
 
@@ -54,10 +54,11 @@ async def _task(db: AsyncSession, r: Reminder) -> Task | None:
     return t
 
 
-async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
+async def _before_event(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
     e = await _event(db, r)
-    if e is None or e.kind != EventKind.class_:
+    if e is None or e.kind != EventKind.busy:
         return None
+    event_type = await db.get(EventType, e.event_type_id) if e.event_type_id else None
     tz = get_tz(user.timezone)
     minutes = round((e.start - now).total_seconds() / 60)
     if minutes <= 0:
@@ -67,10 +68,9 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
     else:
         when = f"В {e.start.astimezone(tz):%H:%M}"
 
-    kind = CLASS_TYPE_SHORT.get(ClassType(e.class_type)) if e.class_type else None
-    where = f"ауд. {e.location}" if e.location else None
-    head = " · ".join(p for p in (fmt_range(e.start, e.end, tz), kind, where) if p)
-    info = lines(head, f"Преподаватель: {e.teacher}" if e.teacher else None)
+    parts = event_parts(e, event_type)
+    head = " · ".join(p for p in (fmt_range(e.start, e.end, tz), *parts.inline, parts.place) if p)
+    info = lines(head, *(f"{label}: {text}" for label, text in parts.details))
     sections = [Section(None, info)]
     if e.note.strip():
         sections.append(Section("Взять / подготовить", tuple(e.note.strip().splitlines())))
@@ -103,8 +103,8 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
         title=f"{when}: {e.title}",
         sections=tuple(sections),
         url=url,
-        kind=ReminderKind.before_class,
-        tag=f"class-{e.id}",
+        kind=ReminderKind.before_event,
+        tag=f"event-{e.id}",
     )
 
 
@@ -243,8 +243,8 @@ def _test(*_: object) -> Message:
 
 async def render(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
     kind = ReminderKind(r.kind)
-    if kind == ReminderKind.before_class:
-        msg = await _before_class(db, user, r, now)
+    if kind == ReminderKind.before_event:
+        msg = await _before_event(db, user, r, now)
     elif kind == ReminderKind.deadline:
         msg = await _deadline(db, user, r, now)
     elif kind == ReminderKind.subtask_start:

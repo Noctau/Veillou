@@ -9,6 +9,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useEventTypes } from '@/features/schedule/useSchedule'
 import { BUDGETS_UI as T } from '@/lib/terms'
 
 import {
@@ -23,10 +24,11 @@ import {
 
 type Editing = { budget?: LoadBudget } | null
 
-/** Лимиты нагрузки (M15.3): «не больше N часов в день» на группу типов действий. */
+/** Лимиты нагрузки (M15.3): «не больше N часов в день» на группу типов действий и занятости. */
 export function BudgetsSection() {
   const { data: budgets, isPending } = useBudgets()
   const types = byId(useActionTypes().data)
+  const eventTypes = byId(useEventTypes().data)
   const [editing, setEditing] = useState<Editing>(null)
 
   return (
@@ -54,7 +56,12 @@ export function BudgetsSection() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">{b.name}</div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {b.action_type_ids.map((id) => types.get(id)?.name).filter(Boolean).join(', ')}
+                    {[
+                      ...b.action_type_ids.map((id) => types.get(id)?.name),
+                      ...b.event_type_ids.map((id) => eventTypes.get(id)?.name),
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
                   </div>
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -79,18 +86,25 @@ export function BudgetsSection() {
 
 function BudgetForm({ budget, onDone }: { budget?: LoadBudget; onDone: () => void }) {
   const { data: types } = useActionTypes()
+  const { data: eventTypes } = useEventTypes()
   const create = useCreateBudget()
   const update = useUpdateBudget()
   const remove = useDeleteBudget()
   const [name, setName] = useState(budget?.name ?? '')
   const [hours, setHours] = useState(budget ? budget.minutes_per_day / 60 : 4)
   const [members, setMembers] = useState<string[]>(budget?.action_type_ids ?? [])
+  const [eventMembers, setEventMembers] = useState<string[]>(budget?.event_type_ids ?? [])
   const minutes = Math.round(hours * 60)
   const valid = name.trim() !== '' && minutes >= 15 && minutes <= 1440
   const saving = create.isPending || update.isPending
 
   const save = () => {
-    const body = { name: name.trim(), minutes_per_day: minutes, action_type_ids: members }
+    const body = {
+      name: name.trim(),
+      minutes_per_day: minutes,
+      action_type_ids: members,
+      event_type_ids: eventMembers,
+    }
     if (budget) update.mutate({ id: budget.id, body }, { onSuccess: onDone })
     else create.mutate(body, { onSuccess: onDone })
   }
@@ -139,6 +153,26 @@ function BudgetForm({ budget, onDone }: { budget?: LoadBudget; onDone: () => voi
         </ToggleGroup>
         <FieldDescription>{T.membersHint}</FieldDescription>
       </Field>
+      {!!eventTypes?.length && (
+        <Field>
+          <FieldLabel>{T.eventMembers}</FieldLabel>
+          <ToggleGroup
+            type="multiple"
+            variant="outline"
+            size="sm"
+            className="flex-wrap justify-start"
+            value={eventMembers}
+            onValueChange={setEventMembers}
+          >
+            {eventTypes.map((t) => (
+              <ToggleGroupItem key={t.id} value={t.id} className="rounded-full! border px-3">
+                {t.name}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <FieldDescription>{T.eventMembersHint}</FieldDescription>
+        </Field>
+      )}
       <DialogFooter className="flex-row items-center">
         {budget && (
           <ConfirmButton

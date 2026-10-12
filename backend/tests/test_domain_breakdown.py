@@ -151,7 +151,7 @@ def test_free_minutes_without_budget():
 
 def test_free_minutes_subtracts_busy_and_competing_blocks():
     deadline = at(MON, 13)
-    busy = (Busy(at(MON, 10), at(MON, 11), is_class=False),)
+    busy = (Busy(at(MON, 10), at(MON, 11)),)
     competing = Block("x", 60, group_id="other", deadline=at(MON, 12))
     later = Block("y", 60, group_id="other", deadline=at(MON + timedelta(days=3), 12))
     mine = Block("m", 60, group_id="me", deadline=at(MON, 12))

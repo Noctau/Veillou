@@ -10,7 +10,7 @@ from app.domain.enums import BacklogStatus, EventKind, SourceType
 from app.models import BacklogItem, Event, User
 from app.services.free import FreeService
 
-from .test_replan import API, MON, add_event, at, task_with_steps
+from .test_replan import API, MON, add_event, add_event_type, at, task_with_steps
 
 TUE = MON + timedelta(days=1)
 
@@ -54,12 +54,26 @@ async def test_window_respected(auth_client, user):
     assert len(await free(user, "suggest", 30, now=at(TUE, 11))) == 1
 
 
-async def test_on_class_days(auth_client, user):
-    await add_item(user, "Посылка", estimate_min=15, conditions=["on_class_days"])
+async def test_on_event_days(auth_client, user):
+    pair = await add_event_type(user)
+    other = await add_event_type(user, name="Личное")
+    await add_item(user, "Посылка", estimate_min=15, days_event_type_id=pair.id)
+    assert await free(user, "suggest", 30, now=at(TUE, 11)) == []
+    # Событие другого типа не в счёт
+    await add_event(
+        user,
+        kind=EventKind.busy,
+        event_type_id=other.id,
+        title="Врач",
+        start=at(TUE, 9),
+        end=at(TUE, 10),
+        is_fixed=True,
+    )
     assert await free(user, "suggest", 30, now=at(TUE, 11)) == []
     await add_event(
         user,
-        kind=EventKind.class_,
+        kind=EventKind.busy,
+        event_type_id=pair.id,
         title="Пара",
         start=at(TUE, 9),
         end=at(TUE, 10, 30),

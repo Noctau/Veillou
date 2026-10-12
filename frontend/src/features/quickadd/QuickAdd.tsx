@@ -217,7 +217,7 @@ export function QuickAdd() {
       const start = wallToUtc(day, p.time, tz)
       reset()
       createEvent.mutate(
-        { kind: 'personal', title, start, end: eventEnd(p, start, tz), note: '', area_id: areaId },
+        { title, start, end: eventEnd(p, start, tz), note: '', area_id: areaId },
         { onSuccess: (e) => remember({ id: e.id, kind, title, link: '/calendar' }), onError: restore },
       )
       return

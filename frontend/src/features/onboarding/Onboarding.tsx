@@ -7,11 +7,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NotificationsSection } from '@/features/notifications/NotificationsSection'
-import { BellsEditor } from '@/features/schedule/BellsEditor'
+import { PeriodForm } from '@/features/schedule/PeriodForm'
 import { SchedulePanel } from '@/features/schedule/SchedulePanel'
-import { SemesterForm } from '@/features/schedule/SemesterForm'
-import { useCurrentSemester } from '@/features/schedule/useCurrentSemester'
-import { useBells } from '@/features/schedule/useSchedule'
+import { SlotGridEditor } from '@/features/schedule/SlotGridEditor'
+import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
+import { groupGrids, useSlotGrids } from '@/features/schedule/useSchedule'
 import { DayModeSection } from '@/features/settings/sections/DayModeSection'
 import { RestSection } from '@/features/settings/sections/RestSection'
 import { useSettings } from '@/features/settings/useSettings'
@@ -21,16 +21,17 @@ import { useFinishOnboarding } from './useOnboarding'
 
 type Step = { title: string; hint: string; body: (next: () => void) => ReactNode }
 
-function SemesterStep({ next }: { next: () => void }) {
-  const { semester, select, today, isPending } = useCurrentSemester()
+function PeriodStep({ next }: { next: () => void }) {
+  const { period, select, today, isPending } = useCurrentPeriod()
   if (isPending) return <Skeleton className="h-64" />
   return (
     <Card>
       <CardContent className="pt-4">
-        <SemesterForm
-          key={semester?.id ?? 'new'}
-          semester={semester}
+        <PeriodForm
+          key={period?.id ?? 'new'}
+          period={period}
           today={today}
+          withDefaultSlots
           onDone={(s) => {
             select(s.id)
             next()
@@ -41,14 +42,15 @@ function SemesterStep({ next }: { next: () => void }) {
   )
 }
 
-function BellsStep() {
-  const { semester } = useCurrentSemester()
-  const { data: bells } = useBells(semester?.id)
-  if (!semester) return <p className="text-sm text-muted-foreground">Сначала создайте семестр — вернитесь на шаг назад.</p>
+function SlotsStep() {
+  const { period } = useCurrentPeriod()
+  const { data: rows, isPending } = useSlotGrids()
+  if (!period) return <p className="text-sm text-muted-foreground">Без периода сетка не нужна — этот шаг можно пропустить.</p>
+  const grid = groupGrids(rows ?? []).find((g) => g.period_id === period.id)
   return (
     <Card>
       <CardContent className="pt-4">
-        {bells ? <BellsEditor key={semester.id} semesterId={semester.id} bells={bells} /> : <Skeleton className="h-40" />}
+        {isPending ? <Skeleton className="h-40" /> : <SlotGridEditor key={grid?.id ?? 'new'} grid={grid} periodId={period.id} />}
       </CardContent>
     </Card>
   )
@@ -67,28 +69,28 @@ function DayModeStep() {
 
 const STEPS: Step[] = [
   {
-    title: 'Семестр',
-    hint: 'Даты занятий и сессии. По ним считаются чётность недель и пары на весь семестр.',
-    body: (next) => <SemesterStep next={next} />,
+    title: 'Период',
+    hint: 'Если у занятости есть границы и цикл недель (семестр, четверть) — заведите период. Нет — пропустите шаг.',
+    body: (next) => <PeriodStep next={next} />,
   },
   {
-    title: 'Звонки',
-    hint: 'Стандартные уже подставлены. Если в какой-то день другое расписание звонков — поправьте и сохраните.',
-    body: () => <BellsStep />,
+    title: 'Сетка слотов',
+    hint: 'Номера и время (звонки, уроки). Стандартные уже подставлены — поправьте и сохраните.',
+    body: () => <SlotsStep />,
   },
   {
-    title: 'Пары',
-    hint: 'Нажмите на клетку, чтобы добавить пару. Сферу можно создать прямо там. Числитель и знаменатель переключаются сверху.',
+    title: 'Расписание',
+    hint: 'Добавьте правила: что и когда повторяется. Тип занятости и сферу можно завести прямо в диалоге.',
     body: () => <SchedulePanel />,
   },
   {
     title: 'Часы, сон и отдых',
-    hint: 'Когда можно ставить учёбу и дела и сколько свободных вечеров оставить. Не забудьте «Сохранить».',
+    hint: 'Когда можно ставить дела и сколько свободных вечеров оставить. Не забудьте «Сохранить».',
     body: () => <DayModeStep />,
   },
   {
     title: 'Уведомления',
-    hint: 'Напоминания перед парой, о дедлайнах и утренняя сводка. Включите push на этом телефоне.',
+    hint: 'Напоминания перед событиями, о дедлайнах и утренняя сводка. Включите push на этом телефоне.',
     body: () => <NotificationsSection />,
   },
   {
@@ -98,7 +100,7 @@ const STEPS: Step[] = [
   },
 ]
 
-/** Короткая первичная настройка: семестр → звонки → пары → часы/сон → push → Telegram. */
+/** Короткая первичная настройка: период → сетка → расписание → часы/сон → push → Telegram. */
 export function Onboarding() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()

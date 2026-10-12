@@ -3,7 +3,7 @@ import { ExternalLinkIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { formatLink, type LinkValue, renderFields } from './fields'
-import type { Area, FieldDef } from './useAreas'
+import type { Area, FieldDef, FieldValues } from './useAreas'
 
 function Links({ value, multiple }: { value: unknown; multiple: boolean }) {
   const items = (multiple && Array.isArray(value) ? value : [value]) as (LinkValue | string)[]
@@ -28,21 +28,21 @@ function Links({ value, multiple }: { value: unknown; multiple: boolean }) {
   )
 }
 
-/** Значения полей сферы: «Подпись: значение», ссылки — кликабельные. */
+/** Значения полей (сферы, события): «Подпись: значение», ссылки — кликабельные. */
 export function FieldValuesView({
   defs,
-  area,
+  values,
   areas,
   className,
 }: {
   defs: FieldDef[]
-  area: Area
+  values: FieldValues
   /** Для полей «сфера» — названия. */
   areas?: Area[]
   className?: string
 }) {
   const areaNames = Object.fromEntries((areas ?? []).map((a) => [a.id, a.name]))
-  const rendered = renderFields(defs, area.fields, { areaNames })
+  const rendered = renderFields(defs, values, { areaNames })
   if (!rendered.length) return null
   return (
     <dl className={cn('flex flex-col gap-0.5 text-sm', className)}>

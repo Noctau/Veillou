@@ -1,6 +1,6 @@
 """Пересборка будущих напоминаний пользователя.
 
-Собирает из БД пары, дедлайны и блоки, считает желаемый набор через
+Собирает из БД события с напоминанием, дедлайны и блоки, считает желаемый набор через
 `notify.builder` и сверяет его с таблицей `reminders` по `dedupe_key`:
 недостающие создаёт, изменившиеся двигает, лишние удаляет.
 
@@ -33,6 +33,7 @@ from app.models import ActionType, Event, Job, Reminder, Subtask, Task, User
 from app.notify import builder
 from app.notify.builder import Candidate, Planned, TimeRange, Window, windows_from_json
 from app.schemas.settings import ReminderRule, UserSettings
+from app.services.event_types import event_types_by_id
 from app.services.settings import effective_settings
 
 log = logging.getLogger(__name__)
@@ -91,21 +92,34 @@ class _Collector:
             return ()
         return (await self.windows_by_type()).get(type_id, ())
 
-    async def classes(self, channels: list[str]) -> list[Candidate]:
+    async def events(self) -> list[Candidate]:
+        """Перед событием — по типу занятости: `remind_before_min` и его каналы."""
+        types = {
+            t.id: t
+            for t in (await event_types_by_id(self.db, self.user.id)).values()
+            if t.remind_before_min is not None and t.remind_channels
+        }
+        if not types:
+            return []
         rows = await self.db.scalars(
             select(Event).where(
                 Event.user_id == self.user.id,
                 Event.deleted_at.is_(None),
-                Event.kind == EventKind.class_,
+                Event.kind == EventKind.busy,
+                Event.event_type_id.in_(types),
                 Event.status == EventStatus.planned,
                 Event.start > self.now,
                 Event.start <= self.horizon,
             )
         )
-        infos = [builder.ClassInfo(e.id, e.start) for e in rows]
-        return builder.class_candidates(
-            infos, self.s.reminders.before_class.minutes_before, channels
-        )
+        infos = []
+        for e in rows:
+            t = types[e.event_type_id]  # type: ignore[index]
+            minutes = t.remind_before_min or 0
+            infos.append(
+                builder.EventInfo(e.id, e.start, minutes, tuple(str(c) for c in t.remind_channels))
+            )
+        return builder.event_candidates(infos)
 
     async def deadlines(self, channels: list[str]) -> list[Candidate]:
         days = self.s.reminders.deadlines.days_before
@@ -186,8 +200,7 @@ class _Collector:
     async def candidates(self) -> list[Candidate]:
         r = self.s.reminders
         result: list[Candidate] = []
-        if ch := _channels(r.before_class):
-            result += await self.classes(ch)
+        result += await self.events()
         if ch := _channels(r.deadlines):
             result += await self.deadlines(ch)
         if ch := _channels(r.morning_digest):

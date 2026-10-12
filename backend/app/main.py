@@ -68,7 +68,6 @@ def create_app() -> FastAPI:
     api.include_router(areas.router)
     api.include_router(events.router)
     api.include_router(events.calendar_router)
-    api.include_router(events.recurring_router)
     api.include_router(catalog.router)
     api.include_router(budgets.router)
     api.include_router(tasks.router)

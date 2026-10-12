@@ -30,7 +30,7 @@ class Note(UserOwnedMixin, Base):
     area_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
-    # Пара, к которой конспект (вхождение events.kind=class)
+    # Событие, к которому конспект (обычно вхождение правила расписания)
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("events.id", ondelete="SET NULL"), index=True
     )

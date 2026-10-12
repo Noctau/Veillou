@@ -28,7 +28,7 @@ from app.services.replan import ReplanService
 
 from .test_bot import buttons, linked, press, tg, tg_message  # noqa: F401
 from .test_reminders import add_reminder
-from .test_replan import MON, add_event, at, call, task_with_steps
+from .test_replan import MON, add_event, add_event_type, at, call, task_with_steps
 
 API = "/api/v1"
 TZ = get_tz("Europe/Moscow")
@@ -157,9 +157,11 @@ async def test_weekly_message_and_accept(auth_client, user):
 
 
 async def test_morning_digest_has_plan_and_backlog(auth_client, user):
+    pair = await add_event_type(user, show_now_next=True, location_label="ауд.")
     await add_event(
         user,
-        kind=EventKind.class_,
+        kind=EventKind.busy,
+        event_type_id=pair.id,
         title="Климатология",
         start=at(MON, 10, 45),
         end=at(MON, 12, 20),

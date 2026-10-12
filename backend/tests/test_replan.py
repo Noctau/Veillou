@@ -17,7 +17,7 @@ from app.domain.enums import (
     PlanRevisionStatus,
     SourceType,
 )
-from app.models import Calibration, Event, Job, PlanRevision, User
+from app.models import Calibration, Event, EventType, Job, PlanRevision, User
 from app.services import jobs
 from app.services.replan import (
     SKIP_REPLAN,
@@ -78,6 +78,15 @@ async def add_event(user, **kw) -> Event:
         db.add(e)
         await db.commit()
         return e
+
+
+async def add_event_type(user, **kw) -> EventType:
+    """Тип занятости в БД (по умолчанию — «Пара» без буферов и напоминаний)."""
+    async with session_factory() as db:
+        t = EventType(user_id=user.id, name=kw.pop("name", "Пара"), name_plural="Пары", **kw)
+        db.add(t)
+        await db.commit()
+        return t
 
 
 async def task_with_steps(client, *estimates: int, deadline: datetime | None = None, **kw):

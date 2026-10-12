@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from httpx import AsyncClient
 
-from .test_schedule_api import API, SUBJECT_TYPE, make_area, make_semester, other_client
+from .test_schedule_api import API, SUBJECT_TYPE, make_area, make_period, other_client
 
 PUPIL = {
     "name": "Ученик",
@@ -207,13 +207,13 @@ async def test_archive(auth_client: AsyncClient):
 
 
 async def test_period(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
+    sem = await make_period(auth_client)
     area = await make_area(auth_client, sem["id"])
     other = await make_area(auth_client, name="Физика")
     listed = await auth_client.get(f"{API}/areas", params={"period_id": sem["id"]})
     assert [a["id"] for a in listed.json()] == [area["id"]]
-    # Удалили семестр — сфера живёт без периода
-    await auth_client.delete(f"{API}/semesters/{sem['id']}")
+    # Удалили период — сфера живёт без периода
+    await auth_client.delete(f"{API}/periods/{sem['id']}")
     assert (await auth_client.get(f"{API}/areas/{area['id']}")).json()["period_id"] is None
     resp = await auth_client.patch(f"{API}/areas/{other['id']}", json={"period_id": sem["id"]})
     assert resp.status_code == 404

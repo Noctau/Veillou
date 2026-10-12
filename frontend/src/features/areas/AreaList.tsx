@@ -26,7 +26,7 @@ function AreaCard({ area, areaType, areas }: { area: Area; areaType?: AreaType; 
           <span className="font-medium leading-tight">{area.name}</span>
           {area.short_name && <span className="text-xs text-muted-foreground">{area.short_name}</span>}
         </Link>
-        {areaType && <FieldValuesView defs={areaType.fields} area={area} areas={areas} className="text-xs" />}
+        {areaType && <FieldValuesView defs={areaType.fields} values={area.fields} areas={areas} className="text-xs" />}
       </CardContent>
     </Card>
   )

@@ -4,7 +4,7 @@
  */
 import { FIELDS_UI } from '@/lib/terms'
 
-import type { FieldDef, FieldValues } from './useAreas'
+import type { FieldDef, FieldDefIn, FieldType, FieldValues } from './useAreas'
 
 export type Contact = Partial<Record<'name' | 'role' | 'phone' | 'email' | 'link' | 'note', string>>
 export type LinkValue = { title?: string; url: string }
@@ -92,4 +92,52 @@ export function renderFields(
 /** Пустые значения формы не отправляем: сервер их всё равно не хранит. */
 export function compactValues(values: FieldValues): FieldValues {
   return Object.fromEntries(Object.entries(values).filter(([, v]) => !isEmpty(v)))
+}
+
+// ---------- черновик описания поля (редактор FieldDefsEditor) ----------
+
+export type FieldDraft = {
+  /** Нет — новое поле, id выдаст сервер. */
+  id?: string
+  key: string
+  label: string
+  type: FieldType
+  options: string
+  multiple: boolean
+  required: boolean
+  show_in_reminder: boolean
+}
+
+let draftSeq = 0
+
+export function toDraft(f?: FieldDef): FieldDraft {
+  draftSeq += 1
+  return {
+    id: f?.id,
+    key: f?.id ?? `new-${draftSeq}`,
+    label: f?.label ?? '',
+    type: f?.type ?? 'text',
+    options: f?.options.join(', ') ?? '',
+    multiple: f?.multiple ?? false,
+    required: f?.required ?? false,
+    show_in_reminder: f?.show_in_reminder ?? false,
+  }
+}
+
+export function fromDraft(d: FieldDraft): FieldDefIn {
+  const choice = CHOICE_TYPES.has(d.type)
+  return {
+    id: d.id ?? null,
+    label: d.label.trim(),
+    type: d.type,
+    options: choice
+      ? d.options
+          .split(',')
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : [],
+    multiple: MULTIPLE_TYPES.has(d.type) && d.multiple,
+    required: d.required,
+    show_in_reminder: d.show_in_reminder,
+  }
 }

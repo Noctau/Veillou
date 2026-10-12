@@ -19,6 +19,7 @@ from app.core.time import ensure_aware, local_date, wall_to_utc
 from app.domain.planner.contracts import (
     Block,
     BlockId,
+    Busy,
     FixedBlock,
     PlanInput,
     PlanSettings,
@@ -289,25 +290,31 @@ def window_slots(
 
 
 def busy_slots(inp: PlanInput, grid: Grid, dates: Sequence[date]) -> list[Interval]:
-    """Всё, куда нельзя ставить гибкие блоки: сон, обед, жёсткое, дорога, закреплённое."""
+    """Всё, куда нельзя ставить гибкие блоки: сон, обед, жёсткое с буферами дороги,
+    закреплённое."""
     s, tz = inp.settings, inp.tz
     holes: list[Interval] = []
     for d in dates:
         holes.append(grid.outer(*_daily(d, s.sleep.start, s.sleep.end, tz)))
         if s.lunch:
             holes.append(grid.outer(*_daily(d, s.lunch.start, s.lunch.end, tz)))
-    classes_by_date: dict[date, list[tuple[datetime, datetime]]] = defaultdict(list)
+    merged: dict[tuple[date, str], list[Busy]] = defaultdict(list)
+    spans: list[tuple[datetime, datetime, int, int]] = []
     for b in inp.busy:
         holes.append(grid.outer(b.start, b.end))
-        if b.is_class:
-            classes_by_date[local_date(b.start, tz)].append((b.start, b.end))
-    if s.travel_buffer_min > 0:
-        buf = timedelta(minutes=s.travel_buffer_min)
-        for classes in classes_by_date.values():
-            first = min(c[0] for c in classes)
-            last = max(c[1] for c in classes)
-            holes.append(grid.outer(first - buf, first))
-            holes.append(grid.outer(last, last + buf))
+        if b.merge_key is not None:
+            merged[(local_date(b.start, tz), b.merge_key)].append(b)
+        else:
+            spans.append((b.start, b.end, b.buffer_before, b.buffer_after))
+    for group in merged.values():
+        first = min(group, key=lambda b: b.start)
+        last = max(group, key=lambda b: b.end)
+        spans.append((first.start, last.end, first.buffer_before, last.buffer_after))
+    for start, end, before, after in spans:
+        if before > 0:
+            holes.append(grid.outer(start - timedelta(minutes=before), start))
+        if after > 0:
+            holes.append(grid.outer(end, end + timedelta(minutes=after)))
     holes.extend(grid.outer(f.start, f.end) for f in inp.fixed)
     return merge(holes)
 

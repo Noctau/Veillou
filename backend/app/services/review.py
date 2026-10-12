@@ -18,8 +18,8 @@ from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain import backlog as box
 from app.domain.enums import (
-    FIXED_KINDS,
     BacklogStatus,
+    EventKind,
     EventStatus,
     PlanReason,
     TaskStatus,
@@ -49,7 +49,7 @@ class ReviewService:
         return select(Event).where(
             Event.user_id == self.user_id,
             Event.deleted_at.is_(None),
-            Event.kind.not_in(FIXED_KINDS),
+            Event.kind != EventKind.busy,
             Event.source_type.in_(PLANNED_SOURCES),
             Event.start >= start,
             Event.start < end,

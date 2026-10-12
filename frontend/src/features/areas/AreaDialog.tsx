@@ -9,7 +9,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useSemesters } from '@/features/schedule/useSchedule'
+import { usePeriods } from '@/features/schedule/useSchedule'
 import { PALETTE } from '@/lib/colors'
 import { AREAS_UI as T } from '@/lib/terms'
 
@@ -88,7 +88,7 @@ function AreaForm({
   const create = useCreateArea()
   const update = useUpdateArea()
   const remove = useDeleteArea()
-  const { data: semesters } = useSemesters()
+  const { data: periods } = usePeriods()
   const { data: allAreas } = useAreas()
   const [typeId, setTypeId] = useState(initialTypeId ?? '')
   const areaType = types.find((t) => t.id === typeId)
@@ -165,7 +165,7 @@ function AreaForm({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>{T.noPeriod}</SelectItem>
-                {semesters?.map((s) => (
+                {periods?.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}
                   </SelectItem>

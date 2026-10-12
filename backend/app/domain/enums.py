@@ -3,40 +3,14 @@
 from enum import StrEnum
 
 
-class Parity(StrEnum):
-    """Чётность недели: числитель = odd, знаменатель = even."""
-
-    odd = "odd"
-    even = "even"
-
-
-class RuleParity(StrEnum):
-    """Когда идёт пара: каждую неделю, по числителям или по знаменателям."""
-
-    all = "all"
-    odd = "odd"
-    even = "even"
-
-
-class ClassType(StrEnum):
-    lecture = "lecture"
-    seminar = "seminar"
-    lab = "lab"
-    other = "other"
-
-
 class EventKind(StrEnum):
-    class_ = "class"  # пара (из ClassRule)
-    personal = "personal"  # личное (жёсткое)
-    rest = "rest"  # отдых (жёсткое)
-    subtask = "subtask"  # подзадача (гибкое, M4+)
-    backlog = "backlog"  # дело из ящика (гибкое, M11)
-    exam_prep = "exam_prep"  # подготовка к экзамену (гибкое, M12)
-    exam = "exam"  # сам экзамен (жёсткое, из Exam)
-    project = "project"  # работа над проектом — резерв недельной нормы (гибкое, M13)
+    """Поведение события в планировщике (смысл задаёт тип занятости, Part 2 M17.1)."""
 
-
-FIXED_KINDS = frozenset({EventKind.class_, EventKind.personal, EventKind.rest, EventKind.exam})
+    busy = "busy"  # жёсткое: занятость (тип занятости — `event_type_id`)
+    subtask = "subtask"  # шаг задачи (гибкое)
+    backlog = "backlog"  # дело из ящика (гибкое)
+    prep = "prep"  # подготовка к событию (гибкое)
+    project = "project"  # работа над проектом — резерв недельной нормы (гибкое)
 
 
 class EventStatus(StrEnum):
@@ -49,8 +23,16 @@ class EventStatus(StrEnum):
 class TemplateType(StrEnum):
     """Откуда материализовано вхождение."""
 
-    class_rule = "class_rule"
-    recurring = "recurring"  # RecurringEvent (личные блоки и отдых с повтором)
+    schedule_rule = "schedule_rule"
+
+
+class PatternKind(StrEnum):
+    """Паттерн правила расписания (domain/recurrence.py)."""
+
+    weekly = "weekly"  # по дням недели, с маской недель цикла периода
+    day_cycle = "day_cycle"  # смены: N дней через M от якорной даты
+    rrule = "rrule"
+    once = "once"
 
 
 # ---------- справочники (M4.1) ----------
@@ -96,6 +78,10 @@ class CategoryIcon(StrEnum):
     flask_conical = "flask-conical"
     book_open = "book-open"
     clipboard_check = "clipboard-check"
+    user = "user"
+    coffee = "coffee"
+    calendar = "calendar"
+    clock = "clock"
 
 
 # ---------- сферы и поля (Part 2, M16) ----------
@@ -191,9 +177,9 @@ class BacklogCondition(StrEnum):
     """Условия дела — фиксированный набор чипов, без свободного текста."""
 
     weekday_daytime = "weekday_daytime"  # только в будни днём
-    on_class_days = "on_class_days"  # в дни пар (в городе)
     needs_laptop = "needs_laptop"  # нужен ноутбук
-    # «В часы работы учреждений» — теперь `BacklogItem.hours_action_type_id` (M15.2)
+    # «В часы работы учреждений» — теперь `BacklogItem.hours_action_type_id` (M15.2),
+    # «в дни пар» — `BacklogItem.days_event_type_id` (в дни событий типа, M17.5)
 
 
 # ---------- файлы (M5.1) ----------
@@ -277,7 +263,7 @@ AI_JOB_KINDS = frozenset(
 
 class ReminderKind(StrEnum):
     morning_digest = "morning_digest"
-    before_class = "before_class"
+    before_event = "before_event"  # перед событием типа с `remind_before_min`
     deadline = "deadline"
     subtask_start = "subtask_start"
     evening_review = "evening_review"
@@ -288,7 +274,7 @@ class ReminderKind(StrEnum):
 class ReminderStatus(StrEnum):
     pending = "pending"
     sent = "sent"
-    skipped = "skipped"  # устарело (пара отменена, задание сделано, истёк срок)
+    skipped = "skipped"  # устарело (событие отменено, задание сделано, истёк срок)
     failed = "failed"  # кончились попытки
 
 

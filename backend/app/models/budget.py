@@ -3,7 +3,7 @@
 В лимит засчитываются гибкие блоки по типу действия (`load_budget_members`),
 а также закреплённое и сделанное сегодня. Блок, чей тип действия входит в два
 лимита, считается в обоих. Нет лимитов — нет и ограничений.
-Жёсткие события войдут в лимиты по типу занятости (M17).
+Жёсткие события засчитываются по типу занятости (M17).
 """
 
 import uuid
@@ -36,13 +36,24 @@ class LoadBudgetMember(UserOwnedMixin, Base):
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        Index(
+            "uq_load_budget_members_event_type",
+            "budget_id",
+            "event_type_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     budget_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("load_budgets.id", ondelete="CASCADE"), index=True
     )
+    # Ровно одно из двух: тип действия (гибкие блоки) или тип занятости (жёсткие события)
     action_type_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("action_types.id", ondelete="CASCADE")
+    )
+    event_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("event_types.id", ondelete="CASCADE")
     )
 
 

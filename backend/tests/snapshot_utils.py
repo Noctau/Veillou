@@ -31,18 +31,19 @@ from app.models import (
     AreaType,
     BacklogItem,
     Category,
-    ClassRule,
     DayOff,
     Event,
+    EventType,
     Exam,
     ExamQuestion,
     ExamSession,
     LoadBudget,
     Milestone,
     Note,
+    Period,
     Project,
-    RecurringEvent,
-    Semester,
+    ScheduleRule,
+    SlotGrid,
     Source,
     Subtask,
     Task,
@@ -120,11 +121,10 @@ class Labels:
         tasks = {t.id: t.title for t in await rows(Task)}
         exams = {e.id: f"Экзамен {areas.get(e.area_id, '?')}" for e in await rows(Exam)}
         simple: list[tuple[Iterable[Any], str]] = [
-            (await rows(Semester), "name"),
+            (await rows(Period), "name"),
             (await rows(AreaType), "name"),
             (await rows(Area), "name"),
             (await rows(DayOff), "title"),
-            (await rows(RecurringEvent), "title"),
             (await rows(Category), "name"),
             (await rows(ActionType), "name"),
             (await rows(TaskType), "name"),
@@ -134,6 +134,7 @@ class Labels:
             (await rows(BacklogItem), "title"),
             (await rows(Note), "title"),
             (await rows(Source), "title"),
+            (await rows(EventType), "name"),
         ]
         for items, attr in simple:
             for item in items:
@@ -142,10 +143,19 @@ class Labels:
             self._add(exam_id, label)
         for budget in await rows(LoadBudget):
             self._add(budget.id, f"лимит {budget.name}")
-        for r in await rows(ClassRule):
-            when = f"пара {r.pair_number}" if r.pair_number else f"{r.start_time:%H:%M}"
-            parity = f" {r.parity}" if r.parity != "all" else ""
-            self._add(r.id, f"{areas.get(r.area_id)} д{r.weekday} {when}{parity}")
+        for g in await rows(SlotGrid):
+            self._add(g.id, f"сетка {g.name} д{g.weekday or 0}")
+        # Правило со сферой — как бывшее правило пары («Климатология д1 пара 1 odd»),
+        # без сферы — по названию (бывший личный повтор)
+        for r in await rows(ScheduleRule):
+            if r.area_id is None:
+                self._add(r.id, r.title or "?")
+                continue
+            when = f"пара {r.slot_from}" if r.slot_from else f"{r.start_time:%H:%M}"
+            mask = r.pattern.get("cycle_weeks")
+            parity = {(1,): " odd", (2,): " even"}.get(tuple(mask or ()), "")
+            days = ",".join(map(str, r.pattern.get("weekdays") or []))
+            self._add(r.id, f"{areas.get(r.area_id)} д{days} {when}{parity}")
         for st in await rows(Subtask):
             occ = f" {st.occurrence_date:%d.%m}" if st.occurrence_date else ""
             self._add(st.id, f"{tasks.get(st.task_id)} / {st.title}{occ}")

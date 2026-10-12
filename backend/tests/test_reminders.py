@@ -18,7 +18,7 @@ from app.domain.enums import (
     ReminderStatus,
     TaskStatus,
 )
-from app.models import Event, Job, Reminder, Task
+from app.models import Event, EventType, Job, Reminder, Task
 from app.notify.message import Message
 from app.notify.notifier import SENT, Delivery, Notifier, failed, skipped
 from app.services import jobs
@@ -182,10 +182,34 @@ async def test_simultaneous_reminders_merged_into_one_message(session, user):
 # ---------- пересборка ----------
 
 
+async def class_type(session, user) -> EventType:
+    """Тип «Пара» пользователя с напоминанием за 15 мин (как после миграции)."""
+    found = await session.scalar(
+        select(EventType).where(EventType.user_id == user.id, EventType.name == "Пара")
+    )
+    if found is not None:
+        return found
+    t = EventType(
+        user_id=user.id,
+        name="Пара",
+        name_plural="Пары",
+        remind_before_min=15,
+        remind_channels=["push", "telegram"],
+        show_now_next=True,
+        location_label="ауд.",
+        fields=[],
+    )
+    session.add(t)
+    await session.commit()
+    return t
+
+
 async def add_class(session, user, start: datetime, **kw) -> Event:
+    t = await class_type(session, user)
     e = Event(
         user_id=user.id,
-        kind=EventKind.class_,
+        kind=EventKind.busy,
+        event_type_id=t.id,
         title=kw.pop("title", "Климатология"),
         start=start,
         end=start + timedelta(minutes=95),
@@ -213,10 +237,10 @@ def tomorrow_at(h: int, m: int = 0) -> datetime:
     return wall_to_utc(d, time(h, m), TZ)
 
 
-async def test_sync_creates_before_class_and_digest(session, user):
+async def test_sync_creates_before_event_and_digest(session, user):
     e = await add_class(session, user, tomorrow_at(10, 45))
     await sync_user_reminders(session, user.id)
-    [r] = await pending(session, user, ReminderKind.before_class)
+    [r] = await pending(session, user, ReminderKind.before_event)
     assert r.fire_at == tomorrow_at(10, 30)
     assert r.entity_id == e.id
     assert r.is_auto
@@ -230,24 +254,24 @@ async def test_sync_follows_moved_and_cancelled_class(session, user):
     e.start, e.end = tomorrow_at(12, 30), tomorrow_at(14, 5)
     await session.commit()
     await sync_user_reminders(session, user.id)
-    [r] = await pending(session, user, ReminderKind.before_class)
+    [r] = await pending(session, user, ReminderKind.before_event)
     assert r.fire_at == tomorrow_at(12, 15)
 
     e.status = EventStatus.cancelled
     await session.commit()
     await sync_user_reminders(session, user.id)
-    assert await pending(session, user, ReminderKind.before_class) == []
+    assert await pending(session, user, ReminderKind.before_event) == []
 
 
 async def test_sync_does_not_recreate_sent(session, user):
     await add_class(session, user, tomorrow_at(10, 45))
     await sync_user_reminders(session, user.id)
-    [r] = await pending(session, user, ReminderKind.before_class)
+    [r] = await pending(session, user, ReminderKind.before_event)
     r.status = ReminderStatus.sent
     await session.commit()
     stats = await sync_user_reminders(session, user.id)
     assert stats.created == 0
-    assert await pending(session, user, ReminderKind.before_class) == []
+    assert await pending(session, user, ReminderKind.before_event) == []
 
 
 async def test_sync_is_idempotent(session, user):
@@ -259,7 +283,7 @@ async def test_sync_is_idempotent(session, user):
 
 async def test_sync_keeps_snoozed_and_overdue(session, user):
     manual = await add_reminder(session, user, fire_at=now_utc() + timedelta(hours=2))
-    overdue = await add_reminder(session, user, is_auto=True, dedupe_key="before_class:x:y")
+    overdue = await add_reminder(session, user, is_auto=True, dedupe_key="before_event:x:y")
     await sync_user_reminders(session, user.id)
     ids = {r.id for r in await pending(session, user, ReminderKind.test)}
     assert {manual.id, overdue.id} <= ids
@@ -268,27 +292,25 @@ async def test_sync_keeps_snoozed_and_overdue(session, user):
 async def test_disabled_rule_removes_reminders(auth_client, session, user):
     await add_class(session, user, tomorrow_at(10, 45))
     await sync_user_reminders(session, user.id)
-    resp = await auth_client.patch(
-        f"{API}/me/settings", json={"reminders": {"before_class": {"enabled": False}}}
-    )
+    t = await class_type(session, user)
+    resp = await auth_client.patch(f"{API}/event-types/{t.id}", json={"remind_before_min": None})
     assert resp.status_code == 200
-    await session.refresh(user)
+    await session.refresh(t)
     await sync_user_reminders(session, user.id)
-    assert await pending(session, user, ReminderKind.before_class) == []
+    assert await pending(session, user, ReminderKind.before_event) == []
 
 
 async def test_quiet_hours_and_minutes_from_settings(auth_client, session, user):
     await add_class(session, user, tomorrow_at(9, 0))
     await auth_client.patch(
-        f"{API}/me/settings",
-        json={
-            "quiet_hours": {"start": "23:00", "end": "08:50"},
-            "reminders": {"before_class": {"minutes_before": 20}},
-        },
+        f"{API}/me/settings", json={"quiet_hours": {"start": "23:00", "end": "08:50"}}
     )
+    t = await class_type(session, user)
+    await auth_client.patch(f"{API}/event-types/{t.id}", json={"remind_before_min": 20})
+    await session.refresh(t)
     await session.refresh(user)
     await sync_user_reminders(session, user.id)
-    [r] = await pending(session, user, ReminderKind.before_class)
+    [r] = await pending(session, user, ReminderKind.before_event)
     assert r.fire_at == tomorrow_at(8, 50)  # 8:40 в тихие часы → их конец
 
 
@@ -404,12 +426,12 @@ async def test_failing_job_is_retried(session, user):
 # ---------- рендер ----------
 
 
-async def test_before_class_message(session, user):
+async def test_before_event_message(session, user):
     e = await add_class(session, user, now_utc() + timedelta(minutes=15), note="Взять калькулятор")
     await add_reminder(
         session,
         user,
-        kind=ReminderKind.before_class,
+        kind=ReminderKind.before_event,
         entity_type="event",
         entity_id=e.id,
         payload={"start": e.start.isoformat()},
@@ -424,12 +446,12 @@ async def test_before_class_message(session, user):
     assert "Взять калькулятор" in body
 
 
-async def test_stale_class_reminder_skipped(session, user):
+async def test_stale_event_reminder_skipped(session, user):
     e = await add_class(session, user, now_utc() + timedelta(minutes=15))
     r = await add_reminder(
         session,
         user,
-        kind=ReminderKind.before_class,
+        kind=ReminderKind.before_event,
         entity_type="event",
         entity_id=e.id,
         payload={"start": (e.start - timedelta(hours=1)).isoformat()},
@@ -588,7 +610,7 @@ async def test_upcoming_reminders_api(auth_client, session, user):
     await sync_user_reminders(session, user.id)
     items = (await auth_client.get(f"{API}/me/reminders")).json()
     labels = [i["label"] for i in items]
-    assert "Перед парой: Климатология" in labels
+    assert "Перед событием: Климатология" in labels
     assert any(label.startswith("Утренняя сводка") for label in labels)
 
 
@@ -614,10 +636,10 @@ async def test_morning_digest_with_deadline_goes_to_both_channels(auth_client, s
     html = msg.telegram_html()
     assert "Не забыть" in html
     assert "Дедлайн через 3 дня: Реферат" in html
-    assert "Климатология (лекция)" not in html  # тип пары не задан
+    assert "Климатология (лекция)" not in html  # полей у события нет
     assert "10:45–12:20 Климатология · ауд. 1234" in html
 
-    # Перед парой — отдельное сообщение в 10:30
+    # Перед событием — отдельное сообщение в 10:30
     await dispatch_due(session_factory, notifier(push=push, telegram=tg), now=tomorrow_at(10, 30))
     assert push.sent[-1].title == "Через 15 мин: Климатология"
     assert tg.sent[-1].title == "Через 15 мин: Климатология"
