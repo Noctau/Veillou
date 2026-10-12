@@ -71,7 +71,6 @@ from app.domain.planner import (
     PlanResult,
     PlanSettings,
     Quota,
-    TimeRange,
     Window,
     solve,
 )
@@ -98,6 +97,7 @@ from app.schemas.settings import UserSettings
 from app.services import exams
 from app.services.budgets import BudgetIndex, budget_index
 from app.services.calibration import coefficients
+from app.services.day_profiles import load_days
 from app.services.event_types import event_types_by_id
 from app.services.settings import effective_settings
 
@@ -132,10 +132,6 @@ class PlanStaleError(AppError):
 
 def plan_settings(s: UserSettings) -> PlanSettings:
     return PlanSettings(
-        work_weekdays=TimeRange(s.work_hours.weekdays.start, s.work_hours.weekdays.end),
-        work_weekends=TimeRange(s.work_hours.weekends.start, s.work_hours.weekends.end),
-        sleep=TimeRange(s.sleep.start, s.sleep.end),
-        lunch=TimeRange(s.lunch.start, s.lunch.end),
         deadline_buffer_days=s.deadline_buffer_days,
         free_evenings_per_week=s.rest.free_evenings_per_week,
         weekend_half_days=s.rest.weekend_half_days,
@@ -244,6 +240,7 @@ class _Builder:
 
     def __init__(self, db: AsyncSession, user: User, now: datetime) -> None:
         self.db = db
+        self.user = user
         self.user_id = user.id
         self.now = now
         self.tz = get_tz(user.timezone)
@@ -271,6 +268,13 @@ class _Builder:
         colors = {c.id: c.color for c in await self._scalars(Category)}
         coefs = await coefficients(self.db, self.user_id)
         budgets = await budget_index(self.db, self.user_id, self.today)
+        # Режимы дня на весь горизонт (+ запас на хвосты суток)
+        days = await load_days(
+            self.db,
+            self.user,
+            self.today - timedelta(days=1),
+            self.today + timedelta(days=MAX_HORIZON_DAYS + 2),
+        )
 
         hard = await self._scalars(
             Event,
@@ -567,22 +571,18 @@ class _Builder:
                 )
 
         # Дела из ящика, взятые на неделю: только в своей неделе, после основных блоков
-        work = (
-            Window(
-                frozenset({1, 2, 3, 4, 5}), s.work_hours.weekdays.start, s.work_hours.weekdays.end
-            ),
-            Window(frozenset({6, 7}), s.work_hours.weekends.start, s.work_hours.weekends.end),
-        )
         for item in items:
             key = block_id(SourceType.backlog_item, item.id)
             remaining = (item.estimate_min or box.DEFAULT_ESTIMATE_MIN) - consumed.get(key, 0)
             if remaining < MIN_BLOCK_MIN:
                 continue
             act = effective(item.action_type_id)
-            base = (
+            item_windows, within_work = box.item_windows(
                 windows_from_json(item.time_window)
                 if item.time_window
-                else type_windows(item.action_type_id) or work
+                else type_windows(item.action_type_id),
+                item.conditions,
+                type_windows(item.hours_action_type_id),
             )
             planned_week = item.planned_week
             if planned_week is None:  # в выборке только взятые на неделю
@@ -597,9 +597,8 @@ class _Builder:
                     priority=box.priority(
                         local_date(item.created_at, self.tz), item.desired_by, self.today
                     ),
-                    windows=box.condition_windows(
-                        base, item.conditions, type_windows(item.hours_action_type_id)
-                    ),
+                    windows=item_windows,
+                    within_work=within_work,
                     days=(
                         frozenset(event_days.get(item.days_event_type_id, ()))
                         if item.days_event_type_id
@@ -761,6 +760,7 @@ class _Builder:
             fixed=tuple(fixed),
             previous=previous,
             settings=plan_settings(s),
+            days=days.specs(sorted(days.by_date)),
             budgets=budgets.budgets,
             quotas=tuple(quotas),
             max_horizon_days=MAX_HORIZON_DAYS,
@@ -772,6 +772,7 @@ class _Builder:
                 repr(inp.fixed),
                 repr(inp.previous),
                 repr(inp.settings),
+                repr(inp.days),
                 repr(inp.budgets),
                 repr(inp.quotas),
                 sorted(str(e.id) for e in orphans),

@@ -8,8 +8,8 @@ import { TaskTypesSection } from '@/features/catalog/TaskTypesSection'
 import { NotificationsSection } from '@/features/notifications/NotificationsSection'
 import { CalibrationSection } from '@/features/plan/CalibrationSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
+import { DayProfilesSection } from '@/features/dayprofiles/DayProfilesSection'
 import { AccountSection } from '@/features/settings/sections/AccountSection'
-import { DayModeSection } from '@/features/settings/sections/DayModeSection'
 import { EventTypesSection } from '@/features/schedule/EventTypesSection'
 import { RemindersSection } from '@/features/settings/sections/RemindersSection'
 import { RestSection } from '@/features/settings/sections/RestSection'
@@ -41,7 +41,7 @@ export function SettingsPage() {
       )}
       {settings && (
         <div className="flex flex-col gap-4">
-          <DayModeSection settings={settings} />
+          <DayProfilesSection />
           <StudySection settings={settings} />
           <EventTypesSection />
           <BudgetsSection />

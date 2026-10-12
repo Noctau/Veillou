@@ -21,7 +21,8 @@
 - ящик: дела с чипом «в дни пар» и «в часы учреждений», взятые на неделю, и старое;
 - экзамен с билетами и планом подготовки;
 - проект с недельной нормой (ВКР) и проект для заданий с работы;
-- лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); переопределённые настройки (сон).
+- лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); режимы дня «Будни» и
+  «Выходные» с поздним сном (M18).
 """
 
 import json
@@ -152,14 +153,23 @@ async def build_student(client: AsyncClient) -> Student:
         return await _ok(await c.put(API + url, json=body))
 
     # ---------- настройки ----------
+    # Сон 00:00–08:00 и будни 9–22 — как их перенесла миграция M18 в «Будни» и
+    # «Выходные» (тихие часы — из настроек); сводка в 08:00 = подъём, разбор в 21:30
     await patch(
         "/me/settings",
         {
-            "sleep": {"start": "00:00", "end": "08:00"},
-            "work_hours": {"weekdays": {"start": "09:00", "end": "22:00"}},
+            "schedule": {
+                "morning_digest_after_wake_min": 0,
+                "evening_review_before_sleep_min": 150,
+            },
             "onboarding_done": True,
         },
     )
+    for profile in await _ok(await c.get(f"{API}/day-profiles")):
+        body: dict[str, Any] = {"wake": "08:00", "sleep": "00:00", "quiet_follows_sleep": False}
+        if profile["key"] == "weekdays":
+            body["work_windows"] = [{"start": "09:00", "end": "22:00"}]
+        await patch(f"/day-profiles/{profile['id']}", body)
     types = {t["key"]: t["id"] for t in await _ok(await c.get(f"{API}/action-types"))}
     cats = {x["key"]: x["id"] for x in await _ok(await c.get(f"{API}/categories")) if x["key"]}
     # Лимит «Учёба» — бывший study_limit_min_per_day: 300

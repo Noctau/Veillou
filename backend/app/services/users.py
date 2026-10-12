@@ -8,6 +8,7 @@ from app.core.security import MAX_PASSWORD_LENGTH, hash_password_async
 from app.core.time import is_valid_tz, now_utc
 from app.models import User, UserSession
 from app.services.catalog import ensure_defaults
+from app.services.day_profiles import ensure_day_profiles
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -50,6 +51,7 @@ async def create_user(
     session.add(user)
     await session.flush()
     await ensure_defaults(session, user.id)
+    await ensure_day_profiles(session, user.id)
     await session.commit()
     return user
 

@@ -1,21 +1,23 @@
 """M8.2–M8.5: сценарии планировщика (`solve`)."""
 
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 
 import pytest
 
 from app.core.time import get_tz, wall_to_utc
+from app.domain import dayprofile
 from app.domain.planner import (
     Block,
     Budget,
     Busy,
+    DaySpec,
     FixedBlock,
     Placement,
     PlanInput,
     PlanResult,
     PlanSettings,
     RiskReason,
-    TimeRange,
     Window,
     solve,
 )
@@ -36,6 +38,17 @@ STUDY_LIMIT = frozenset({"study"})
 
 def at(d: date, h: int, m: int = 0) -> datetime:
     return wall_to_utc(d, time(h, m), TZ)
+
+
+def days_like(
+    tz=TZ, first: date = MON - timedelta(days=7), n: int = 90, **changes
+) -> tuple[DaySpec, ...]:
+    """Сутки по встроенным режимам (будни / выходные) с правками: `lunch=None`,
+    `wake=time(9)`, `sleep=time(1, 30)`…"""
+    return tuple(
+        dayprofile.day_spec(d, replace(dayprofile.fallback(d), **changes), tz)
+        for d in (first + timedelta(days=i) for i in range(n))
+    )
 
 
 def plan(*blocks: Block, now: datetime | None = None, **kw) -> PlanResult:
@@ -334,17 +347,13 @@ def test_pinned_subtasks_count_in_task_limit():
 
 def test_night_block_counts_for_previous_day():
     """Учёба в 00:00 вторника — это ещё вечер понедельника (день начинается с подъёма)."""
-    settings = PlanSettings(
-        sleep=TimeRange(time(1, 30), time(9)),
-        free_evenings_per_week=0,
-        weekend_half_days=0,
-    )
     night = (Window(frozenset({2}), time(0), time(1, 30)),)
     result = plan(
         Block("night", 60, windows=night, budgets=STUDY_LIMIT),
         Block("day", 60, budgets=STUDY_LIMIT),
         now=at(MON, 23),
-        settings=settings,
+        settings=NO_REST,
+        days=days_like(sleep=time(1, 30), wake=time(9)),
         budgets=(Budget("study", 60),),
     )
     assert start(result, "night") == at(TUE, 0)

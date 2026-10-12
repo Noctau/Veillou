@@ -6,6 +6,7 @@ from app.models.attachment import Attachment
 from app.models.backlog import BacklogItem
 from app.models.budget import BudgetDayOverride, LoadBudget, LoadBudgetMember
 from app.models.catalog import ActionType, Category, TaskType
+from app.models.day_profile import DayProfile, DayProfileRule
 from app.models.event import Event
 from app.models.exam import Exam, ExamQuestion, ExamSession
 from app.models.note import Note
@@ -31,6 +32,8 @@ __all__ = [
     "Calibration",
     "Category",
     "DayOff",
+    "DayProfile",
+    "DayProfileRule",
     "Event",
     "EventType",
     "Exam",

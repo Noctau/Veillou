@@ -129,6 +129,23 @@ INVARIANTS = (
         "WHERE a.deleted_at IS NULL AND t.deleted_at IS NOT NULL",
     ),
     Invariant(
+        "у каждого пользователя есть режим дня",
+        frozenset({"users", "day_profiles"}),
+        "SELECT count(*) FROM users u WHERE NOT EXISTS (SELECT 1 FROM day_profiles p "
+        "WHERE p.user_id = u.id AND p.deleted_at IS NULL)",
+    ),
+    Invariant(
+        "правило режима дня — живого режима того же пользователя",
+        frozenset({"day_profile_rules", "day_profiles"}),
+        "SELECT count(*) FROM day_profile_rules r JOIN day_profiles p ON p.id = r.profile_id "
+        "WHERE r.deleted_at IS NULL AND (p.deleted_at IS NOT NULL OR p.user_id <> r.user_id)",
+    ),
+    Invariant(
+        "в настройках нет сна, обеда и рабочих часов (они в режимах дня)",
+        frozenset({"users", "day_profiles"}),
+        "SELECT count(*) FROM users WHERE settings ?| array['sleep', 'lunch', 'work_hours']",
+    ),
+    Invariant(
         "подзадача — в задании того же пользователя",
         frozenset({"subtasks", "tasks"}),
         "SELECT count(*) FROM subtasks s JOIN tasks t ON t.id = s.task_id "

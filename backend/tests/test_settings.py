@@ -42,8 +42,11 @@ async def test_defaults(auth_client: AsyncClient):
     # Справочник засеян при создании пользователя: тип по умолчанию — «Самостоятельная учёба»
     assert data["default_action_type_id"] is not None
     assert {**data, "default_action_type_id": None} == UserSettings().model_dump(mode="json")
-    assert data["sleep"] == {"start": "23:30", "end": "07:30"}
-    assert data["schedule"]["morning_digest"] == "08:00"
+    # Сон, обед и рабочие часы — в режимах дня (M18), сводка и разбор — от них
+    for key in ("sleep", "lunch", "work_hours"):
+        assert key not in data
+    assert data["schedule"]["morning_digest_after_wake_min"] == 30
+    assert data["schedule"]["evening_review_before_sleep_min"] == 120
     # Дорога и «перед парой» — флаги типов занятости (M17), не настройки
     assert "travel_buffer_min" not in data
     assert "before_class" not in data["reminders"]
@@ -54,14 +57,14 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
     resp = await auth_client.patch(
         URL,
         json={
-            "work_hours": {"weekdays": {"end": "19:00"}},
+            "schedule": {"morning_digest_after_wake_min": 0},
             "reminders": {"evening_review": {"channels": ["telegram"]}},
         },
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert data["work_hours"]["weekdays"] == {"start": "09:00", "end": "19:00"}
-    assert data["work_hours"]["weekends"] == {"start": "11:00", "end": "19:00"}
+    assert data["schedule"]["morning_digest_after_wake_min"] == 0
+    assert data["schedule"]["evening_review_before_sleep_min"] == 120
     assert data["reminders"]["evening_review"] == {"enabled": True, "channels": ["telegram"]}
     assert data["reminders"]["deadlines"]["enabled"] is True
 
@@ -69,13 +72,13 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
     resp = await auth_client.patch(URL, json={"deadline_buffer_days": 2})
     data = resp.json()
     assert data["deadline_buffer_days"] == 2
-    assert data["work_hours"]["weekdays"]["end"] == "19:00"
+    assert data["schedule"]["morning_digest_after_wake_min"] == 0
 
     # В БД — только переопределения
     stored = dict(await session.scalar(select(User.settings)))
     assert stored.pop("default_action_type_id")
     assert stored == {
-        "work_hours": {"weekdays": {"end": "19:00"}},
+        "schedule": {"morning_digest_after_wake_min": 0},
         "reminders": {"evening_review": {"channels": ["telegram"]}},
         "deadline_buffer_days": 2,
     }
@@ -83,34 +86,35 @@ async def test_patch_deep_merges(auth_client: AsyncClient, session: AsyncSession
 
 
 async def test_null_resets_to_default(auth_client: AsyncClient):
-    await auth_client.patch(URL, json={"lunch": {"start": "12:00", "end": "12:30"}})
-    resp = await auth_client.patch(URL, json={"lunch": None})
-    assert resp.json()["lunch"] == {"start": "13:00", "end": "14:00"}
+    await auth_client.patch(URL, json={"quiet_hours": {"start": "21:00", "end": "07:00"}})
+    resp = await auth_client.patch(URL, json={"quiet_hours": None})
+    assert resp.json()["quiet_hours"] == {"start": "22:30", "end": "08:00"}
 
 
-async def test_overnight_ranges_allowed_for_sleep(auth_client: AsyncClient):
-    resp = await auth_client.patch(URL, json={"sleep": {"start": "00:30", "end": "08:30"}})
-    assert resp.status_code == 200
+async def test_overnight_ranges_allowed_for_quiet_hours(auth_client: AsyncClient):
     resp = await auth_client.patch(URL, json={"quiet_hours": {"start": "23:00", "end": "07:00"}})
     assert resp.status_code == 200
 
 
-async def test_invalid_merged_result_rejected_and_not_saved(auth_client: AsyncClient):
-    # Только конец обеда раньше дефолтного начала 13:00 -> итог невалиден
-    resp = await auth_client.patch(URL, json={"lunch": {"end": "12:00"}})
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "invalid_settings"
-    assert (await auth_client.get(URL)).json()["lunch"]["end"] == "14:00"
+async def test_old_day_settings_rejected(auth_client: AsyncClient):
+    for body in [
+        {"sleep": {"start": "00:30", "end": "08:30"}},
+        {"work_hours": {"weekdays": {"end": "19:00"}}},
+        {"schedule": {"morning_digest": "08:00"}},
+    ]:
+        resp = await auth_client.patch(URL, json=body)
+        assert resp.status_code == 422, body
 
 
 async def test_patch_validation(auth_client: AsyncClient):
     for body in [
         {"unknown_field": 1},
-        {"work_hours": {"weekdays": {"bogus": "10:00"}}},
+        {"quiet_hours": {"bogus": "10:00"}},
         {"deadline_buffer_days": 30},
         {"default_action_type_id": "nope"},
         {"reminders": {"deadlines": {"channels": ["sms"]}}},
-        {"sleep": {"start": "25:00"}},
+        {"quiet_hours": {"start": "25:00"}},
+        {"schedule": {"morning_digest_after_wake_min": 2000}},
         {"schedule": {"weekly_review_weekday": 8}},
     ]:
         resp = await auth_client.patch(URL, json=body)

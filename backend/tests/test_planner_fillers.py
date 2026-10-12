@@ -4,7 +4,7 @@ from datetime import time, timedelta
 
 import pytest
 
-from app.domain.planner import Block, Budget, Busy, PlanSettings, RiskReason, TimeRange, Window
+from app.domain.planner import Block, Budget, Busy, PlanSettings, RiskReason, Window
 
 from .test_planner import (
     MON,
@@ -16,13 +16,15 @@ from .test_planner import (
     TZ,
     WED,
     at,
+    days_like,
     parts,
     plan,
     risks,
     start,
 )
 
-ONE_FREE_HOUR = PlanSettings(lunch=None, free_evenings_per_week=0, weekend_half_days=0)
+ONE_FREE_HOUR = PlanSettings(free_evenings_per_week=0, weekend_half_days=0)
+NO_LUNCH = days_like(lunch=None)
 
 
 def busy_except(d, h_free: int) -> tuple[Busy, ...]:
@@ -36,7 +38,12 @@ def test_filler_never_displaces_study(limit):
     study = Block("study", 60, deadline=at(MON, 23), buffer_days=0)
     filler = Block("box", 60, filler=True, priority=8, deadline=at(MON, 23), buffer_days=0)
     result = plan(
-        study, filler, busy=busy_except(MON, 15), settings=ONE_FREE_HOUR, time_limit_s=limit
+        study,
+        filler,
+        busy=busy_except(MON, 15),
+        settings=ONE_FREE_HOUR,
+        days=NO_LUNCH,
+        time_limit_s=limit,
     )
     assert parts(result, "study") == [(at(MON, 15), at(MON, 16))]
     assert not parts(result, "box")
@@ -89,10 +96,8 @@ def test_allowed_days_night_belongs_to_previous_day():
     """Блок в 00:30 относится к вечеру предыдущего дня — и к его «дню пар»."""
     night = (Window(frozenset(range(1, 8)), time(0), time(1)),)
     block = Block("late", 30, windows=night, days=frozenset({TUE}))
-    settings = PlanSettings(
-        sleep=TimeRange(time(1), time(8)), free_evenings_per_week=0, weekend_half_days=0
-    )
-    result = plan(block, settings=settings)
+    settings = PlanSettings(free_evenings_per_week=0, weekend_half_days=0)
+    result = plan(block, settings=settings, days=days_like(sleep=time(1), wake=time(8)))
     local = start(result, "late").astimezone(TZ)
     assert local.date() == WED
     assert local.hour == 0

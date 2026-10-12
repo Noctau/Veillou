@@ -9,12 +9,12 @@ from app.domain.planner import (
     Busy,
     FixedBlock,
     PlanInput,
-    PlanSettings,
-    TimeRange,
     Window,
     available_slots,
 )
 from app.domain.planner.grid import Grid, intersect, merge, prepare, subtract
+
+from .test_planner import days_like
 
 TZ = get_tz("Europe/Moscow")
 MON = date(2026, 10, 12)  # понедельник
@@ -80,8 +80,7 @@ def test_sleep_cuts_late_study_window():
 
 
 def test_night_study_when_sleep_is_late():
-    settings = PlanSettings(sleep=TimeRange(time(1, 30), time(9)))
-    data = inp(Block("b", 60, windows=STUDY), settings=settings)
+    data = inp(Block("b", 60, windows=STUDY), days=days_like(sleep=time(1, 30), wake=time(9)))
     tue = MON + timedelta(days=1)
     # Пн 09:00–13:00, 14:00–… до 01:00 вторника (окно), сон с 01:30
     assert (time(14), time(1)) in [
@@ -283,7 +282,7 @@ def test_dst_transition_keeps_wall_time():
         now=wall_to_utc(sun - timedelta(days=1), time(0), berlin),
         tz=berlin,
         blocks=(Block("b", 60, windows=(Window(frozenset(range(1, 8)), time(9), time(19)),)),),
-        settings=PlanSettings(lunch=None),
+        days=days_like(berlin, sun - timedelta(days=3), 20, lunch=None),
     )
     prep = prepare(data)
     for lo, hi in prep.by_id["b"].free[:4]:

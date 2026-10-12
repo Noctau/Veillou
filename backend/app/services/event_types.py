@@ -2,7 +2,8 @@
 со ссылками при удалении.
 
 Удаление типа: его правила расписания удаляются вместе с будущими вхождениями,
-участие в лимитах и чип ящика «в дни событий типа» снимаются. Прошедшие события
+участие в лимитах, правила режимов дня по его событиям и чип ящика «в дни
+событий типа» снимаются. Прошедшие события
 остаются со ссылкой на удалённый тип — для планировщика и текстов это «просто занято».
 """
 
@@ -15,7 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz
 from app.domain.fields import FieldError, dump_defs, merge_defs, parse_defs
-from app.models import AreaType, BacklogItem, EventType, LoadBudgetMember, ScheduleRule, User
+from app.models import (
+    AreaType,
+    BacklogItem,
+    DayProfileRule,
+    EventType,
+    LoadBudgetMember,
+    ScheduleRule,
+    User,
+)
 from app.schemas.schedule import EventTypeCreate, EventTypeUpdate
 from app.services.base import UserScopedRepository
 from app.services.schedule_sync import SeriesSync
@@ -44,6 +53,10 @@ class _MemberRepo(UserScopedRepository[LoadBudgetMember]):
     model = LoadBudgetMember
 
 
+class _DayRuleRepo(UserScopedRepository[DayProfileRule]):
+    model = DayProfileRule
+
+
 class EventTypeService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
@@ -52,6 +65,7 @@ class EventTypeService:
         self.area_types = _AreaTypeRepo(db, user.id)
         self.rules = _RuleRepo(db, user.id)
         self.members = _MemberRepo(db, user.id)
+        self.day_rules = _DayRuleRepo(db, user.id)
         self.sync = SeriesSync(db, user.id, get_tz(user.timezone))
 
     async def list(self) -> list[EventType]:
@@ -113,6 +127,8 @@ class EventTypeService:
             await self.sync.remove_series(rule.id)
         for m in await self.members.find_all(LoadBudgetMember.event_type_id == id):
             self.members.soft_delete(m)
+        for r in await self.day_rules.find_all(DayProfileRule.event_type_id == id):
+            self.day_rules.soft_delete(r)
         await self.db.execute(
             update(BacklogItem)
             .where(BacklogItem.user_id == self.user_id, BacklogItem.days_event_type_id == id)

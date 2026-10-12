@@ -300,8 +300,17 @@ async def test_disabled_rule_removes_reminders(auth_client, session, user):
     assert await pending(session, user, ReminderKind.before_event) == []
 
 
+async def _quiet_follows_sleep(auth_client, value: bool) -> None:
+    for p in (await auth_client.get(f"{API}/day-profiles")).json():
+        resp = await auth_client.patch(
+            f"{API}/day-profiles/{p['id']}", json={"quiet_follows_sleep": value}
+        )
+        assert resp.status_code == 200, resp.text
+
+
 async def test_quiet_hours_and_minutes_from_settings(auth_client, session, user):
     await add_class(session, user, tomorrow_at(9, 0))
+    await _quiet_follows_sleep(auth_client, False)
     await auth_client.patch(
         f"{API}/me/settings", json={"quiet_hours": {"start": "23:00", "end": "08:50"}}
     )
@@ -312,6 +321,20 @@ async def test_quiet_hours_and_minutes_from_settings(auth_client, session, user)
     await sync_user_reminders(session, user.id)
     [r] = await pending(session, user, ReminderKind.before_event)
     assert r.fire_at == tomorrow_at(8, 50)  # 8:40 в тихие часы → их конец
+
+
+async def test_quiet_hours_follow_day_profile_sleep(auth_client, session, user):
+    """Тихие часы — сон режима: подъём в 9:00 → напоминание 8:40 переносится на 9:00."""
+    await add_class(session, user, tomorrow_at(9, 30))
+    for p in (await auth_client.get(f"{API}/day-profiles")).json():
+        await auth_client.patch(f"{API}/day-profiles/{p['id']}", json={"wake": "09:00"})
+    t = await class_type(session, user)
+    await auth_client.patch(f"{API}/event-types/{t.id}", json={"remind_before_min": 50})
+    await session.refresh(t)
+    await session.refresh(user)
+    await sync_user_reminders(session, user.id)
+    [r] = await pending(session, user, ReminderKind.before_event)
+    assert r.fire_at == tomorrow_at(9, 0)
 
 
 async def test_deadline_reminders_at_digest_time(auth_client, session, user):
@@ -334,7 +357,8 @@ async def test_deadline_reminders_at_digest_time(auth_client, session, user):
 
 
 async def test_digest_moved_to_past_time_fires_now_once(auth_client, session, user):
-    """Сводку перенесли с 10:00 на 9:00 в 9:30 — сегодняшняя уходит сразу, без дублей."""
+    """Сводку перенесли с 10:00 на 9:00 в 9:30 — сегодняшняя уходит сразу, без дублей.
+    (Подъём по умолчанию — 7:30: 10:00 — через 150 мин, 9:00 — через 90.)"""
     today = now_utc().astimezone(TZ).date()
     now = wall_to_utc(today, time(9, 30), TZ)
     key = f"morning_digest:{today.isoformat()}"
@@ -343,18 +367,18 @@ async def test_digest_moved_to_past_time_fires_now_once(auth_client, session, us
         rs = await pending(session, user, ReminderKind.morning_digest)
         return [r for r in rs if r.dedupe_key == key]
 
-    async def set_digest(at: str) -> None:
+    async def set_digest(after_wake: int) -> None:
         resp = await auth_client.patch(
-            f"{API}/me/settings", json={"schedule": {"morning_digest": at}}
+            f"{API}/me/settings", json={"schedule": {"morning_digest_after_wake_min": after_wake}}
         )
         assert resp.status_code == 200, resp.text
         await session.refresh(user)
 
-    await set_digest("10:00")
+    await set_digest(150)
     await sync_user_reminders(session, user.id, now)
     assert [r.fire_at for r in await todays()] == [wall_to_utc(today, time(10), TZ)]
 
-    await set_digest("09:00")
+    await set_digest(90)
     await sync_user_reminders(session, user.id, now)
     [r] = await todays()
     assert r.fire_at == now

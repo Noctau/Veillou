@@ -6,7 +6,7 @@
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
 Дела из ящика (взятые на неделю), дни подготовки к экзаменам, недельная
-норма проекта, лимиты нагрузки и буферы типов занятости — тоже.
+норма проекта, лимиты нагрузки, буферы типов занятости и режимы дня — тоже.
 
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
@@ -24,6 +24,8 @@ from app.models import (
     ActionType,
     BacklogItem,
     BudgetDayOverride,
+    DayProfile,
+    DayProfileRule,
     Event,
     EventType,
     Exam,
@@ -123,7 +125,7 @@ def _relevant(obj: Any, is_new: bool) -> bool:
         return not is_new and bool(_changed(obj, EVENT_TYPE_FIELDS))
     if isinstance(obj, LoadBudget):
         return is_new or bool(_changed(obj, {"minutes_per_day", "deleted_at"}))
-    return isinstance(obj, LoadBudgetMember | BudgetDayOverride)
+    return isinstance(obj, LoadBudgetMember | BudgetDayOverride | DayProfile | DayProfileRule)
 
 
 def _reason(objs: list[Any]) -> PlanReason:

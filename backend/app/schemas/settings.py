@@ -10,7 +10,7 @@
 import uuid
 from datetime import time
 from enum import StrEnum
-from typing import Annotated, Any, Self
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -18,7 +18,6 @@ from pydantic import (
     Field,
     create_model,
     field_validator,
-    model_validator,
 )
 
 from app.schemas.common import WallTime
@@ -38,21 +37,6 @@ class TimeRange(_Model):
 
     start: WallTime
     end: WallTime
-
-
-class DayRange(TimeRange):
-    """Интервал, который не переходит через полночь."""
-
-    @model_validator(mode="after")
-    def _check_order(self) -> Self:
-        if self.end <= self.start:
-            raise ValueError("Конец должен быть позже начала")
-        return self
-
-
-class WorkHours(_Model):
-    weekdays: DayRange = DayRange(start=time(9, 0), end=time(21, 0))
-    weekends: DayRange = DayRange(start=time(11, 0), end=time(19, 0))
 
 
 class ReminderRule(_Model):
@@ -94,11 +78,20 @@ class Reminders(_Model):
     subtask_start: ReminderRule = ReminderRule(enabled=False)
 
 
-class Schedule(_Model):
-    """Когда приходят сводка и разборы."""
+# Смещение от подъёма / отбоя режима дня, минут (отрицательное — в другую сторону)
+OffsetMin = Annotated[int, Field(ge=-720, le=720)]
 
-    morning_digest: WallTime = time(8, 0)
-    evening_review: WallTime = time(21, 30)
+
+class Schedule(_Model):
+    """Когда приходят сводка и разборы. Сводка и вечерний разбор — по режиму дня:
+    после ночной смены с подъёмом в 15:00 сводка придёт после 15:00."""
+
+    morning_digest_after_wake_min: OffsetMin = Field(
+        default=30, description="Утренняя сводка — через N минут после подъёма"
+    )
+    evening_review_before_sleep_min: OffsetMin = Field(
+        default=120, description="Вечерний разбор — за N минут до отбоя"
+    )
     weekly_review_weekday: int = Field(default=7, ge=1, le=7, description="ISO: 1 = Пн, 7 = Вс")
     weekly_review: WallTime = time(19, 0)
 
@@ -111,16 +104,18 @@ class Rest(_Model):
 
 
 class UserSettings(_Model):
-    work_hours: WorkHours = WorkHours()
-    sleep: TimeRange = TimeRange(start=time(23, 30), end=time(7, 30))
-    lunch: DayRange = DayRange(start=time(13, 0), end=time(14, 0))
+    """Сон, обед и рабочие часы — в режимах дня (`day_profiles`, M18)."""
+
     default_action_type_id: uuid.UUID | None = Field(
         default=None, description="Тип действия задач и дел без своего типа; null — без типа"
     )
     deadline_buffer_days: int = Field(
         default=1, ge=0, le=14, description="Закончить за N дней до дедлайна"
     )
-    quiet_hours: TimeRange = TimeRange(start=time(22, 30), end=time(8, 0))
+    quiet_hours: TimeRange = Field(
+        default=TimeRange(start=time(22, 30), end=time(8, 0)),
+        description="Для режимов дня без «тихие часы — сон режима»",
+    )
     schedule: Schedule = Schedule()
     reminders: Reminders = Reminders()
     rest: Rest = Rest()

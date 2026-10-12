@@ -34,8 +34,8 @@ from app.models.base import UserOwnedMixin
 from app.schemas.review import FreeSuggestion
 from app.schemas.task import SubtaskSchedule
 from app.services.calibration import coefficients
+from app.services.day_profiles import load_days
 from app.services.replan import windows_from_json
-from app.services.settings import effective_settings
 from app.services.tasks import TaskService
 
 SOURCE_MODEL: dict[str, type[Task] | type[Subtask] | type[BacklogItem]] = {
@@ -140,13 +140,10 @@ class FreeService:
                 )
                 meta[(kind, id)] = (task.title if sub else None, task.id, task.deadline)
 
-        s = effective_settings(self.user)
-        work = (
-            Window(
-                frozenset({1, 2, 3, 4, 5}), s.work_hours.weekdays.start, s.work_hours.weekdays.end
-            ),
-            Window(frozenset({6, 7}), s.work_hours.weekends.start, s.work_hours.weekends.end),
-        )
+        # Дело без своих окон — в рабочие окна сегодняшнего режима дня
+        profile = (await load_days(self.db, self.user, self.today, self.today)).profile(self.today)
+        weekday = frozenset({self.today.isoweekday()})
+        work = tuple(Window(weekday, start, end) for start, end in profile.work)
         types_today = await self._event_types_today()
         week = box.week_start(self.today)
         for item in await self._all(BacklogItem, BacklogItem.status == BacklogStatus.active):

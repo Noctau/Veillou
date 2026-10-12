@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { type EventView, placeOf, timeRange, useEventView } from '@/features/calendar/eventUtils'
 import { EventDetailsDialog } from '@/features/calendar/EventDetailsDialog'
 import { EventDialog } from '@/features/calendar/EventDialog'
+import { TodayProfileChip } from '@/features/dayprofiles/TodayProfileChip'
 import { type CalendarEvent, useCalendar, useUpdateEvent } from '@/features/calendar/useCalendar'
 import { cycleWeek } from '@/features/schedule/cycle'
 import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
@@ -209,11 +210,12 @@ export function TodayView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-baseline gap-2 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span className="font-medium text-foreground first-letter:uppercase">
           {formatDay(today, { weekday: 'long', month: 'long' })}
         </span>
         {week && <span>· {SCHEDULE_UI.cycleWeek(week).toLowerCase()}</span>}
+        <TodayProfileChip day={today} />
       </div>
 
       {isPending && <Skeleton className="h-28" />}

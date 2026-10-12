@@ -12,7 +12,7 @@ import { SchedulePanel } from '@/features/schedule/SchedulePanel'
 import { SlotGridEditor } from '@/features/schedule/SlotGridEditor'
 import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
 import { groupGrids, useSlotGrids } from '@/features/schedule/useSchedule'
-import { DayModeSection } from '@/features/settings/sections/DayModeSection'
+import { DayProfilesSection } from '@/features/dayprofiles/DayProfilesSection'
 import { RestSection } from '@/features/settings/sections/RestSection'
 import { useSettings } from '@/features/settings/useSettings'
 import { TelegramSection } from '@/features/telegram/TelegramSection'
@@ -61,7 +61,7 @@ function DayModeStep() {
   if (!settings) return <Skeleton className="h-64" />
   return (
     <div className="flex flex-col gap-4">
-      <DayModeSection settings={settings} />
+      <DayProfilesSection />
       <RestSection settings={settings} />
     </div>
   )

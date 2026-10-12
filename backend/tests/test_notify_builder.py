@@ -13,6 +13,7 @@ from app.notify.builder import (
     Window,
     adjust,
     build,
+    daily_at,
     deadline_candidates,
     digest_candidates,
     event_candidates,
@@ -23,6 +24,7 @@ from app.notify.builder import (
 )
 
 TZ = get_tz("Europe/Moscow")
+AT8 = daily_at(time(8), TZ)
 QUIET = TimeRange(time(22, 30), time(8, 0))
 CH = ("push", "telegram")
 WEEKDAYS = frozenset({1, 2, 3, 4, 5})
@@ -164,9 +166,7 @@ def test_merge_does_not_chain():
 
 def test_deadline_merges_with_digest():
     t = DeadlineInfo(uuid.uuid4(), at(TUE + timedelta(days=3), 23, 59))
-    cands = deadline_candidates([t], [3], time(8), TZ, CH) + digest_candidates(
-        [TUE], time(8), TZ, CH
-    )
+    cands = deadline_candidates([t], [3], AT8, TZ, CH) + digest_candidates([TUE], AT8, CH)
     planned = build(cands, QUIET, TZ)
     assert len(planned) == 2
     assert {p.fire_at for p in planned} == {at(TUE, 8)}
@@ -200,7 +200,7 @@ def test_moved_event_gets_new_key():
 
 def test_deadline_days_before_at_digest_time():
     due = at(date(2026, 10, 15), 23, 59)
-    cands = deadline_candidates([DeadlineInfo(uuid.uuid4(), due)], [3, 1, 0], time(8), TZ, CH)
+    cands = deadline_candidates([DeadlineInfo(uuid.uuid4(), due)], [3, 1, 0], AT8, TZ, CH)
     assert sorted(local(c.fire_at) for c in cands) == [
         (date(2026, 10, 12), time(8)),
         (date(2026, 10, 14), time(8)),
@@ -212,19 +212,19 @@ def test_deadline_days_before_at_digest_time():
 def test_deadline_before_morning_skips_same_day():
     # Сдать в 7:00 — напоминание «в день сдачи» в 8:00 уже поздно
     due = at(TUE, 7)
-    cands = deadline_candidates([DeadlineInfo(uuid.uuid4(), due)], [0], time(8), TZ, CH)
+    cands = deadline_candidates([DeadlineInfo(uuid.uuid4(), due)], [0], AT8, TZ, CH)
     assert build(cands, QUIET, TZ) == []
 
 
 def test_changed_deadline_gets_new_keys():
     tid = uuid.uuid4()
-    a = deadline_candidates([DeadlineInfo(tid, at(TUE, 23))], [1], time(8), TZ, CH)[0]
-    b = deadline_candidates([DeadlineInfo(tid, at(TUE, 22))], [1], time(8), TZ, CH)[0]
+    a = deadline_candidates([DeadlineInfo(tid, at(TUE, 23))], [1], AT8, TZ, CH)[0]
+    b = deadline_candidates([DeadlineInfo(tid, at(TUE, 22))], [1], AT8, TZ, CH)[0]
     assert a.key != b.key
 
 
 def test_digest_daily():
-    cands = digest_candidates([TUE, TUE + timedelta(days=1)], time(8), TZ, CH)
+    cands = digest_candidates([TUE, TUE + timedelta(days=1)], AT8, CH)
     assert [c.key for c in cands] == ["morning_digest:2026-10-06", "morning_digest:2026-10-07"]
     assert cands[0].fire_at == at(TUE, 8)
 

@@ -28,7 +28,7 @@ from app.models import Event, Reminder, Subtask, Task, User
 from app.notify.builder import next_allowed
 from app.notify.message import fmt_moment, plural
 from app.schemas.task import SubtaskSchedule, SubtaskUpdate, TaskUpdate
-from app.services.reminders import quiet_range
+from app.services.reminders import load_quiet
 from app.services.settings import effective_settings
 from app.services.tasks import TaskService
 
@@ -81,9 +81,10 @@ async def _task(db: AsyncSession, r: Reminder) -> Task:
     return t
 
 
-def _snooze(db: AsyncSession, user: User, r: Reminder, at: datetime) -> datetime:
+async def _snooze(db: AsyncSession, user: User, r: Reminder, at: datetime) -> datetime:
     tz = get_tz(user.timezone)
-    fire_at = next_allowed(at, quiet_range(effective_settings(user)), tz)
+    quiet = await load_quiet(db, user, effective_settings(user), at)
+    fire_at = next_allowed(at, quiet, tz)
     if r.expires_at is not None and fire_at >= r.expires_at:
         raise ReminderActionError("Позже напоминать уже поздно — срок раньше")
     db.add(
@@ -133,7 +134,7 @@ async def perform(
                 await db.commit()
             return ActionResult(f"Готово: «{task.title}» закрыто", url)
         at = now + (SNOOZE if action == ReminderAction.snooze else timedelta(days=1))
-        fire_at = _snooze(db, user, r, at)
+        fire_at = await _snooze(db, user, r, at)
         await db.commit()
         return ActionResult(f"Напомню {fmt_moment(fire_at, tz, today)}", url)
 
@@ -148,7 +149,7 @@ async def perform(
                 await db.commit()
             return ActionResult(f"Готово: «{st.title}»", url)
         if action == ReminderAction.snooze:
-            fire_at = _snooze(db, user, r, now + SNOOZE)
+            fire_at = await _snooze(db, user, r, now + SNOOZE)
             await db.commit()
             return ActionResult(f"Напомню {fmt_moment(fire_at, tz, today)}", url)
         if event.status != EventStatus.planned:

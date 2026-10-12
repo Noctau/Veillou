@@ -689,6 +689,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/day-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Profiles
+         * @description Режимы дня по позиции: первый — режим по умолчанию.
+         */
+        get: operations["list_profiles"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Profile
+         * @description Удаляет режим и его правила назначения.
+         */
+        delete: operations["delete_profile"];
+        options?: never;
+        head?: never;
+        /** Update Profile */
+        patch: operations["update_profile"];
+        trace?: never;
+    };
+    "/api/v1/day-profiles/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Days
+         * @description Режим каждой даты отрезка [start, end] (не длиннее 93 дней).
+         */
+        get: operations["list_days"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profiles/days/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Day
+         * @description Режим одной даты («сегодня — выходной»); null — снова по правилам.
+         */
+        put: operations["set_day"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profile-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rules */
+        get: operations["list_rules"];
+        put?: never;
+        /** Create Rule */
+        post: operations["create_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profile-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Rule */
+        delete: operations["delete_rule"];
+        options?: never;
+        head?: never;
+        /** Update Rule */
+        patch: operations["update_rule"];
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -2761,23 +2879,202 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** DayProfileCreate */
+        DayProfileCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Wake
+             * Format: time
+             * @description Подъём
+             * @default 07:30:00
+             */
+            wake: string;
+            /**
+             * Sleep
+             * Format: time
+             * @description Отбой; не позже подъёма — после полуночи
+             * @default 23:30:00
+             */
+            sleep: string;
+            /** @description Обед; null — без обеда */
+            lunch?: components["schemas"]["Lunch"] | null;
+            /**
+             * Work Windows
+             * @description Когда вообще можно ставить дела
+             */
+            work_windows?: components["schemas"]["Span"][];
+            /**
+             * Rest Evening Ok
+             * @description Может быть свободным вечером
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @description Может быть половиной выходного
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @description Тихие часы — сон режима (иначе — тихие часы из настроек)
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
+        };
+        /** DayProfileDay */
+        DayProfileDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Profile Id
+             * @description null — встроенный режим (своих нет)
+             */
+            profile_id: string | null;
+            /** Name */
+            name: string;
+            /** Pinned */
+            pinned: boolean;
+        };
         /**
-         * DayRange
-         * @description Интервал, который не переходит через полночь.
+         * DayProfileDayPut
+         * @description Режим одной даты в одно касание («сегодня — выходной»); null — по правилам.
          */
-        DayRange: {
-            /** Start */
-            start: string;
-            /** End */
-            end: string;
+        DayProfileDayPut: {
+            /** Profile Id */
+            profile_id: string | null;
         };
-        /** DayRangePatch */
-        DayRangePatch: {
-            /** Start */
-            start?: string | null;
-            /** End */
-            end?: string | null;
+        /** DayProfileRead */
+        DayProfileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Key
+             * @description Ключ сида/миграции; у своих режимов — null
+             */
+            key: string | null;
+            /** Name */
+            name: string;
+            /** Wake */
+            wake: string;
+            /** Sleep */
+            sleep: string;
+            lunch: components["schemas"]["SpanRead"] | null;
+            /** Work Windows */
+            work_windows: components["schemas"]["SpanRead"][];
+            /** Rest Evening Ok */
+            rest_evening_ok: boolean;
+            /** Rest Halfday Ok */
+            rest_halfday_ok: boolean;
+            /** Quiet Follows Sleep */
+            quiet_follows_sleep: boolean;
+            /** Position */
+            position: number;
         };
+        /** DayProfileRuleCreate */
+        DayProfileRuleCreate: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /**
+             * Date From
+             * @description dates: с (включительно)
+             */
+            date_from?: string | null;
+            /**
+             * Date To
+             * @description dates: по (включительно)
+             */
+            date_to?: string | null;
+            /**
+             * Event Type Id
+             * @description event_day / day_after
+             */
+            event_type_id?: string | null;
+            /**
+             * Weekdays
+             * @description weekdays
+             */
+            weekdays?: number[];
+        };
+        /** DayProfileRuleRead */
+        DayProfileRuleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /** Date From */
+            date_from: string | null;
+            /** Date To */
+            date_to: string | null;
+            /** Event Type Id */
+            event_type_id: string | null;
+            /** Weekdays */
+            weekdays: number[];
+            /** Position */
+            position: number;
+        };
+        /** DayProfileRuleUpdate */
+        DayProfileRuleUpdate: {
+            /** Profile Id */
+            profile_id?: string | null;
+            kind?: components["schemas"]["DayRuleKind"] | null;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Event Type Id */
+            event_type_id?: string | null;
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** DayProfileUpdate */
+        DayProfileUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Wake */
+            wake?: string | null;
+            /** Sleep */
+            sleep?: string | null;
+            /** @description null — без обеда */
+            lunch?: components["schemas"]["Lunch"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span"][] | null;
+            /** Rest Evening Ok */
+            rest_evening_ok?: boolean | null;
+            /** Rest Halfday Ok */
+            rest_halfday_ok?: boolean | null;
+            /** Quiet Follows Sleep */
+            quiet_follows_sleep?: boolean | null;
+            /** Position */
+            position?: number | null;
+        };
+        /**
+         * DayRuleKind
+         * @description Правило назначения режима дня (domain/dayprofile.py). Приоритет: dates >
+         *     event_day / day_after (по позиции) > weekdays > первый режим.
+         * @enum {string}
+         */
+        DayRuleKind: "dates" | "event_day" | "day_after" | "weekdays";
         /**
          * DeadlineDays
          * @description Срок = дата выдачи (или сегодня) + N дней, 23:59.
@@ -3635,6 +3932,19 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** Lunch */
+        Lunch: {
+            /**
+             * Start
+             * Format: time
+             */
+            start: string;
+            /**
+             * End
+             * Format: time
+             */
+            end: string;
         };
         /** MilestoneCreate */
         MilestoneCreate: {
@@ -4809,19 +5119,22 @@ export interface components {
         RiskReason: "no_slots" | "no_time" | "dependency" | "late" | "overdue" | "rest" | "quota";
         /**
          * Schedule
-         * @description Когда приходят сводка и разборы.
+         * @description Когда приходят сводка и разборы. Сводка и вечерний разбор — по режиму дня:
+         *     после ночной смены с подъёмом в 15:00 сводка придёт после 15:00.
          */
         Schedule: {
             /**
-             * Morning Digest
-             * @default 08:00
+             * Morning Digest After Wake Min
+             * @description Утренняя сводка — через N минут после подъёма
+             * @default 30
              */
-            morning_digest: string;
+            morning_digest_after_wake_min: number;
             /**
-             * Evening Review
-             * @default 21:30
+             * Evening Review Before Sleep Min
+             * @description Вечерний разбор — за N минут до отбоя
+             * @default 120
              */
-            evening_review: string;
+            evening_review_before_sleep_min: number;
             /**
              * Weekly Review Weekday
              * @description ISO: 1 = Пн, 7 = Вс
@@ -4836,10 +5149,16 @@ export interface components {
         };
         /** SchedulePatch */
         SchedulePatch: {
-            /** Morning Digest */
-            morning_digest?: string | null;
-            /** Evening Review */
-            evening_review?: string | null;
+            /**
+             * Morning Digest After Wake Min
+             * @description Утренняя сводка — через N минут после подъёма
+             */
+            morning_digest_after_wake_min?: number | null;
+            /**
+             * Evening Review Before Sleep Min
+             * @description Вечерний разбор — за N минут до отбоя
+             */
+            evening_review_before_sleep_min?: number | null;
             /**
              * Weekly Review Weekday
              * @description ISO: 1 = Пн, 7 = Вс
@@ -5157,6 +5476,29 @@ export interface components {
             status?: components["schemas"]["SourceStatus"] | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * Span
+         * @description Интервал внутри суток; `end <= start` — до следующего дня (рабочее окно совы).
+         */
+        Span: {
+            /**
+             * Start
+             * Format: time
+             */
+            start: string;
+            /**
+             * End
+             * Format: time
+             */
+            end: string;
+        };
+        /** SpanRead */
+        SpanRead: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
         };
         /** SubtaskCreate */
         SubtaskCreate: {
@@ -5713,35 +6055,11 @@ export interface components {
             /** Timezone */
             timezone: string;
         };
-        /** UserSettings */
+        /**
+         * UserSettings
+         * @description Сон, обед и рабочие часы — в режимах дня (`day_profiles`, M18).
+         */
         UserSettings: {
-            /**
-             * @default {
-             *       "weekdays": {
-             *         "end": "21:00",
-             *         "start": "09:00"
-             *       },
-             *       "weekends": {
-             *         "end": "19:00",
-             *         "start": "11:00"
-             *       }
-             *     }
-             */
-            work_hours: components["schemas"]["WorkHours"];
-            /**
-             * @default {
-             *       "start": "23:30",
-             *       "end": "07:30"
-             *     }
-             */
-            sleep: components["schemas"]["TimeRange"];
-            /**
-             * @default {
-             *       "start": "13:00",
-             *       "end": "14:00"
-             *     }
-             */
-            lunch: components["schemas"]["DayRange"];
             /**
              * Default Action Type Id
              * @description Тип действия задач и дел без своего типа; null — без типа
@@ -5754,6 +6072,7 @@ export interface components {
              */
             deadline_buffer_days: number;
             /**
+             * @description Для режимов дня без «тихие часы — сон режима»
              * @default {
              *       "start": "22:30",
              *       "end": "08:00"
@@ -5762,8 +6081,8 @@ export interface components {
             quiet_hours: components["schemas"]["TimeRange"];
             /**
              * @default {
-             *       "morning_digest": "08:00",
-             *       "evening_review": "21:30",
+             *       "morning_digest_after_wake_min": 30,
+             *       "evening_review_before_sleep_min": 120,
              *       "weekly_review_weekday": 7,
              *       "weekly_review": "19:00"
              *     }
@@ -5836,9 +6155,6 @@ export interface components {
         };
         /** UserSettingsPatch */
         UserSettingsPatch: {
-            work_hours?: components["schemas"]["WorkHoursPatch"] | null;
-            sleep?: components["schemas"]["TimeRangePatch"] | null;
-            lunch?: components["schemas"]["DayRangePatch"] | null;
             /**
              * Default Action Type Id
              * @description Тип действия задач и дел без своего типа; null — без типа
@@ -5849,6 +6165,7 @@ export interface components {
              * @description Закончить за N дней до дедлайна
              */
             deadline_buffer_days?: number | null;
+            /** @description Для режимов дня без «тихие часы — сон режима» */
             quiet_hours?: components["schemas"]["TimeRangePatch"] | null;
             schedule?: components["schemas"]["SchedulePatch"] | null;
             reminders?: components["schemas"]["RemindersPatch"] | null;
@@ -5932,28 +6249,6 @@ export interface components {
             planned: components["schemas"]["BacklogRead"][];
             /** Suggestions */
             suggestions: components["schemas"]["BacklogRead"][];
-        };
-        /** WorkHours */
-        WorkHours: {
-            /**
-             * @default {
-             *       "start": "09:00",
-             *       "end": "21:00"
-             *     }
-             */
-            weekdays: components["schemas"]["DayRange"];
-            /**
-             * @default {
-             *       "start": "11:00",
-             *       "end": "19:00"
-             *     }
-             */
-            weekends: components["schemas"]["DayRange"];
-        };
-        /** WorkHoursPatch */
-        WorkHoursPatch: {
-            weekdays?: components["schemas"]["DayRangePatch"] | null;
-            weekends?: components["schemas"]["DayRangePatch"] | null;
         };
     };
     responses: never;
@@ -11738,6 +12033,955 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_days: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileDay"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_day: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileDayPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileDay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileRuleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"];
+                };
             };
             /** @description Bad Request */
             400: {

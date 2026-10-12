@@ -4,9 +4,23 @@ from datetime import timedelta
 
 import pytest
 
-from app.domain.planner import Block, Busy, FixedBlock, PlanSettings, Quota, RiskReason
+from app.domain.planner import Block, Busy, FixedBlock, Quota, RiskReason
 
-from .test_planner import FRI, MON, NO_REST, STUDY, SUN, TUE, WED, at, parts, plan, risks, start
+from .test_planner import (
+    FRI,
+    MON,
+    NO_REST,
+    STUDY,
+    SUN,
+    TUE,
+    WED,
+    at,
+    days_like,
+    parts,
+    plan,
+    risks,
+    start,
+)
 
 NEXT_MON = MON + timedelta(days=7)
 TAG = "project:vkr"
@@ -99,7 +113,8 @@ def test_quota_beats_backlog(limit):
         reserve(0),
         busy=busy,
         quotas=(Quota("q", TAG, MON, NEXT_MON, 90),),
-        settings=PlanSettings(lunch=None, free_evenings_per_week=0, weekend_half_days=0),
+        settings=NO_REST,
+        days=days_like(lunch=None),
         time_limit_s=limit,
     )
     assert parts(result, "res0") == [(at(MON, 14), at(MON, 15, 30))]
@@ -117,7 +132,8 @@ def test_quota_does_not_make_task_late(limit):
         reserve(0, 120),
         busy=busy,
         quotas=(Quota("q", TAG, MON, TUE, 120),),
-        settings=PlanSettings(lunch=None, free_evenings_per_week=0, weekend_half_days=0),
+        settings=NO_REST,
+        days=days_like(lunch=None),
         time_limit_s=limit,
     )
     assert parts(result, "task") == [(at(MON, 14), at(MON, 16))]

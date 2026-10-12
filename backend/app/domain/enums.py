@@ -35,6 +35,16 @@ class PatternKind(StrEnum):
     once = "once"
 
 
+class DayRuleKind(StrEnum):
+    """Правило назначения режима дня (domain/dayprofile.py). Приоритет: dates >
+    event_day / day_after (по позиции) > weekdays > первый режим."""
+
+    dates = "dates"  # конкретные даты: «завтра — выходной», «отпуск 1–14 августа»
+    event_day = "event_day"  # в день, когда начинается событие типа
+    day_after = "day_after"  # на следующий день после начала события типа («после ночной»)
+    weekdays = "weekdays"  # по дням недели
+
+
 # ---------- справочники (M4.1) ----------
 
 

@@ -17,6 +17,7 @@ from app.domain.enums import BacklogCondition
 from app.domain.planner import Window
 
 WEEKDAY_DAYTIME = (Window(frozenset({1, 2, 3, 4, 5}), time(9), time(18)),)
+ALL_WEEK = (Window(frozenset(range(1, 8)), time(0), time(0)),)
 DAY = 24 * 60
 WEEK = 7 * DAY
 # Оценка дела без оценки
@@ -119,6 +120,23 @@ def condition_windows(
     if hours:
         result = intersect_windows(result, hours)
     return tuple(result)
+
+
+def item_windows(
+    own: Sequence[Window], conditions: Iterable[str], hours: Sequence[Window] = ()
+) -> tuple[tuple[Window, ...], bool]:
+    """Окна дела для планировщика и флаг `within_work`.
+
+    `own` — своё окно дела или окно его типа действия. Без них дело идёт в общие
+    рабочие окна дня (режим дня): чипы тогда дают окна, которые планировщик ещё
+    пересекает с рабочими (`within_work`), а без чипов окон нет вовсе.
+    """
+    if own:
+        return condition_windows(own, conditions, hours), False
+    limited = condition_windows(ALL_WEEK, conditions, hours)
+    if limited == ALL_WEEK:
+        return (), False
+    return limited, True
 
 
 # ---------- приоритет и выбор ----------

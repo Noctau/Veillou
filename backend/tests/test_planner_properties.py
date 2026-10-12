@@ -1,4 +1,5 @@
-"""M8.6: property-тесты планировщика и бенчмарк (M15.3 — лимиты нагрузки).
+"""M8.6: property-тесты планировщика и бенчмарк (M15.3 — лимиты нагрузки,
+M18.2 — режимы дня: размещения внутри своих `DaySpec`).
 
 Инварианты проверяются по исходному входу (datetime и «настенное» время),
 независимо от сетки и подготовки внутри планировщика.
@@ -15,11 +16,14 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from app.core.time import get_tz, wall_to_utc
+from app.domain import dayprofile
+from app.domain.dayprofile import Profile
 from app.domain.planner import (
     Block,
     BlockId,
     Budget,
     Busy,
+    DaySpec,
     FixedBlock,
     PlanInput,
     PlanResult,
@@ -42,6 +46,28 @@ WINDOWS = [
 CLASSES = [(time(9), time(10, 35)), (time(10, 45), time(12, 20)), (time(13), time(14, 35))]
 # «LX» во входе нет — такой лимит ничего не ограничивает
 BUDGET_IDS = ["L0", "L1", "L2", "LX"]
+# Режимы дня: будни, выходные, «после ночной» (подъём 15:00), сова (отбой 02:00)
+PROFILES = [
+    dayprofile.FALLBACK_WEEKDAYS,
+    dayprofile.FALLBACK_WEEKENDS,
+    Profile(
+        "after_night",
+        "После ночной",
+        wake=time(15),
+        sleep=time(23, 30),
+        work=((time(16), time(22)),),
+        rest_evening_ok=False,
+    ),
+    Profile(
+        "owl",
+        "Сова",
+        wake=time(10),
+        sleep=time(2),
+        lunch=(time(14), time(15)),
+        work=((time(11), time(13)), (time(18), time(1, 30))),
+        rest_halfday_ok=True,
+    ),
+]
 
 
 def at(d: date, t: time) -> datetime:
@@ -127,6 +153,12 @@ def plan_inputs(draw) -> PlanInput:
         free_evenings_per_week=draw(st.integers(0, 3)),
         weekend_half_days=draw(st.integers(0, 2)),
     )
+    days: tuple[DaySpec, ...] = ()
+    if draw(st.booleans()):
+        days = tuple(
+            dayprofile.day_spec(d, draw(st.sampled_from(PROFILES)), TZ)
+            for d in (MON - timedelta(days=2) + timedelta(days=i) for i in range(30))
+        )
     return PlanInput(
         now=now,
         tz=TZ,
@@ -134,6 +166,7 @@ def plan_inputs(draw) -> PlanInput:
         busy=tuple(busy),
         fixed=tuple(fixed),
         settings=plan_settings,
+        days=days,
         budgets=budgets,
     )
 
@@ -149,27 +182,42 @@ def _daily(d: date, start: time, end: time) -> tuple[datetime, datetime]:
     return at(d, start), at(d + timedelta(days=1) if end <= start else d, end)
 
 
-def _within_windows(block: Block, s: PlanSettings, start: datetime, end: datetime) -> bool:
-    windows = block.windows or (
-        Window(WEEKDAYS, s.work_weekdays.start, s.work_weekdays.end),
-        Window(frozenset({6, 7}), s.work_weekends.start, s.work_weekends.end),
-    )
+def _spec(inp: PlanInput, d: date) -> DaySpec:
+    return next((x for x in inp.days if x.date == d), None) or dayprofile.fallback_spec(d, TZ)
+
+
+def _within_windows(inp: PlanInput, block: Block, start: datetime, end: datetime) -> bool:
+    """Внутри окна блока (и рабочего окна дня, если `within_work`); без окон — внутри
+    рабочего окна своего дня."""
     first = start.astimezone(TZ).date() - timedelta(days=1)
-    for i in range(2):
-        d = first + timedelta(days=i)
-        for w in windows:
+    near = [first + timedelta(days=i) for i in range(2)]
+    in_work = any(lo <= start and end <= hi for d in near for lo, hi in _spec(inp, d).work)
+    if not block.windows:
+        return in_work
+    for d in near:
+        for w in block.windows:
             if d.isoweekday() in w.weekdays:
                 lo, hi = _daily(d, w.start, w.end)
                 if lo <= start and end <= hi:
-                    return True
+                    return in_work or not block.within_work
     return False
 
 
-def _planning_day(dt: datetime, s: PlanSettings) -> date:
-    """День планировщика: начинается с подъёма."""
-    local = dt.astimezone(TZ)
-    wake = datetime.combine(local.date(), s.sleep.end, TZ)
-    return local.date() if local >= wake else local.date() - timedelta(days=1)
+def _planning_day(inp: PlanInput, dt: datetime) -> date:
+    """День планировщика: начинается с подъёма своего режима."""
+    d = dt.astimezone(TZ).date()
+    return d if dt >= _spec(inp, d).wake else d - timedelta(days=1)
+
+
+def _asleep_or_lunch(inp: PlanInput, start: datetime, end: datetime) -> bool:
+    d = start.astimezone(TZ).date()
+    for day in (d - timedelta(days=1), d):
+        spec, after = _spec(inp, day), _spec(inp, day + timedelta(days=1))
+        if _overlap(start, end, spec.sleep, after.wake):
+            return True
+        if spec.lunch and _overlap(start, end, *spec.lunch):
+            return True
+    return False
 
 
 def check_invariants(inp: PlanInput, result: PlanResult) -> None:
@@ -188,12 +236,12 @@ def check_invariants(inp: PlanInput, result: PlanResult) -> None:
     fixed_load: Counter = Counter()
     for item in (*inp.fixed, *inp.busy):
         for budget in item.budgets & known:
-            day = _planning_day(item.start, s)
+            day = _planning_day(inp, item.start)
             fixed_load[(budget, day)] += (item.end - item.start).total_seconds() / 60
     load: Counter = Counter(fixed_load)
     per_group: dict = {}
     for f in inp.fixed:
-        per_group.setdefault((f.group_id, _planning_day(f.start, s)), set()).add(f.id)
+        per_group.setdefault((f.group_id, _planning_day(inp, f.start)), set()).add(f.id)
 
     for block_id, parts in by_block.items():
         block = blocks[block_id]
@@ -203,16 +251,13 @@ def check_invariants(inp: PlanInput, result: PlanResult) -> None:
         assert len(parts) <= (2 if block.splittable else 1)
         for p in parts:
             assert p.start >= inp.now
-            assert _within_windows(block, s, p.start, p.end), f"{block_id} вне окна: {p}"
+            assert _within_windows(inp, block, p.start, p.end), f"{block_id} вне окна: {p}"
             for b in inp.busy:
                 assert not _overlap(p.start, p.end, b.start, b.end), f"{block_id} на занятом"
             for f in inp.fixed:
                 assert not _overlap(p.start, p.end, f.start, f.end)
-            d = p.start.astimezone(TZ).date()
-            for day in (d - timedelta(days=1), d):
-                assert not _overlap(p.start, p.end, *_daily(day, s.sleep.start, s.sleep.end))
-                assert not _overlap(p.start, p.end, *_daily(day, s.lunch.start, s.lunch.end))
-            day = _planning_day(p.start, s)
+            assert not _asleep_or_lunch(inp, p.start, p.end), f"{block_id} во сне / обеде"
+            day = _planning_day(inp, p.start)
             for budget in block.budgets & known:
                 load[(budget, day)] += (p.end - p.start).total_seconds() / 60
             if block.group_id is not None:

@@ -10,6 +10,7 @@ import { useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useDayProfileDays } from '@/features/dayprofiles/useDayProfiles'
 import { useNow } from '@/features/today/useNow'
 import { KIND_LABEL, UNTYPED_LAYER } from '@/lib/terms'
 import { addDaysIso, toWallIso } from '@/lib/time'
@@ -97,7 +98,13 @@ export function CalendarView() {
   const now = useNow(60_000)
   const calendarRef = useRef<FullCalendar>(null)
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs)
-  const [range, setRange] = useState<{ from: string; to: string; title: string } | null>(null)
+  const [range, setRange] = useState<{
+    from: string
+    to: string
+    title: string
+    firstDay: string
+    lastDay: string
+  } | null>(null)
   const [opened, setOpened] = useState<CalendarEvent | null>(null)
   const [draft, setDraft] = useState<EventDraft | null>(null)
   const eventView = useEventView()
@@ -105,6 +112,8 @@ export function CalendarView() {
   const view = prefs.view ?? defaultView()
   const hidden = useMemo(() => new Set(prefs.hidden ?? []), [prefs.hidden])
   const { data } = useCalendar(range?.from, range?.to)
+  const { data: dayProfiles } = useDayProfileDays(range?.firstDay ?? '', range?.lastDay ?? '', !!range)
+  const profileOf = useMemo(() => new Map((dayProfiles ?? []).map((d) => [d.date, d.name])), [dayProfiles])
   const update = useUpdateEvent()
 
   const updatePrefs = (next: Prefs) => {
@@ -161,7 +170,13 @@ export function CalendarView() {
   const api = () => calendarRef.current?.getApi()
 
   const onDatesSet = (arg: DatesSetArg) =>
-    setRange({ from: fcToUtc(arg.start, tz), to: fcToUtc(arg.end, tz), title: arg.view.title })
+    setRange({
+      from: fcToUtc(arg.start, tz),
+      to: fcToUtc(arg.end, tz),
+      title: arg.view.title,
+      firstDay: arg.start.toISOString().slice(0, 10),
+      lastDay: addDaysIso(arg.end.toISOString().slice(0, 10), -1),
+    })
 
   const onEventClick = (arg: EventClickArg) => {
     const source = arg.event.extendedProps.source as CalendarEvent | undefined
@@ -266,6 +281,18 @@ export function CalendarView() {
           eventResize={onEventMove}
           snapDuration="00:15:00"
           eventLongPressDelay={400}
+          dayHeaderContent={(arg) => {
+            // Режим дня — под датой (в неделе и дне; в месяце заголовки — дни недели)
+            const profile = arg.view.type.startsWith('timeGrid')
+              ? profileOf.get(arg.date.toISOString().slice(0, 10))
+              : undefined
+            return (
+              <div className="flex flex-col items-center leading-tight">
+                <span>{arg.text}</span>
+                {profile && <span className="text-[10px] font-normal text-muted-foreground">{profile}</span>}
+              </div>
+            )
+          }}
           eventContent={(arg) => (arg.event.display === 'background' ? undefined : <EventContent arg={arg} view={eventView} />)}
         />
       </div>
