@@ -13,8 +13,9 @@
   «утром / днём / вечером», «с 14 до 16»; длительность «на 2 часа», «на 30 мин»;
 - сфера — по названию, короткому имени и синонимам, с учётом падежей
   («по климатологии», «клим»);
-- тип задачи и тип действия — по словарям слов, которые передаёт сервис
-  (сейчас — словари сида справочников, services/catalog.py; M21.1 — синонимы).
+- типы задач, действий и занятости — по названиям и синонимам справочников
+  пользователя (`Term`), тоже с учётом падежей: «реферат» ~ «реферата»,
+  «записаться» ~ «записалась», «слово*» — любое окончание, «№» — как есть.
 
 Дедлайн (`is_deadline`) — если перед датой стоит «до» / «к» или есть слово
 «дедлайн / срок / сдать». Дата без времени как дедлайн — конец дня (23:59).
@@ -22,7 +23,7 @@
 
 import datetime as dt
 import re
-from collections.abc import Hashable, Sequence
+from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from enum import StrEnum
@@ -43,6 +44,14 @@ class AreaRef:
 
 
 @dataclass(frozen=True)
+class Term:
+    """Строка справочника для словаря быстрого ввода: id и слова (название, синонимы)."""
+
+    id: Hashable
+    names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ParseResult:
     title: str
     date: dt.date | None = None
@@ -53,9 +62,10 @@ class ParseResult:
     deadline: datetime | None = None
     is_deadline: bool = False
     area_id: Hashable | None = None
-    # id типов из словарей слов, которые передал сервис (`task_words`, `action_words`)
+    # id типов из словарей, которые передал сервис
     task_type: Hashable | None = None
     action_type: Hashable | None = None
+    event_type: Hashable | None = None
     # Тип действия не узнан, но похоже на задачу — сервис подставит тип по умолчанию
     default_action: bool = False
     kind_hint: KindHint = KindHint.backlog
@@ -105,20 +115,120 @@ WEEKDAYS: list[tuple[int, str]] = [
     (6, r"вс|воскресень[еяю]"),
 ]
 
-# Глаголы учёбы без явного типа: тоже задание
-STUDY_VERBS = r"сдать|написать|решить|подготовить|выучить|доделать|оформить|отправить"
+# Глаголы результата: «сдать», «отправить» — это задача со сроком, даже без типа.
+# Грамматика, как предлоги «до» / «к», а не словарь предметной области
+TASK_VERBS = r"сдать|написать|решить|подготовить|выучить|доделать|оформить|отправить"
 
-# Словарь: (id типа, regex слов). Порядок важен: первое совпадение побеждает
-Words = Sequence[tuple[Hashable, str]]
+# Окончания существительных и прилагательных после основы («реферат|ом», «курсов|ую»)
+_ENDINGS = sorted(
+    {
+        *"аяоеуюыиьй",
+        *[
+            "ой",
+            "ей",
+            "ою",
+            "ею",
+            "ам",
+            "ям",
+            "ами",
+            "ями",
+            "ах",
+            "ях",
+            "ом",
+            "ем",
+            "ов",
+            "ев",
+            "ью",
+            "ья",
+            "ьи",
+            "ье",
+            "ьям",
+            "ьями",
+            "ьях",
+        ],
+        *[
+            "ая",
+            "яя",
+            "ую",
+            "юю",
+            "ое",
+            "ее",
+            "ые",
+            "ие",
+            "ых",
+            "их",
+            "ым",
+            "им",
+            "ыми",
+            "ими",
+            "ого",
+            "его",
+            "ому",
+            "ему",
+            "ий",
+            "ый",
+            "ия",
+            "ию",
+            "ии",
+        ],
+    },
+    key=len,
+    reverse=True,
+)
+_ENDING = "(?:" + "|".join(_ENDINGS) + ")?"
+_VOWELS = "аеиоуыэюяйь"
+_ALNUM = "0-9a-zа-я"
 
 
-def guess(text: str, words: Words) -> Hashable | None:
-    """Тип по словам словаря: «записаться к врачу» → id типа «учреждения»."""
-    normalized = _normalize(text)
-    for type_id, pattern in words:
-        if re.search(_b(f"(?:{pattern})"), normalized):
-            return type_id
-    return None
+def _word_pattern(word: str) -> str:
+    """Слово справочника → regex с падежами. «слово*» — любое окончание."""
+    if word.endswith("*") and len(word) > 1:
+        return re.escape(word[:-1]) + f"[{_ALNUM}]*"
+    if not re.fullmatch("[а-я]+", word) or len(word) <= 3:
+        return re.escape(word)
+    # Глагол: «записа|лась», «отнес|у»; «часть», «сеть» — не глаголы
+    if m := re.fullmatch(r"(.{3,}?[аеиоуыя])(ться|ть)|(.{3,}?)(сти|зти|чь)", word):
+        return re.escape(m[1] or m[3]) + "[а-я]{0,4}"
+    stem = word
+    while len(stem) > 3 and len(word) - len(stem) < 2 and stem[-1] in _VOWELS:
+        stem = stem[:-1]
+    return re.escape(stem) + _ENDING
+
+
+def term_pattern(name: str) -> str | None:
+    """Название или синоним → regex фразы (слова через пробелы) с границами слова."""
+    words = _normalize(name).split()
+    if not words:
+        return None
+    body = r"\s+".join(_word_pattern(w) for w in words)
+    left = rf"(?<![{_ALNUM}])" if re.match(f"[{_ALNUM}]", words[0]) else ""
+    right = rf"(?![{_ALNUM}])" if re.search(f"[{_ALNUM}*]$", words[-1]) else ""
+    return left + body + right
+
+
+def _patterns(terms: Sequence[Term]) -> list[tuple[Hashable, str]]:
+    return [
+        (t.id, pattern)
+        for t in terms
+        for name in t.names
+        if (pattern := term_pattern(name)) is not None
+    ]
+
+
+def _best(text: str, terms: Sequence[Term], free: Callable[[int, int], bool]) -> Hashable | None:
+    """Тип, чьё слово совпало длиннее всех («проверить дз» важнее «дз»); при равной
+    длине — первый по порядку справочника."""
+    best: tuple[int, Hashable] | None = None
+    for type_id, pattern in _patterns(terms):
+        for m in re.finditer(pattern, text):
+            if free(m.start(), m.end()) and (best is None or m.end() - m.start() > best[0]):
+                best = (m.end() - m.start(), type_id)
+    return best[1] if best else None
+
+
+def guess(text: str, terms: Sequence[Term]) -> Hashable | None:
+    """Тип по словам справочника: «записаться к врачу» → id типа «учреждения»."""
+    return _best(_normalize(text), terms, lambda a, b: True)
 
 
 WORD = r"[0-9a-zа-я]+"
@@ -210,7 +320,10 @@ def _word_match(name: str, token: str) -> bool:
     # Короткое имя — начало слова: «клим» → «климатологии»
     if len(name) >= 4 and token.startswith(name):
         return True
-    # Падежи: «климатология» ~ «климатологии»
+    # Падежи: «климатология» ~ «климатологии», «маша» ~ «маше»
+    if len(name) == 4:
+        short = name[:-1] if name[-1] in _VOWELS else name
+        return token.startswith(short) and len(token) - len(short) <= 2
     stem = name[:-2] if len(name) >= 6 else name[:-1] if len(name) >= 5 else None
     return stem is not None and token.startswith(stem) and len(token) - len(stem) <= 4
 
@@ -252,13 +365,14 @@ def parse(
     text: str,
     now: datetime,
     areas: Sequence[AreaRef] = (),
-    task_words: Words = (),
-    action_words: Words = (),
+    task_types: Sequence[Term] = (),
+    action_types: Sequence[Term] = (),
+    event_types: Sequence[Term] = (),
 ) -> ParseResult:
     """Разбирает строку быстрого ввода. `now` — aware, в TZ пользователя.
 
-    `task_words` / `action_words` — словари типов задач и действий пользователя
-    (id, regex слов); пустые — типы не угадываются.
+    `task_types` / `action_types` / `event_types` — справочники пользователя
+    (названия и синонимы); пустые — типы не угадываются.
     """
     if now.tzinfo is None:
         raise ValueError("now должен быть с часовым поясом")
@@ -283,10 +397,10 @@ def parse(
             at, end_at = t1, t2
             sc.take(m)
 
-    # «через 2 недели», «через две недели», «через час», «через пару дней»
+    # «через 2 недели», «через две недели», «через час», «через пару дней»  lexicon-ok
     words = "|".join(NUMBER_WORDS)
     rel = (
-        rf"через\s+(?P<n>\d+|пару|полчаса|{words})?\s*"
+        rf"через\s+(?P<n>\d+|пару|полчаса|{words})?\s*"  # lexicon-ok
         r"(?P<unit>мин[а-я]*|час[а-я]*|ч|дн[а-я]*|день|недел[а-я]*|нед|мес[а-я]*)?"
     )
     if (m := sc.find(_b(rel))) and (m["unit"] or m["n"] == "полчаса"):
@@ -294,7 +408,8 @@ def parse(
         if n_raw in NUMBER_WORDS:
             n = NUMBER_WORDS[n_raw]
         else:
-            n = 2 if n_raw == "пару" else 1 if n_raw in (None, "полчаса") else int(n_raw)
+            couple = n_raw == "пару"  # lexicon-ok: «через пару дней»
+            n = 2 if couple else 1 if n_raw in (None, "полчаса") else int(n_raw)
         unit = m["unit"] or "мин"
         if n_raw == "полчаса":
             n, unit = 30, "мин"
@@ -435,12 +550,9 @@ def parse(
         day = today if at > now.time() else today + timedelta(days=1)
 
     # Тип задачи и сфера — по тексту без дат (в названии остаются)
-    task_type: Hashable | None = None
-    for candidate, pattern in task_words:
-        if sc.find(_b(f"(?:{pattern})")):
-            task_type = candidate
-            break
-    has_study_verb = sc.find(_b(f"(?:{STUDY_VERBS})")) is not None
+    task_type = _best(sc.text, task_types, sc.free)
+    event_type = _best(sc.text, event_types, sc.free)
+    has_task_verb = sc.find(_b(f"(?:{TASK_VERBS})")) is not None
 
     area_id: Hashable | None = None
     if found := _match_area(sc, areas):
@@ -460,21 +572,24 @@ def parse(
     if day is not None:
         deadline = datetime.combine(day, at or END_OF_DAY, tzinfo=now.tzinfo)
 
-    if has_study_verb and day is not None and at is None:
+    if has_task_verb and day is not None and at is None:
         is_deadline = True
 
-    action_type = guess(title, action_words)
+    action_type = guess(title, action_types)
     default_action = action_type is None and bool(
-        task_type is not None or area_id is not None or has_study_verb
+        task_type is not None or area_id is not None or has_task_verb
     )
 
     kind: KindHint
-    if at is not None and not is_deadline and task_type is None:
+    # Тип занятости («созвон», «смена») со временем — событие, даже если похоже на задачу
+    if at is not None and not is_deadline and (task_type is None or event_type is not None):
         kind = KindHint.event
     elif task_type is not None or area_id is not None or is_deadline:
         kind = KindHint.task
     else:
         kind = KindHint.backlog
+    if kind != KindHint.event:
+        event_type = None  # тип занятости — только у события
 
     return ParseResult(
         title=title,
@@ -487,6 +602,7 @@ def parse(
         area_id=area_id,
         task_type=task_type,
         action_type=action_type,
+        event_type=event_type,
         default_action=default_action,
         kind_hint=kind,
     )
@@ -498,16 +614,18 @@ def parse(
 AI_TEXT_LEN = 80
 
 
-def needs_ai(text: str, p: ParseResult) -> bool:
+def needs_ai(text: str, p: ParseResult, *, has_areas: bool = True) -> bool:
     """Разбор неуверенный — стоит спросить ИИ.
 
     Длинный или многострочный текст (пересланное задание) или задание без
-    срока либо без сферы. Короткие дела и события с временем ИИ не нужны.
+    срока либо без сферы (если сферы у пользователя вообще есть). Короткие дела
+    и события с временем ИИ не нужны.
     """
     text = text.strip()
     if "\n" in text or len(text) > AI_TEXT_LEN:
         return True
-    return p.kind_hint == KindHint.task and (p.date is None or p.area_id is None)
+    no_area = has_areas and p.area_id is None
+    return p.kind_hint == KindHint.task and (p.date is None or no_area)
 
 
 _DATE_CUE = re.compile(

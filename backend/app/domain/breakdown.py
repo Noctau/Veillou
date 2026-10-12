@@ -33,7 +33,7 @@ class RawStep:
     order: int
     title: str
     estimate_min: int
-    action_type: str
+    action_type: str | None  # название типа действия пользователя
     depends_on: tuple[int, ...] = ()
     note: str = ""
 
@@ -44,7 +44,7 @@ class DraftStep:
 
     title: str
     estimate_min: int
-    action_type: str
+    action_type: str | None
     depends_on: tuple[int, ...] = ()
     note: str = ""
 

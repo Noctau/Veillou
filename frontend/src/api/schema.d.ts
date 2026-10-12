@@ -2154,6 +2154,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Config
+         * @description Вся конфигурация (сферы, занятость, расписание, режимы, лимиты, типы,
+         *     категории, автозадачи) одной сборкой со ссылками `ref` вместо id.
+         */
+        get: operations["export_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Config
+         * @description Импорт сборки поверх текущей конфигурации: новое добавляется, совпадающее по
+         *     названию обновляется, ничего не удаляется. `dry_run=true` (по умолчанию) — только
+         *     отчёт, что добавится и изменится.
+         */
+        post: operations["import_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/ai-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Ai Setup
+         * @description «Настроить по описанию»: ИИ собирает черновик сборки (джоба `ai.setup`,
+         *     результат — `GET /jobs/{id}`, тип `setup`). Ничего не меняется до импорта.
+         */
+        post: operations["start_ai_setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2176,6 +2240,11 @@ export interface components {
              * @default false
              */
             prefer_morning: boolean;
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
+            synonyms?: string[];
         };
         /**
          * ActionTypeKey
@@ -2203,6 +2272,8 @@ export interface components {
              * @description Лёгкое предпочтение утра в плане
              */
             prefer_morning: boolean;
+            /** Synonyms */
+            synonyms: string[];
             /** Position */
             position: number;
         };
@@ -2216,6 +2287,8 @@ export interface components {
             default_category_id?: string | null;
             /** Prefer Morning */
             prefer_morning?: boolean | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
             /** Position */
             position?: number | null;
         };
@@ -2728,6 +2801,587 @@ export interface components {
             /** Minutes */
             minutes: number;
         };
+        /** BundleActionType */
+        "BundleActionType-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Input"][];
+            /** Category */
+            category?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /** BundleActionType */
+        "BundleActionType-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Output"][];
+            /** Category */
+            category?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /** BundleArea */
+        BundleArea: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Area Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            area_type: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name?: string | null;
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Synonyms */
+            synonyms?: string[];
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** BundleAreaType */
+        BundleAreaType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /** Sections */
+            sections?: components["schemas"]["AreaSection"][];
+        };
+        /** BundleBudget */
+        BundleBudget: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Minutes Per Day */
+            minutes_per_day: number;
+            /** Action Types */
+            action_types?: string[];
+            /** Event Types */
+            event_types?: string[];
+        };
+        /** BundleCategory */
+        BundleCategory: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+        };
+        /** BundleChange */
+        BundleChange: {
+            /** Section */
+            section: string;
+            /** Ref */
+            ref: string;
+            /**
+             * Name
+             * @description Как показать человеку: название кирпича
+             */
+            name: string;
+            /**
+             * Fields
+             * @description changed: какие поля другие
+             */
+            fields: string[];
+        };
+        /** BundleDayOff */
+        BundleDayOff: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** BundleDayProfile */
+        "BundleDayProfile-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /**
+             * Wake
+             * Format: time
+             */
+            wake: string;
+            /**
+             * Sleep
+             * Format: time
+             */
+            sleep: string;
+            lunch?: components["schemas"]["Lunch-Input"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span-Input"][];
+            /**
+             * Rest Evening Ok
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
+        };
+        /** BundleDayProfile */
+        "BundleDayProfile-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Wake */
+            wake: string;
+            /** Sleep */
+            sleep: string;
+            lunch?: components["schemas"]["Lunch-Output"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span-Output"][];
+            /**
+             * Rest Evening Ok
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
+        };
+        /** BundleDayProfileRule */
+        BundleDayProfileRule: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Profile
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            profile: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Weekdays */
+            weekdays?: number[];
+        };
+        /** BundleEventRule */
+        BundleEventRule: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Event Type */
+            event_type?: string | null;
+            /** Schedule Rule */
+            schedule_rule?: string | null;
+            /** @default before */
+            when: components["schemas"]["EventRuleWhen"];
+            /** Title Template */
+            title_template: string;
+            /**
+             * Estimate Min
+             * @default 30
+             */
+            estimate_min: number;
+            /** Action Type */
+            action_type?: string | null;
+            /** Task Type */
+            task_type?: string | null;
+            /**
+             * Offset Min
+             * @default 0
+             */
+            offset_min: number;
+            /** Within Days */
+            within_days?: number | null;
+            /**
+             * Until Next
+             * @default false
+             */
+            until_next: boolean;
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** BundleEventType */
+        BundleEventType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural?: string | null;
+            /** @default calendar */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #64748b
+             */
+            color: string;
+            /**
+             * Buffer Before Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_before_min: number;
+            /**
+             * Buffer After Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_after_min: number;
+            /**
+             * Merge Buffers
+             * @default false
+             */
+            merge_buffers: boolean;
+            /** Remind Before Min */
+            remind_before_min?: number | null;
+            /** Remind Channels */
+            remind_channels?: components["schemas"]["Channel"][];
+            /**
+             * Show Now Next
+             * @default false
+             */
+            show_now_next: boolean;
+            /**
+             * Is Rest
+             * @default false
+             */
+            is_rest: boolean;
+            /**
+             * Supports Prep
+             * @default false
+             */
+            supports_prep: boolean;
+            /**
+             * Location Label
+             * @default
+             */
+            location_label: string;
+            /** Default Area Type */
+            default_area_type?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /**
+         * BundleImportResult
+         * @description Что добавится / изменится / уже есть. dry_run — ничего не записано.
+         */
+        BundleImportResult: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** Added */
+            added: components["schemas"]["BundleChange"][];
+            /** Changed */
+            changed: components["schemas"]["BundleChange"][];
+            /** Skipped */
+            skipped: components["schemas"]["BundleChange"][];
+        };
+        /** BundlePeriod */
+        BundlePeriod: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Cycle Weeks
+             * @default 1
+             */
+            cycle_weeks: number;
+            /**
+             * First Cycle Week
+             * @default 1
+             */
+            first_cycle_week: number;
+            /** Pauses */
+            pauses?: components["schemas"]["Pause"][];
+        };
+        /** BundleScheduleRule */
+        "BundleScheduleRule-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Event Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            event_type: string;
+            /** Area */
+            area?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Slot Grid */
+            slot_grid?: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** BundleScheduleRule */
+        "BundleScheduleRule-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Event Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            event_type: string;
+            /** Area */
+            area?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Slot Grid */
+            slot_grid?: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** BundleSettings */
+        BundleSettings: {
+            /**
+             * Default Action Type
+             * @description Тип действия по умолчанию для задач и дел
+             */
+            default_action_type?: string | null;
+        };
+        /** BundleSlotGrid */
+        "BundleSlotGrid-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Schedules */
+            schedules: components["schemas"]["SlotGridDay-Input"][];
+        };
+        /** BundleSlotGrid */
+        "BundleSlotGrid-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Schedules */
+            schedules: components["schemas"]["SlotGridDay-Output"][];
+        };
+        /** BundleTaskType */
+        BundleTaskType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /** Synonyms */
+            synonyms?: string[];
+            /** Action Type */
+            action_type?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            /** Deadline Rule */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
+        };
         /** CalendarDayOff */
         CalendarDayOff: {
             /**
@@ -2836,6 +3490,88 @@ export interface components {
             ready: boolean;
             /** Reason */
             reason?: string | null;
+        };
+        /**
+         * ConfigBundle
+         * @description Конфигурация целиком. Разделы — в порядке зависимостей при импорте.
+         */
+        "ConfigBundle-Input": {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Categories */
+            categories?: components["schemas"]["BundleCategory"][];
+            /** Action Types */
+            action_types?: components["schemas"]["BundleActionType-Input"][];
+            /** Task Types */
+            task_types?: components["schemas"]["BundleTaskType"][];
+            /** Area Types */
+            area_types?: components["schemas"]["BundleAreaType"][];
+            /** Periods */
+            periods?: components["schemas"]["BundlePeriod"][];
+            /** Days Off */
+            days_off?: components["schemas"]["BundleDayOff"][];
+            /** Slot Grids */
+            slot_grids?: components["schemas"]["BundleSlotGrid-Input"][];
+            /** Areas */
+            areas?: components["schemas"]["BundleArea"][];
+            /** Event Types */
+            event_types?: components["schemas"]["BundleEventType"][];
+            /** Budgets */
+            budgets?: components["schemas"]["BundleBudget"][];
+            /** Day Profiles */
+            day_profiles?: components["schemas"]["BundleDayProfile-Input"][];
+            /** Day Profile Rules */
+            day_profile_rules?: components["schemas"]["BundleDayProfileRule"][];
+            /** Schedule Rules */
+            schedule_rules?: components["schemas"]["BundleScheduleRule-Input"][];
+            /** Event Rules */
+            event_rules?: components["schemas"]["BundleEventRule"][];
+            settings?: components["schemas"]["BundleSettings"];
+        };
+        /**
+         * ConfigBundle
+         * @description Конфигурация целиком. Разделы — в порядке зависимостей при импорте.
+         */
+        "ConfigBundle-Output": {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Categories */
+            categories?: components["schemas"]["BundleCategory"][];
+            /** Action Types */
+            action_types?: components["schemas"]["BundleActionType-Output"][];
+            /** Task Types */
+            task_types?: components["schemas"]["BundleTaskType"][];
+            /** Area Types */
+            area_types?: components["schemas"]["BundleAreaType"][];
+            /** Periods */
+            periods?: components["schemas"]["BundlePeriod"][];
+            /** Days Off */
+            days_off?: components["schemas"]["BundleDayOff"][];
+            /** Slot Grids */
+            slot_grids?: components["schemas"]["BundleSlotGrid-Output"][];
+            /** Areas */
+            areas?: components["schemas"]["BundleArea"][];
+            /** Event Types */
+            event_types?: components["schemas"]["BundleEventType"][];
+            /** Budgets */
+            budgets?: components["schemas"]["BundleBudget"][];
+            /** Day Profiles */
+            day_profiles?: components["schemas"]["BundleDayProfile-Output"][];
+            /** Day Profile Rules */
+            day_profile_rules?: components["schemas"]["BundleDayProfileRule"][];
+            /** Schedule Rules */
+            schedule_rules?: components["schemas"]["BundleScheduleRule-Output"][];
+            /** Event Rules */
+            event_rules?: components["schemas"]["BundleEventRule"][];
+            settings?: components["schemas"]["BundleSettings"];
         };
         /**
          * Contact
@@ -2954,12 +3690,12 @@ export interface components {
              */
             sleep: string;
             /** @description Обед; null — без обеда */
-            lunch?: components["schemas"]["Lunch"] | null;
+            lunch?: components["schemas"]["Lunch-Input"] | null;
             /**
              * Work Windows
              * @description Когда вообще можно ставить дела
              */
-            work_windows?: components["schemas"]["Span"][];
+            work_windows?: components["schemas"]["Span-Input"][];
             /**
              * Rest Evening Ok
              * @description Может быть свободным вечером
@@ -3112,9 +3848,9 @@ export interface components {
             /** Sleep */
             sleep?: string | null;
             /** @description null — без обеда */
-            lunch?: components["schemas"]["Lunch"] | null;
+            lunch?: components["schemas"]["Lunch-Input"] | null;
             /** Work Windows */
-            work_windows?: components["schemas"]["Span"][] | null;
+            work_windows?: components["schemas"]["Span-Input"][] | null;
             /** Rest Evening Ok */
             rest_evening_ok?: boolean | null;
             /** Rest Halfday Ok */
@@ -3500,7 +4236,7 @@ export interface components {
             supports_prep: boolean;
             /**
              * Location Label
-             * @description Подпись перед местом в текстах: «ауд.» → «ауд. 1801»
+             * @description Подпись перед местом в текстах: «каб.» → «каб. 12»
              * @default
              */
             location_label: string;
@@ -3508,6 +4244,11 @@ export interface components {
             default_area_type_id?: string | null;
             /** Fields */
             fields?: components["schemas"]["FieldDefIn"][];
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
+            synonyms?: string[];
         };
         /** EventTypeRead */
         EventTypeRead: {
@@ -3553,6 +4294,8 @@ export interface components {
              * @description Живые поля (удалённые не показываются)
              */
             fields: components["schemas"]["FieldDefRead"][];
+            /** Synonyms */
+            synonyms: string[];
             /** Position */
             position: number;
         };
@@ -3593,6 +4336,8 @@ export interface components {
              * @description Полный список полей
              */
             fields?: components["schemas"]["FieldDefIn"][] | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
             /** Position */
             position?: number | null;
         };
@@ -3753,7 +4498,7 @@ export interface components {
              */
             waiting?: string | null;
             /** Result */
-            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"] | components["schemas"]["MilestonesDraft"]) | null;
+            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"] | components["schemas"]["MilestonesDraft"] | components["schemas"]["SetupDraft"]) | null;
         };
         /** JobStarted */
         JobStarted: {
@@ -3850,7 +4595,7 @@ export interface components {
             password: string;
         };
         /** Lunch */
-        Lunch: {
+        "Lunch-Input": {
             /**
              * Start
              * Format: time
@@ -3860,6 +4605,13 @@ export interface components {
              * End
              * Format: time
              */
+            end: string;
+        };
+        /** Lunch */
+        "Lunch-Output": {
+            /** Start */
+            start: string;
+            /** End */
             end: string;
         };
         /** MilestoneCreate */
@@ -5167,6 +5919,11 @@ export interface components {
              * @description Тип действия по словам; похоже на задачу — тип по умолчанию
              */
             action_type_id: string | null;
+            /**
+             * Event Type Id
+             * @description Тип занятости по словам — для события
+             */
+            event_type_id?: string | null;
             kind_hint: components["schemas"]["KindHint"];
             /**
              * Needs Ai
@@ -5583,15 +6340,70 @@ export interface components {
             /** Sources */
             sources: components["schemas"]["SourceRead"][];
         };
+        /**
+         * SetupDraft
+         * @description Черновик ИИ-настройки (M21.4) — сборка; ничего не применено, пока не нажали
+         *     «Применить» (`POST /config/import`).
+         */
+        SetupDraft: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "setup";
+            /**
+             * Text
+             * @description Описание, по которому собран черновик
+             */
+            text: string;
+            /**
+             * About
+             * @description «О себе» от ИИ — предложить сохранить
+             */
+            about: string;
+            bundle: components["schemas"]["ConfigBundle-Output"];
+            /**
+             * Warnings
+             * @description Что уточнить и что пропущено при проверке
+             */
+            warnings: string[];
+            /** @description Что добавится и изменится при импорте */
+            preview: components["schemas"]["BundleImportResult"];
+        };
+        /** SetupRequest */
+        SetupRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Comment
+             * @description «Заново с комментарием»
+             */
+            comment?: string | null;
+            /**
+             * Previous
+             * @description Прошлый черновик кратко
+             */
+            previous?: string[];
+        };
         /** SlotGridDay */
-        SlotGridDay: {
+        "SlotGridDay-Input": {
             /**
              * Weekday
              * @description null — общие слоты
              */
             weekday?: number | null;
             /** Slots */
-            slots: components["schemas"]["SlotIn"][];
+            slots: components["schemas"]["SlotIn-Input"][];
+        };
+        /** SlotGridDay */
+        "SlotGridDay-Output": {
+            /**
+             * Weekday
+             * @description null — общие слоты
+             */
+            weekday?: number | null;
+            /** Slots */
+            slots: components["schemas"]["SlotIn-Output"][];
         };
         /**
          * SlotGridPut
@@ -5607,7 +6419,7 @@ export interface components {
             /** Name */
             name: string;
             /** Schedules */
-            schedules: components["schemas"]["SlotGridDay"][];
+            schedules: components["schemas"]["SlotGridDay-Input"][];
         };
         /** SlotGridRead */
         SlotGridRead: {
@@ -5626,7 +6438,7 @@ export interface components {
             slots: components["schemas"]["SlotRead"][];
         };
         /** SlotIn */
-        SlotIn: {
+        "SlotIn-Input": {
             /** Number */
             number: number;
             /**
@@ -5638,6 +6450,15 @@ export interface components {
              * End
              * Format: time
              */
+            end: string;
+        };
+        /** SlotIn */
+        "SlotIn-Output": {
+            /** Number */
+            number: number;
+            /** Start */
+            start: string;
+            /** End */
             end: string;
         };
         /** SlotRead */
@@ -5747,7 +6568,7 @@ export interface components {
          * Span
          * @description Интервал внутри суток; `end <= start` — до следующего дня (рабочее окно совы).
          */
-        Span: {
+        "Span-Input": {
             /**
              * Start
              * Format: time
@@ -5757,6 +6578,16 @@ export interface components {
              * End
              * Format: time
              */
+            end: string;
+        };
+        /**
+         * Span
+         * @description Интервал внутри суток; `end <= start` — до следующего дня (рабочее окно совы).
+         */
+        "Span-Output": {
+            /** Start */
+            start: string;
+            /** End */
             end: string;
         };
         /** SpanRead */
@@ -6144,7 +6975,10 @@ export interface components {
             name: string;
             /** @default tag */
             icon: components["schemas"]["CategoryIcon"];
-            /** Synonyms */
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
             synonyms?: string[];
             /** Default Action Type Id */
             default_action_type_id?: string | null;
@@ -6373,6 +7207,12 @@ export interface components {
          */
         UserSettings: {
             /**
+             * About
+             * @description О себе — для ИИ: чем занят, где учится или работает (до 1000 символов)
+             * @default
+             */
+            about: string;
+            /**
              * Default Action Type Id
              * @description Тип действия задач и дел без своего типа; null — без типа
              */
@@ -6467,6 +7307,11 @@ export interface components {
         };
         /** UserSettingsPatch */
         UserSettingsPatch: {
+            /**
+             * About
+             * @description О себе — для ИИ: чем занят, где учится или работает (до 1000 символов)
+             */
+            about?: string | null;
             /**
              * Default Action Type Id
              * @description Тип действия задач и дел без своего типа; null — без типа
@@ -22327,6 +23172,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigBundle-Output"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_config: {
+        parameters: {
+            query?: {
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigBundle-Input"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleImportResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start_ai_setup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStarted"];
                 };
             };
             /** @description Bad Request */

@@ -16,6 +16,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     create_model,
     field_validator,
 )
@@ -103,9 +104,15 @@ class Rest(_Model):
     weekend_half_days: int = Field(default=1, ge=0, le=4)
 
 
+About = Annotated[str, StringConstraints(max_length=1000)]
+
 class UserSettings(_Model):
     """Сон, обед и рабочие часы — в режимах дня (`day_profiles`, M18)."""
 
+    about: About = Field(
+        default="",
+        description="О себе — для ИИ: чем занят, где учится или работает (до 1000 символов)",
+    )
     default_action_type_id: uuid.UUID | None = Field(
         default=None, description="Тип действия задач и дел без своего типа; null — без типа"
     )

@@ -9,8 +9,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.domain.enums import ActionTypeKey, TaskTypeKey
-from app.domain.quickparse import AreaRef, KindHint, guess, parse
-from app.services.catalog import ACTION_TYPE_WORDS, TASK_TYPE_WORDS
+from app.domain.quickparse import AreaRef, KindHint, Term, guess, needs_ai, parse
+
+from .student import M21, PART1_ACTION_TYPES, TASK_TYPES
 
 MSK = ZoneInfo("Europe/Moscow")
 NOW = datetime(2026, 10, 6, 15, 0, tzinfo=MSK)
@@ -24,9 +25,16 @@ SUBJECTS = [
 ]
 
 
+# Словарь студентки после миграции M21.1: id типа = его ключ сида
+TASK_TERMS = [Term(TaskTypeKey(key), (name, *syn)) for key, name, _, syn in TASK_TYPES]
+ACTION_TERMS = [
+    Term(ActionTypeKey(key), (name, *M21.ACTION_WORDS.get(key, [])))
+    for key, (name, _) in PART1_ACTION_TYPES.items()
+]
+
+
 def p(text: str, now: datetime = NOW, subjects=SUBJECTS):
-    # Словари сида: id типа = его ключ
-    return parse(text, now, subjects, TASK_TYPE_WORDS, ACTION_TYPE_WORDS)
+    return parse(text, now, subjects, TASK_TERMS, ACTION_TERMS)
 
 
 def eod(d: date) -> datetime:
@@ -376,8 +384,8 @@ def test_default_action_for_task_like(text, expected):
 
 
 def test_guess_action_type_plain():
-    assert guess("МФЦ, паспорт", ACTION_TYPE_WORDS) == ActionTypeKey.institutions
-    assert guess("Глава 1", ACTION_TYPE_WORDS) is None
+    assert guess("МФЦ, паспорт", ACTION_TERMS) == ActionTypeKey.institutions
+    assert guess("Глава 1", ACTION_TERMS) is None
     assert guess("МФЦ, паспорт", []) is None
 
 
@@ -386,3 +394,96 @@ def test_without_words_types_unknown():
     r = parse("реферат климатология до 15 окт", NOW, SUBJECTS)
     assert (r.task_type, r.action_type) == (None, None)
     assert r.kind_hint == KindHint.task
+
+
+# ---------- словарь пользователя (M21.1) ----------
+
+SCHOOL_AREAS = [AreaRef("algebra", ("Алгебра",)), AreaRef("geom", ("Геометрия", "геома"))]
+SCHOOL_TASKS = [Term("hw", ("ДЗ", "дз", "№", "упр"))]
+TUTOR_AREAS = [AreaRef("masha", ("Маша",)), AreaRef("petya", ("Петя Иванов", "петя"))]
+TUTOR_TASKS = [
+    Term("hw", ("ДЗ",)),
+    Term("check", ("Проверка ДЗ", "проверить дз")),
+    Term("prep", ("Подготовка урока", "подготовить урок")),
+]
+OFFICE_EVENTS = [Term("meet", ("Встреча", "созвон", "стендап")), Term("trip", ("Командировка",))]
+OFFICE_ACTIONS = [Term("people", ("Связь с людьми", "позвонить", "клиент"))]
+
+
+def test_schoolkid_homework_number():
+    """«алгебра №245»: сфера по названию, тип по синониму «№» (срок — по типу, в сервисе)."""
+    r = parse("алгебра №245", NOW, SCHOOL_AREAS, SCHOOL_TASKS)
+    assert (r.area_id, r.task_type, r.kind_hint) == ("algebra", "hw", KindHint.task)
+    assert r.title == "№245"
+    assert r.date is None
+    r = parse("геома упр 12 к пятнице", NOW, SCHOOL_AREAS, SCHOOL_TASKS)
+    assert (r.area_id, r.task_type, r.date) == ("geom", "hw", date(2026, 10, 9))
+
+
+def test_tutor_check_homework_dative_name():
+    """«проверить дз маше»: ученица в дательном падеже, длинное совпадение типа важнее «ДЗ»."""
+    r = parse("проверить дз маше", NOW, TUTOR_AREAS, TUTOR_TASKS)
+    assert (r.area_id, r.task_type, r.kind_hint) == ("masha", "check", KindHint.task)
+    assert r.title == "Проверить дз"
+    assert parse("подготовить урок пете на завтра", NOW, TUTOR_AREAS, TUTOR_TASKS).area_id == (
+        "petya"
+    )
+    # «машина» — не «Маша»
+    assert parse("помыть машину", NOW, TUTOR_AREAS, TUTOR_TASKS).area_id is None
+
+
+def test_office_call_with_client_is_event_of_type():
+    r = parse("созвон с клиентом в пт 15:00", NOW, (), (), OFFICE_ACTIONS, OFFICE_EVENTS)
+    assert r.kind_hint == KindHint.event
+    assert (r.date, r.time) == (date(2026, 10, 9), time(15, 0))
+    assert (r.event_type, r.action_type) == ("meet", "people")
+    assert r.title == "Созвон с клиентом"
+
+
+def test_event_type_with_time_beats_task_type():
+    """Слово типа занятости со временем — событие, даже если это и тип задачи."""
+    events = [Term("exam", ("Экзамен", "зачёт"))]
+    r = parse("зачёт по англу 15.10 в 10:00", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert (r.kind_hint, r.event_type, r.area_id) == (KindHint.event, "exam", "eng")
+    # Без времени — задача, тип занятости не нужен
+    r = parse("зачёт по англу 15.10", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert (r.kind_hint, r.event_type) == (KindHint.task, None)
+    # «к 10:00» — срок, а не начало события
+    r = parse("зачёт по англу 15.10 к 10:00", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert r.kind_hint == KindHint.task
+
+
+@pytest.mark.parametrize(
+    ("word", "text", "found"),
+    [
+        ("реферат", "два реферата", True),
+        ("курсовая", "сдать курсовую", True),
+        ("презентация", "сделать презентацию", True),
+        ("записаться", "записалась к врачу", True),
+        ("лаба", "лабораторка", False),
+        ("лаборатор*", "лабораторку", True),
+        ("пара", "в парк", False),
+        ("пара", "после пары", True),
+        ("часть", "через час", False),
+        ("зал", "залить", False),
+        ("домашнее задание", "домашнего задания нет", True),
+        ("день рождения", "дня рождения", False),
+        ("мфц", "в МФЦ", True),
+        ("№", "№245", True),
+    ],
+)
+def test_synonym_inflection(word, text, found):
+    assert (guess(text, [Term("t", (word,))]) == "t") is found
+
+
+def test_needs_ai_without_areas():
+    """Задача без сферы — не неуверенность, если сфер у пользователя нет вовсе."""
+    r = parse("отчёт к пятнице", NOW)
+    assert r.kind_hint == KindHint.task
+    assert r.area_id is None
+    assert needs_ai("отчёт к пятнице", r)
+    assert not needs_ai("отчёт к пятнице", r, has_areas=False)
+    # Без срока — всё ещё неуверенно
+    r = parse("реферат", NOW, (), TASK_TERMS)
+    assert r.kind_hint == KindHint.task
+    assert needs_ai("реферат", r, has_areas=False)

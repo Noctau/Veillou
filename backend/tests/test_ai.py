@@ -65,17 +65,22 @@ async def job_result(client: AsyncClient, job_id: str) -> dict:
     return resp.json()
 
 
+# Названия типов действий нейтрального сида (ИИ отвечает названиями, M21.2)
+STUDY = "Сосредоточенная работа"
+PEOPLE = "Связь с людьми"
+
+
 def breakdown_answer(**over) -> str:
     data = {
         "task_type": "Реферат",
-        "category": "study",
+        "category": "Работа",
         "subtasks": [
-            {"order": 2, "title": "Написать текст", "estimate_min": 90, "action_type": "study",
+            {"order": 2, "title": "Написать текст", "estimate_min": 90, "action_type": STUDY,
              "depends_on": [1], "note": ""},
             {"order": 1, "title": "Найти 3 источника", "estimate_min": 40,
-             "action_type": "study", "depends_on": [], "note": "в библиотеке кафедры"},
+             "action_type": STUDY, "depends_on": [], "note": "в библиотеке кафедры"},
             {"order": 3, "title": "Согласовать тему с преподавателем", "estimate_min": 15,
-             "action_type": "people", "depends_on": [], "note": ""},
+             "action_type": PEOPLE, "depends_on": [], "note": ""},
         ],
         "total_estimate_min": 145,
         "warning": None,
@@ -89,10 +94,10 @@ def parsed_answer(**over) -> str:
         "kind": "task",
         "title": "Задание",
         "task_type": "",
-        "subject": "",
+        "area": "",
         "deadline_date": "",
         "deadline_time": "",
-        "action_type": "study",
+        "action_type": STUDY,
         "description": "",
     }
     return json.dumps({**data, **over}, ensure_ascii=False)
@@ -103,7 +108,7 @@ def photo_answer(**over) -> str:
         "text": "",
         "title": "Задание",
         "task_type": "",
-        "subject": "",
+        "area": "",
         "deadline_date": "",
         "deadline_time": "",
     }
@@ -155,6 +160,11 @@ async def test_breakdown_draft(auth_client, fake):
     assert "10 страниц" in prompt
     assert "Дедлайн:" in prompt
     assert "Свободного времени" in prompt
+    # Справочники пользователя — названиями (M21.2)
+    system = fake.calls[0][0][0].content
+    assert "- Связь с людьми (позвонить" in system
+    assert "Категории (category" in system
+    assert "Работа" in system
 
     logs = await ai_logs()
     assert len(logs) == 1
@@ -468,7 +478,7 @@ async def test_ai_parse_card(auth_client, fake):
         parsed_answer(
             title="Доклад про Эль-Ниньо",
             task_type="Доклад",
-            subject="Климатология",
+            area="Климатология",
             deadline_date="2030-01-09",
             # Такого времени в тексте нет — выдуманное время отбрасывается
             deadline_time="15:00",
@@ -577,11 +587,37 @@ async def test_ai_parse_drops_invented_deadline_and_prefers_keyword_rules(auth_c
     job_id = (await auth_client.post(f"{API}/quick-add/ai-parse", json={"text": text})).json()[
         "job_id"
     ]
-    fake.push(
-        parsed_answer(title="Письмо научруку", deadline_date="2030-01-01", action_type="study")
-    )
+    fake.push(parsed_answer(title="Письмо научруку", deadline_date="2030-01-01", action_type=STUDY))
     await run_jobs()
     draft = (await job_result(auth_client, job_id))["result"]
     assert draft["deadline"] is None
     types = {a["key"]: a["id"] for a in (await auth_client.get(f"{API}/action-types")).json()}
     assert draft["action_type_id"] == types["people"]
+
+
+# ---------- ИИ на конфигурации пользователя (M21.2) ----------
+
+
+async def test_about_and_areas_go_to_prompt(auth_client, fake):
+    """«О себе» — в системном промпте, сферы — с их типом; ответ — по названиям."""
+    from .test_schedule_api import make_area, make_period
+
+    resp = await auth_client.patch(
+        f"{API}/me/settings", json={"about": "Репетитор по математике, 5 учеников"}
+    )
+    assert resp.status_code == 200, resp.text
+    period = await make_period(auth_client)
+    area = await make_area(auth_client, period["id"], name="Маша")
+    resp = await auth_client.post(f"{API}/quick-add/ai-parse", json={"text": "проверить дз маше"})
+    assert resp.status_code in (200, 202), resp.text
+    fake.push(
+        parsed_answer(title="Проверить ДЗ", area="Маша", action_type="Сосредоточенная работа")
+    )
+    await run_jobs()
+    system, user = fake.calls[0][0][0].content, fake.calls[0][0][1].content
+    assert "О пользователе (с его слов): Репетитор по математике, 5 учеников" in system
+    assert "студент" not in system.lower()
+    assert "- Маша (" in user
+    job = await job_result(auth_client, resp.json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["result"]["area_id"] == area["id"]

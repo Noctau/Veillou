@@ -35,6 +35,7 @@ async def parse_quick_add(
         area_id=result.area_id if isinstance(result.area_id, uuid.UUID) else None,
         task_type_id=parsed.task_type_id,
         action_type_id=parsed.action_type_id,
+        event_type_id=parsed.event_type_id,
         kind_hint=result.kind_hint,
-        needs_ai=needs_ai(data.text, result),
+        needs_ai=needs_ai(data.text, result, has_areas=parsed.has_areas),
     )

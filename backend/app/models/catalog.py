@@ -61,6 +61,8 @@ class ActionType(UserOwnedMixin, Base):
     )
     # [{"weekdays": [1,2,3,4,5], "start": "09:00", "end": "19:00"}]; end <= start — через полночь
     windows: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    # Слова быстрого ввода и ИИ: «врач», «мфц»
+    synonyms: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
     # Лёгкое предпочтение утра в планировщике (бывшая логика на ключе people)
     prefer_morning: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     position: Mapped[int] = mapped_column(SmallInteger, default=0)

@@ -22,13 +22,17 @@
 - экзамен (событие типа «Экзамен») с планом подготовки по билетам;
 - проект с недельной нормой (ВКР) и проект для заданий с работы;
 - лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); режимы дня «Будни» и
-  «Выходные» с поздним сном (M18).
+  «Выходные» с поздним сном (M18);
+- типы действий с названиями сида Part 1 и словами быстрого ввода Part 1 в синонимах,
+  как их оставляет миграция M21.1 (новых пользователей сид создаёт нейтральным).
 """
 
+import importlib.util
 import json
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
 from typing import Any
 
 from httpx import AsyncClient
@@ -56,6 +60,32 @@ TASK_TYPES: list[tuple[str, str, str, list[str]]] = [
         ["экзамен", "зачёт", "коллоквиум", "контрольная"],
     ),
 ]
+
+
+def _migration(name: str) -> Any:
+    """Модуль миграции по части имени файла (списки слов — единый источник)."""
+    versions = Path(__file__).parents[1] / "migrations" / "versions"
+    [path] = versions.glob(f"*{name}.py")
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+M21 = _migration("m21_vocabulary")
+# Названия и категории типов действий Part 1 (сид до M21.1): ключ → (название, категория)
+PART1_ACTION_TYPES = {
+    "people": ("Связь с людьми", "study"),
+    "institutions": ("Учреждения", "home"),
+    "study": ("Самостоятельная учёба", "study"),
+    "outside": ("Вне дома", "home"),
+    "home": ("Домашние дела", "home"),
+    "personal": ("Личное", "personal"),
+}
+for _key, _name, _icon, _synonyms in TASK_TYPES:
+    _synonyms.extend(w for w in M21.TASK_WORDS.get(_key, []) if w not in _synonyms)
 
 # Поля «Пары» — как их создаёт миграция M17.1 (id полей сида, а не f1, f2)
 CLASS_FIELDS = [
@@ -163,6 +193,8 @@ async def build_student(client: AsyncClient) -> Student:
                 "evening_review_before_sleep_min": 150,
             },
             "onboarding_done": True,
+            # «О себе» — как переносит миграция M21.2
+            "about": _migration("m21_about").ABOUT,
         },
     )
     for profile in await _ok(await c.get(f"{API}/day-profiles")):
@@ -172,6 +204,16 @@ async def build_student(client: AsyncClient) -> Student:
         await patch(f"/day-profiles/{profile['id']}", body)
     types = {t["key"]: t["id"] for t in await _ok(await c.get(f"{API}/action-types"))}
     cats = {x["key"]: x["id"] for x in await _ok(await c.get(f"{API}/categories")) if x["key"]}
+    # Типы действий — как у пользователя Part 1 после миграции M21.1
+    for key, (name, category) in PART1_ACTION_TYPES.items():
+        await patch(
+            f"/action-types/{types[key]}",
+            {
+                "name": name,
+                "default_category_id": cats[category],
+                "synonyms": M21.ACTION_WORDS.get(key, []),
+            },
+        )
     # Лимит «Учёба» — бывший study_limit_min_per_day: 300
     budget = await post(
         "/load-budgets",

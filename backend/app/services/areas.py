@@ -42,7 +42,7 @@ def _sections(values: list[Any]) -> list[str]:
     return [str(getattr(v, "value", v)) for v in values]
 
 
-async def area_refs_for_parse(db: AsyncSession, user: User, today: date) -> list[AreaRef]:
+async def active_areas(db: AsyncSession, user: User, today: date) -> list[Area]:
     """Сферы для быстрого ввода и ИИ: не в архиве, в активном периоде или без периода.
     Если таких нет — все неархивные: одинаковые названия из прошлых периодов не делают
     разбор неоднозначным, пока есть текущие."""
@@ -57,13 +57,21 @@ async def area_refs_for_parse(db: AsyncSession, user: User, today: date) -> list
     )
     areas = list(
         await db.scalars(
-            base.where(or_(Area.period_id.in_(active_periods), Area.period_id.is_(None)))
+            base.where(or_(Area.period_id.in_(active_periods), Area.period_id.is_(None))).order_by(
+                Area.name
+            )
         )
     )
     if not areas:
-        areas = list(await db.scalars(base))
+        areas = list(await db.scalars(base.order_by(Area.name)))
+    return areas
+
+
+async def area_refs_for_parse(db: AsyncSession, user: User, today: date) -> list[AreaRef]:
+    """Сферы для быстрого ввода (`active_areas`): название, короткое имя, синонимы."""
     return [
-        AreaRef(a.id, tuple(n for n in (a.name, a.short_name, *a.synonyms) if n)) for a in areas
+        AreaRef(a.id, tuple(n for n in (a.name, a.short_name, *a.synonyms) if n))
+        for a in await active_areas(db, user, today)
     ]
 
 

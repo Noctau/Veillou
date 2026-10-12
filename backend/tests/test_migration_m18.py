@@ -142,6 +142,7 @@ def test_upgrade_then_downgrade(db: str):
         "evening_review_before_sleep_min": 150,
     }
     s = _settings(db, OWL)
+    s.pop("about")  # «о себе» — миграция M21.2
     assert s == {
         "schedule": {
             "morning_digest_after_wake_min": 15,

@@ -30,13 +30,18 @@ async def test_defaults_seeded_for_new_user(auth_client):
     people = types["people"]
     assert people["name"] == "Связь с людьми"
     assert people["windows"] == [{"weekdays": [1, 2, 3, 4, 5], "start": "09:00", "end": "19:00"}]
-    assert people["default_category_id"] == cats["study"]["id"]
-    # Самостоятельная учёба — до 01:00 следующего дня
+    assert people["default_category_id"] == cats["work"]["id"]
+    # Нейтральный сид (M21.1): слова без студенческих, тип по умолчанию — «Сосредоточенная работа»
+    assert "позвонить" in people["synonyms"]
+    assert not {"научрук", "деканат"} & {w for t in types.values() for w in t["synonyms"]}
+    assert types["study"]["name"] == "Сосредоточенная работа"
+    assert types["study"]["synonyms"] == []
+    # Сосредоточенная работа — до 01:00 следующего дня
     assert types["study"]["windows"] == [
         {"weekdays": [1, 2, 3, 4, 5, 6, 7], "start": "07:00", "end": "01:00"}
     ]
     assert [k for k, t in types.items() if t["prefer_morning"]] == ["people"]
-    # Тип по умолчанию — «Самостоятельная учёба»
+    # Тип по умолчанию — «Сосредоточенная работа»
     settings = (await auth_client.get(f"{API}/me/settings")).json()
     assert settings["default_action_type_id"] == types["study"]["id"]
 

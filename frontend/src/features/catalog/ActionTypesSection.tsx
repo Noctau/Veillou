@@ -26,6 +26,7 @@ import {
   useUpdateActionType,
 } from './useCatalog'
 import { describeWindows, windowsValid } from './windows'
+import { parseSynonyms } from './synonyms'
 import { WindowsEditor } from './WindowsEditor'
 
 const NEW_WINDOWS: TimeWindow[] = [{ weekdays: [1, 2, 3, 4, 5], start: '09:00', end: '19:00' }]
@@ -118,11 +119,18 @@ function ActionTypeForm({ actionType, onDone }: { actionType?: ActionType; onDon
   const [windows, setWindows] = useState<TimeWindow[]>(actionType?.windows ?? NEW_WINDOWS)
   const [categoryId, setCategoryId] = useState(actionType?.default_category_id ?? null)
   const [morning, setMorning] = useState(actionType?.prefer_morning ?? false)
+  const [synonyms, setSynonyms] = useState(actionType?.synonyms.join(', ') ?? '')
   const valid = name.trim() !== '' && windows.length > 0 && windowsValid(windows)
   const saving = create.isPending || update.isPending
 
   const save = () => {
-    const body = { name: name.trim(), windows, default_category_id: categoryId, prefer_morning: morning }
+    const body = {
+      name: name.trim(),
+      windows,
+      default_category_id: categoryId,
+      prefer_morning: morning,
+      synonyms: parseSynonyms(synonyms),
+    }
     if (actionType) update.mutate({ id: actionType.id, body }, { onSuccess: onDone })
     else create.mutate(body, { onSuccess: onDone })
   }
@@ -147,6 +155,11 @@ function ActionTypeForm({ actionType, onDone }: { actionType?: ActionType; onDon
       <Field>
         <FieldLabel htmlFor="at-category">{T.category}</FieldLabel>
         <CategorySelect id="at-category" value={categoryId} onChange={setCategoryId} emptyLabel={T.noCategory} />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="at-synonyms">{T.synonyms}</FieldLabel>
+        <Input id="at-synonyms" value={synonyms} onChange={(e) => setSynonyms(e.target.value)} />
+        <FieldDescription>{T.synonymsHint}</FieldDescription>
       </Field>
       <Field orientation="horizontal">
         <Switch id="at-morning" checked={morning} onCheckedChange={setMorning} />

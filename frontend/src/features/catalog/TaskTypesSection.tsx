@@ -16,6 +16,7 @@ import { TASK_TYPES_UI as T } from '@/lib/terms'
 import { ActionTypeSelect, CategorySelect } from './CatalogSelect'
 import { CategoryIcon } from './CategoryIcon'
 import { IconPicker } from './IconPicker'
+import { parseSynonyms } from './synonyms'
 import {
   type CategoryIconName,
   type TaskType,
@@ -84,14 +85,6 @@ export function TaskTypesSection() {
       </Dialog>
     </Card>
   )
-}
-
-/** «реферат, Эссе ,» → ["реферат", "Эссе"] */
-function parseSynonyms(text: string): string[] {
-  return text
-    .split(',')
-    .map((w) => w.trim())
-    .filter(Boolean)
 }
 
 function TaskTypeForm({ taskType, onDone }: { taskType?: TaskType; onDone: () => void }) {

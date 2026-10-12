@@ -39,6 +39,7 @@ export const router = createBrowserRouter([
           { path: 'review', lazy: page(() => import('@/pages/ReviewPage'), 'ReviewPage') },
           { path: 'review/week', lazy: page(() => import('@/pages/WeeklyReviewPage'), 'WeeklyReviewPage') },
           { path: 'settings', lazy: page(() => import('@/pages/SettingsPage'), 'SettingsPage') },
+          { path: 'setup', lazy: page(() => import('@/pages/SetupPage'), 'SetupPage') },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

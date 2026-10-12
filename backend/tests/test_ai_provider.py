@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from app.ai import Image, LLMInvalidError, LLMUnavailableError, Message
 from app.ai.fake import FakeProvider
 from app.ai.provider import OllamaProvider, OpenAICompatProvider, extract_json
-from app.ai.schemas import AIBreakdown, AIParsed, with_choices, with_subjects
+from app.ai.schemas import AIBreakdown, AIParsed, with_choices
 from app.core.config import settings
 
 
@@ -79,14 +79,14 @@ async def test_images_go_to_vision_model_and_last_user_message():
 
 def breakdown(**over):
     data = {
-        "task_type": "essay",
-        "category": "study",
+        "task_type": "Реферат",
+        "category": "Учёба",
         "subtasks": [
             {
                 "order": 1,
                 "title": "Найти источники",
                 "estimate_min": 10,
-                "action_type": "study",
+                "action_type": "Сосредоточенная работа",
                 "depends_on": [],
                 "note": "",
             },
@@ -94,7 +94,7 @@ def breakdown(**over):
                 "order": 2,
                 "title": "  Написать   текст ",
                 "estimate_min": 200,
-                "action_type": "study",
+                "action_type": "Сосредоточенная работа",
                 "depends_on": [1],
                 "note": "",
             },
@@ -153,28 +153,57 @@ def parsed(**over):
         "kind": "task",
         "title": "x",
         "task_type": "other",
-        "subject": "",
+        "area": "",
         "deadline_date": "",
         "deadline_time": "",
-        "action_type": "study",
+        "action_type": "Сосредоточенная работа",
         "description": "",
     }
     return {**data, **over}
 
 
-def test_subject_enum_in_schema():
+def test_area_enum_in_schema():
     from app.ai.provider import model_schema
 
-    schema = with_subjects(AIParsed, ["Климатология", "Физика атмосферы"])
-    subject = model_schema(schema)["properties"]["subject"]
-    assert subject["enum"] == ["Климатология", "Физика атмосферы", ""]
-    assert schema.model_validate(parsed(subject="Климатология")).subject == "Климатология"
-    assert schema.model_validate(parsed(subject="")).subject is None
-    with pytest.raises(ValueError, match="предмет не из списка"):
-        schema.model_validate(parsed(subject="История"))
-    assert with_subjects(AIParsed, []) is AIParsed
+    schema = with_choices(AIParsed, area=["Климатология", "Маша"])
+    area = model_schema(schema)["properties"]["area"]
+    assert area["enum"] == ["Климатология", "Маша", ""]
+    assert schema.model_validate(parsed(area="Маша")).area == "Маша"
+    assert schema.model_validate(parsed(area="")).area is None
+    with pytest.raises(ValueError, match="сфера не из списка"):
+        schema.model_validate(parsed(area="История"))
+    # Пустой справочник: всегда пусто, enum из одной пустой строки
+    empty = with_choices(AIParsed, area=[])
+    assert model_schema(empty)["properties"]["area"]["enum"] == [""]
+    assert empty.model_validate(parsed(area="История")).area is None
     # Порядок полей — как в модели: kind первым
     assert next(iter(schema.model_fields)) == "kind"
+
+
+def test_action_type_and_category_enums_in_breakdown_steps():
+    """M21.2: типы действий и категории — названия пользователя, и у шагов разбивки."""
+    from app.ai.provider import model_schema
+
+    actions = ["Связь с людьми", "Сосредоточенная работа"]
+    schema = with_choices(AIBreakdown, action_type=actions, category=["Учёба", "Работа"])
+    props = model_schema(schema)["properties"]
+    step = props["subtasks"]["items"]["properties"]["action_type"]
+    assert step["enum"] == [*actions, ""]
+    assert props["category"]["enum"] == ["Учёба", "Работа", ""]
+    b = schema.model_validate(breakdown())
+    assert b.subtasks[0].action_type == "Сосредоточенная работа"
+    assert b.category == "Учёба"
+    bad = breakdown()
+    bad["subtasks"][0]["action_type"] = "study"
+    with pytest.raises(ValueError, match="тип действия не из списка"):
+        schema.model_validate(bad)
+    # Зависимости шагов проверяются и в суженной схеме
+    bad = breakdown()
+    bad["subtasks"][0]["depends_on"] = [2]
+    with pytest.raises(ValueError, match="цикл"):
+        schema.model_validate(bad)
+    # Полей, которых в схеме нет, просто нет
+    assert with_choices(AIParsed, category=["Учёба"]) is AIParsed
 
 
 def test_parsed_empty_strings_and_time():

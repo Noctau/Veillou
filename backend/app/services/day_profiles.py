@@ -111,7 +111,7 @@ def _windows_json(data: DayProfileCreate) -> list[dict[str, str]]:
     ]
 
 
-def _apply(p: DayProfile, data: DayProfileCreate) -> None:
+def apply_profile(p: DayProfile, data: DayProfileCreate) -> None:
     p.name = data.name
     p.wake, p.sleep = data.wake, data.sleep
     p.lunch_start = data.lunch.start if data.lunch else None
@@ -240,7 +240,7 @@ class DayProfileService:
             )
         )
         profile = DayProfile(key=None, position=position or 0)
-        _apply(profile, data)
+        apply_profile(profile, data)
         self.profiles.add(profile)
         await self.db.commit()
         return profile
@@ -258,7 +258,7 @@ class DayProfileService:
             data = DayProfileCreate.model_validate(current)
         except ValidationError as exc:
             raise InvalidDataError(format_validation_error(exc)) from exc
-        _apply(profile, data)
+        apply_profile(profile, data)
         if patch.position is not None:
             profile.position = patch.position
         await self.db.commit()

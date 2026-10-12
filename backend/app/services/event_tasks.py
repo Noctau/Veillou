@@ -429,7 +429,7 @@ class EventRuleService:
             *where, order_by=[EventRule.position, EventRule.created_at, EventRule.id]
         )
 
-    async def _check_refs(self, data: EventRuleCreate) -> None:
+    async def check_refs(self, data: EventRuleCreate) -> None:
         if data.event_type_id:
             await self.event_types.get_or_404(data.event_type_id)
         if data.schedule_rule_id:
@@ -443,7 +443,7 @@ class EventRuleService:
         await sync_user(self.db, self.user, self.now)
 
     async def create(self, data: EventRuleCreate) -> EventRule:
-        await self._check_refs(data)
+        await self.check_refs(data)
         position = await self.db.scalar(
             select(func.coalesce(func.max(EventRule.position) + 1, 0)).where(
                 EventRule.user_id == self.user_id, EventRule.deleted_at.is_(None)
@@ -470,7 +470,7 @@ class EventRuleService:
             if name in changes and changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
         data = validate_patch(rule, patch, EventRuleCreate)
-        await self._check_refs(data)
+        await self.check_refs(data)
         for name, value in data.model_dump().items():
             setattr(rule, name, value)
         if patch.position is not None:

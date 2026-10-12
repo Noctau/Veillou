@@ -1,5 +1,5 @@
-"""Быстрый ввод: разбор строки (domain/quickparse) со сферами и словарями типов
-задач и действий пользователя (`catalog.parse_words`)."""
+"""Быстрый ввод: разбор строки (domain/quickparse) на словаре пользователя — сферах,
+типах задач, действий и занятости с их синонимами (`catalog.vocabulary`)."""
 
 import uuid
 from dataclasses import dataclass
@@ -17,7 +17,7 @@ from app.schemas.event import EventCreate
 from app.schemas.task import TaskCreate
 from app.services.areas import area_refs_for_parse
 from app.services.backlog import BacklogService
-from app.services.catalog import default_action_type, ensure_defaults, parse_words
+from app.services.catalog import default_action_type, ensure_defaults, vocabulary
 from app.services.events import EventService
 from app.services.tasks import TaskService
 
@@ -29,6 +29,9 @@ class QuickParse:
     result: ParseResult
     task_type_id: uuid.UUID | None
     action_type_id: uuid.UUID | None
+    event_type_id: uuid.UUID | None
+    # Есть ли у пользователя сферы: без них «задача без сферы» — не неуверенность
+    has_areas: bool
 
 
 def _id(value: object) -> uuid.UUID | None:
@@ -39,13 +42,14 @@ async def parse_text(db: AsyncSession, user: User, text: str) -> QuickParse:
     now = now_utc().astimezone(get_tz(user.timezone))
     if await ensure_defaults(db, user.id):
         await db.flush()
-    words = await parse_words(db, user.id)
-    p = parse(text, now, await area_refs_for_parse(db, user, now.date()), words.task, words.action)
+    words = await vocabulary(db, user.id)
+    areas = await area_refs_for_parse(db, user, now.date())
+    p = parse(text, now, areas, words.task, words.action, words.event)
     action_type_id = _id(p.action_type)
     if action_type_id is None and p.default_action:
         default = await default_action_type(db, user)
         action_type_id = default.id if default else None
-    return QuickParse(p, _id(p.task_type), action_type_id)
+    return QuickParse(p, _id(p.task_type), action_type_id, _id(p.event_type), bool(areas))
 
 
 # ---------- создание из текста (бот) ----------
@@ -111,7 +115,13 @@ async def create_from_text(
     if kind == KindHint.event:
         start, end = _event_bounds(p, tz)
         event = await EventService(db, user).create(
-            EventCreate(title=title, start=start, end=end, area_id=area_id)
+            EventCreate(
+                title=title,
+                start=start,
+                end=end,
+                area_id=area_id,
+                event_type_id=parsed.event_type_id,
+            )
         )
         return Created(
             kind, event.id, title, start=start, end=end, area=area.name if area else None

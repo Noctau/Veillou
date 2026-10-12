@@ -27,6 +27,7 @@ import { useCreateNote } from '@/features/notes/useNotes'
 import { byId, useActionTypes, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useAreas } from '@/features/areas/useAreas'
 import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
+import { useEventTypes } from '@/features/schedule/useSchedule'
 import { useCreateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
@@ -48,11 +49,11 @@ const KINDS: { value: Kind; label: string; icon: typeof InboxIcon }[] = [
   { value: 'task', label: 'Задание', icon: ListTodoIcon },
   { value: 'backlog', label: 'В ящик', icon: InboxIcon },
   { value: 'event', label: 'Событие', icon: CalendarIcon },
-  { value: 'note', label: 'Конспект', icon: NotebookPenIcon },
+  { value: 'note', label: 'Заметка', icon: NotebookPenIcon },
 ]
 
 const DEFAULT_EVENT_MIN = 60
-/** С файлами (из «Поделиться») можно создать только задание или конспект. */
+/** С файлами (из «Поделиться») можно создать только задачу или заметку. */
 const FILE_KINDS: Kind[] = ['task', 'note']
 /** Название задания из фото без подписи — распознавание заменит его (как на сервере). */
 const PHOTO_TITLE = 'Задание с фото'
@@ -112,6 +113,7 @@ export function QuickAdd() {
   const { data: areas } = useAreas()
   const actionTypes = byId(useActionTypes().data)
   const taskTypes = byId(useTaskTypes().data)
+  const eventTypes = byId(useEventTypes().data)
   const createTask = useCreateTask()
   const createBacklog = useCreateBacklog()
   const createEvent = useCreateEvent()
@@ -134,7 +136,7 @@ export function QuickAdd() {
 
   const remember = (item: Saved) => setSaved((old) => [item, ...old].slice(0, 5))
 
-  /** Задание или конспект с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
+  /** Задача или заметка с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
   const saveWithFiles = async () => {
     const raw = text.trim()
     const allImages = share.files.every((f) => f.type.startsWith('image/'))
@@ -183,7 +185,7 @@ export function QuickAdd() {
       navigate(owner.link, { replace: true })
     } catch (error) {
       toast.error(errorMessage(error, 'Не удалось загрузить файл'), {
-        description: 'Само задание или конспект создан — добавьте файлы на его странице',
+        description: 'Задача или заметка создана — добавьте файлы на её странице',
         action: { label: 'Открыть', onClick: () => navigate(owner.link) },
       })
     } finally {
@@ -217,7 +219,14 @@ export function QuickAdd() {
       const start = wallToUtc(day, p.time, tz)
       reset()
       createEvent.mutate(
-        { title, start, end: eventEnd(p, start, tz), note: '', area_id: areaId },
+        {
+          title,
+          start,
+          end: eventEnd(p, start, tz),
+          note: '',
+          area_id: areaId,
+          event_type_id: p.event_type_id ?? null,
+        },
         { onSuccess: (e) => remember({ id: e.id, kind, title, link: '/calendar' }), onError: restore },
       )
       return
@@ -360,8 +369,8 @@ export function QuickAdd() {
               enterKeyHint="send"
               placeholder={
                 hasFiles
-                  ? 'Что это: «реферат климатология до 15 окт» или тема конспекта'
-                  : 'реферат климатология до 15 окт · купить продукты · завтра в 14 врач'
+                  ? 'Что это: «отчёт к пятнице» или тема заметки'
+                  : 'отчёт к пятнице · купить продукты · завтра в 14 врач'
               }
               aria-label="Что добавить"
               className="min-h-14 resize-none text-base"
@@ -419,6 +428,9 @@ export function QuickAdd() {
                 {dateChip()}
                 {kind === 'event' && live.duration_min && !live.end_time && (
                   <Chip icon={<ClockIcon className="size-3" />}>{live.duration_min} мин</Chip>
+                )}
+                {kind === 'event' && live.event_type_id && eventTypes.has(live.event_type_id) && (
+                  <Chip>{eventTypes.get(live.event_type_id)?.name}</Chip>
                 )}
                 {kind === 'task' && live.task_type_id && taskTypes.has(live.task_type_id) && (
                   <Chip icon={<BookOpenIcon className="size-3" />}>{taskTypes.get(live.task_type_id)?.name}</Chip>

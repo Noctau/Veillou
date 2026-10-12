@@ -6,6 +6,7 @@
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,15 +14,17 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.prompts import TaskTypeHint
+from app.ai.prompts import Hint
 from app.core.exceptions import ConflictError, InvalidDataError
 from app.core.time import now_utc
-from app.domain.enums import ActionTypeKey, CategoryIcon, CategoryKey, TaskTypeKey
+from app.domain.enums import ActionTypeKey, CategoryIcon, CategoryKey
+from app.domain.quickparse import Term
 from app.models import (
     ActionType,
     BacklogItem,
     BreakdownTemplate,
     Category,
+    EventType,
     LoadBudgetMember,
     Project,
     Subtask,
@@ -57,6 +60,7 @@ class DefaultActionType:
     category: CategoryKey
     windows: list[dict[str, Any]]
     prefer_morning: bool = False
+    synonyms: tuple[str, ...] = ()
 
 
 # Тип действия по умолчанию у засеянного справочника
@@ -77,111 +81,145 @@ DEFAULT_CATEGORIES = [
     DefaultCategory(CategoryKey.personal, "Личное", "#ec4899", CategoryIcon.heart),
 ]
 
+# Нейтральный сид новых пользователей (M21.1). Студенческие слова Part 1 у
+# мигрированных пользователей лежат в их синонимах (миграция M21).
 DEFAULT_ACTION_TYPES = [
     DefaultActionType(
         ActionTypeKey.people,
         "Связь с людьми",
-        CategoryKey.study,
+        CategoryKey.work,
         [_w(WEEKDAYS, "09:00", "19:00")],
         prefer_morning=True,
+        synonyms=(
+            "позвонить",
+            "созвониться",
+            "созвон",
+            "спросить",
+            "договориться",
+            "согласовать",
+            "встретиться",
+            "руководитель",
+            "коллега",
+            "клиент",
+        ),
     ),
     DefaultActionType(
         ActionTypeKey.institutions,
         "Учреждения",
         CategoryKey.home,
         [_w(WEEKDAYS, "10:00", "18:00")],
+        synonyms=(
+            "врач",
+            "стоматолог",
+            "поликлиника",
+            "больница",
+            "мфц",
+            "банк",
+            "паспорт",
+            "справка",
+            "налоговая",
+            "нотариус",
+            "госуслуги",
+            "записаться",
+            "запись",
+        ),
     ),
     # Любое время, кроме сна (его вычитает планировщик); ночью — до 01:00
     DefaultActionType(
         ActionTypeKey.study,
-        "Самостоятельная учёба",
-        CategoryKey.study,
+        "Сосредоточенная работа",
+        CategoryKey.work,
         [_w(ALL_DAYS, "07:00", "01:00")],
     ),
     DefaultActionType(
-        ActionTypeKey.outside, "Вне дома", CategoryKey.home, [_w(ALL_DAYS, "09:00", "21:00")]
+        ActionTypeKey.outside,
+        "Вне дома",
+        CategoryKey.home,
+        [_w(ALL_DAYS, "09:00", "21:00")],
+        synonyms=(
+            "купить",
+            "магазин",
+            "аптека",
+            "посылка",
+            "почта",
+            "забрать",
+            "отнести",
+            "химчистка",
+            "ремонт",
+            "пункт выдачи",
+        ),
     ),
     DefaultActionType(
-        ActionTypeKey.home, "Домашние дела", CategoryKey.home, [_w(ALL_DAYS, "08:00", "22:00")]
+        ActionTypeKey.home,
+        "Домашние дела",
+        CategoryKey.home,
+        [_w(ALL_DAYS, "08:00", "22:00")],
+        synonyms=(
+            "убрать",
+            "убраться",
+            "уборка",
+            "постирать",
+            "стирка",
+            "приготовить",
+            "готовка",
+            "помыть",
+            "пропылесосить",
+            "разобрать",
+            "погладить",
+            "полить",
+            "вынести",
+        ),
     ),
     DefaultActionType(
         ActionTypeKey.personal,
         "Личное",
         CategoryKey.personal,
         [_w(WEEKDAYS, "18:00", "23:00"), _w([6, 7], "10:00", "23:00")],
+        synonyms=(
+            "спорт",
+            "зал",
+            "бассейн",
+            "йога",
+            "пробежка",
+            "кино",
+            "прогулка",
+            "погулять",
+            "подруга",
+            "друзья",
+            "день рождения",
+        ),
     ),
 ]
 
 DEFAULT_ACTION_TYPE_BY_KEY = {d.key: d for d in DEFAULT_ACTION_TYPES}
 
-# Словари быстрого ввода Part 1 по ключам сида (до M21.1, где их заменят синонимы
-# справочников). Сервис переводит ключи в id типов пользователя (`parse_words`).
-TASK_TYPE_WORDS: list[tuple[TaskTypeKey, str]] = [
-    (TaskTypeKey.exam_prep, r"подготов[а-я]*\s+к\s+(?:экзамен|зачет|коллоквиум|контрольн)[а-я]*"),
-    (TaskTypeKey.exam_prep, r"(?:экзамен|зачет|коллоквиум|контрольн)[а-я]*"),
-    (TaskTypeKey.essay, r"реферат[а-я]*|эссе"),
-    (TaskTypeKey.report, r"доклад[а-я]*|презентаци[а-я]*|выступлени[а-я]*"),
-    (TaskTypeKey.coursework, r"курсов(?:ая|ую|ой)|курсач[а-я]*"),
-    (TaskTypeKey.lab, r"лаб[а-я]*|практикум[а-я]*"),
-    (TaskTypeKey.homework, r"дз|домашк[а-я]*|домашн[а-я]*\s+задани[а-я]*|упражнени[а-я]*"),
-    (TaskTypeKey.reading, r"(?:про|до)?чит[а-я]*|прочест[а-я]*|глав[а-я]*"),
-]
-
-# Порядок важен: первое совпадение побеждает
-ACTION_TYPE_WORDS: list[tuple[ActionTypeKey, str]] = [
-    (
-        ActionTypeKey.institutions,
-        r"деканат[а-я]*|библиотек[а-я]*|врач[а-я]*|стоматолог[а-я]*|поликлиник[а-я]*|"
-        r"больниц[а-я]*|мфц|банк[а-я]*|паспорт[а-я]*|справк[а-я]*|военкомат[а-я]*|"
-        r"налогов[а-я]*|нотариус[а-я]*|записаться|запись",
-    ),
-    (
-        ActionTypeKey.people,
-        r"научрук[а-я]*|руководител[а-я]*|препод[а-я]*|старост[а-я]*|куратор[а-я]*|"
-        r"одногруппник[а-я]*|позвонить|созвониться|спросить|договориться|согласовать",
-    ),
-    (
-        ActionTypeKey.outside,
-        r"купить|магазин[а-я]*|аптек[а-я]*|посылк[а-я]*|почт[а-я]*|забрать|отнести|"
-        r"химчистк[а-я]*|ремонт[а-я]*",
-    ),
-    (
-        ActionTypeKey.home,
-        r"убра[а-я]*|уборк[а-я]*|постира[а-я]*|стирк[а-я]*|приготовить|готовк[а-я]*|"
-        r"помыть|пропылесосить|разобрать|погладить|полить|вынести",
-    ),
-    (
-        ActionTypeKey.personal,
-        r"спорт[а-я]*|зал|бассейн[а-я]*|йог[а-я]*|пробежк[а-я]*|кино|прогулк[а-я]*|"
-        r"погулять|подруг[а-я]*|друз[а-я]*|день\s+рождения",
-    ),
-]
-
 
 @dataclass(frozen=True)
-class ParseWords:
-    """Словари быстрого ввода пользователя: (id типа, regex слов)."""
+class Vocabulary:
+    """Словарь быстрого ввода пользователя: названия и синонимы справочников."""
 
-    task: list[tuple[uuid.UUID, str]]
-    action: list[tuple[uuid.UUID, str]]
+    task: list[Term]
+    action: list[Term]
+    event: list[Term]
 
 
-async def parse_words(db: AsyncSession, user_id: uuid.UUID) -> ParseWords:
-    """Ключи словарей сида → id типов пользователя (у своих и удалённых слов нет)."""
+def _terms(rows: Iterable[Any]) -> list[Term]:
+    return [Term(r.id, (r.name, *(r.synonyms or ()))) for r in rows]
 
-    async def ids(model: type[ActionType] | type[TaskType]) -> dict[str, uuid.UUID]:
-        rows = await db.execute(
-            select(model.key, model.id).where(
-                model.user_id == user_id, model.deleted_at.is_(None), model.key.is_not(None)
+
+async def vocabulary(db: AsyncSession, user_id: uuid.UUID) -> Vocabulary:
+    """Типы задач, действий и занятости пользователя по порядку справочника."""
+
+    async def rows(model: type[ActionType] | type[TaskType] | type[EventType]) -> list[Term]:
+        return _terms(
+            await db.scalars(
+                select(model)
+                .where(model.user_id == user_id, model.deleted_at.is_(None))
+                .order_by(model.position, model.created_at)
             )
         )
-        return {key: id for key, id in rows.all() if key}
 
-    tasks, actions = await ids(TaskType), await ids(ActionType)
-    return ParseWords(
-        [(tasks[k], pattern) for k, pattern in TASK_TYPE_WORDS if k in tasks],
-        [(actions[k], pattern) for k, pattern in ACTION_TYPE_WORDS if k in actions],
-    )
+    return Vocabulary(await rows(TaskType), await rows(ActionType), await rows(EventType))
 
 
 async def ensure_defaults(db: AsyncSession, user_id: uuid.UUID) -> bool:
@@ -237,6 +275,7 @@ async def ensure_defaults(db: AsyncSession, user_id: uuid.UUID) -> bool:
                     "default_category_id": category_ids.get(d.category),
                     "windows": d.windows,
                     "prefer_morning": d.prefer_morning,
+                    "synonyms": list(d.synonyms),
                     "position": i,
                 }
                 for i, d in enumerate(DEFAULT_ACTION_TYPES)
@@ -296,14 +335,12 @@ class TaskTypes:
     def __post_init__(self) -> None:
         self.by_id = {t.id: t for t in self.items}
         self.by_name = {t.name: t.id for t in self.items}
-        # Словарь быстрого ввода Part 1 отдаёт ключи сида (до M21.1)
-        self.by_key = {t.key: t.id for t in self.items if t.key}
 
     def names(self) -> list[str]:
         return list(self.by_name)
 
-    def hints(self) -> list[TaskTypeHint]:
-        return [TaskTypeHint(t.name, tuple(t.synonyms)) for t in self.items]
+    def hints(self) -> list[Hint]:
+        return [Hint(t.name, tuple(t.synonyms)) for t in self.items]
 
     def name_of(self, id: uuid.UUID | None) -> str | None:
         t = self.by_id.get(id) if id else None
@@ -447,6 +484,7 @@ class CatalogService:
             windows=data.model_dump(mode="json")["windows"],
             default_category_id=data.default_category_id,
             prefer_morning=data.prefer_morning,
+            synonyms=data.synonyms,
             position=await self._next_position(ActionType),
         )
         self.action_types.add(action_type)
@@ -456,7 +494,7 @@ class CatalogService:
     async def update_action_type(self, id: uuid.UUID, patch: ActionTypeUpdate) -> ActionType:
         action_type = await self.action_types.get_or_404(id)
         changes = patch.model_dump(mode="json", exclude_unset=True)
-        for name in ("name", "windows", "prefer_morning", "position"):
+        for name in ("name", "windows", "prefer_morning", "synonyms", "position"):
             if name in changes and changes[name] is None:
                 raise InvalidDataError(f"{name}: не может быть пустым")
         if category_id := patch.default_category_id:
@@ -506,7 +544,7 @@ class CatalogService:
         await self.db.commit()
 
     async def reset_action_type(self, id: uuid.UUID) -> ActionType:
-        """Вернуть название, окна, утро и категорию по умолчанию (только у засеянных)."""
+        """Вернуть название, окна, утро, слова и категорию по умолчанию (только у засеянных)."""
         action_type = await self.action_types.get_or_404(id)
         if action_type.key is None:
             raise InvalidDataError("У своего типа нет значений по умолчанию")
@@ -517,6 +555,7 @@ class CatalogService:
         action_type.name = default.name
         action_type.windows = default.windows
         action_type.prefer_morning = default.prefer_morning
+        action_type.synonyms = list(default.synonyms)
         action_type.default_category_id = category.id if category else None
         await self.db.commit()
         return action_type

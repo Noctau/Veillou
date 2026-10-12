@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from app.domain.enums import JobStatus
 from app.domain.quickparse import KindHint
 from app.domain.tasks import find_cycle
+from app.schemas.bundle import BundleImportResult, ConfigBundle
 from app.schemas.common import InputModel, ReadModel, UTCMoment
 from app.schemas.plan import PlanState
 from app.schemas.task import Description, SubtaskEstimate, TaskDetail, Title
@@ -105,8 +106,21 @@ class MilestonesDraft(BaseModel):
     warning: str | None = Field(description="Что уточнить в описании проекта")
 
 
+class SetupDraft(BaseModel):
+    """Черновик ИИ-настройки (M21.4) — сборка; ничего не применено, пока не нажали
+    «Применить» (`POST /config/import`)."""
+
+    type: Literal["setup"] = "setup"
+    text: str = Field(description="Описание, по которому собран черновик")
+    about: str = Field(description="«О себе» от ИИ — предложить сохранить")
+    bundle: ConfigBundle
+    warnings: list[str] = Field(description="Что уточнить и что пропущено при проверке")
+    preview: BundleImportResult = Field(description="Что добавится и изменится при импорте")
+
+
 JobResult = Annotated[
-    BreakdownDraft | ParseDraft | PhotoDraft | MilestonesDraft, Field(discriminator="type")
+    BreakdownDraft | ParseDraft | PhotoDraft | MilestonesDraft | SetupDraft,
+    Field(discriminator="type"),
 ]
 
 
@@ -186,6 +200,14 @@ class TemplateRead(ReadModel):
 
 
 # ---------- разбор текста ----------
+
+
+class SetupRequest(InputModel):
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    comment: Comment | None = Field(default=None, description="«Заново с комментарием»")
+    previous: list[Annotated[str, StringConstraints(max_length=300)]] = Field(
+        default_factory=list, max_length=60, description="Прошлый черновик кратко"
+    )
 
 
 class AIParseRequest(InputModel):

@@ -234,7 +234,7 @@ class ScheduleService:
             *where, order_by=[ScheduleRule.slot_from, ScheduleRule.start_time, ScheduleRule.id]
         )
 
-    async def _check_rule(
+    async def check_rule(
         self, data: ScheduleRuleCreate, rule: ScheduleRule | None = None
     ) -> dict[str, Any]:
         """Ссылки свои и живые, поля — по типу занятости. Возвращает значения для записи."""
@@ -264,7 +264,7 @@ class ScheduleService:
         return {**values, "pattern": pattern, "fields": fields}
 
     async def create_rule(self, data: ScheduleRuleCreate) -> ScheduleRule:
-        rule = ScheduleRule(**await self._check_rule(data))
+        rule = ScheduleRule(**await self.check_rule(data))
         self.rules.add(rule)
         await self.db.flush()
         await self.sync.sync_rules([rule])
@@ -274,7 +274,7 @@ class ScheduleService:
     async def update_rule(self, id: uuid.UUID, patch: ScheduleRuleUpdate) -> ScheduleRule:
         rule = await self.rules.get_or_404(id)
         data = validate_patch(rule, patch, ScheduleRuleCreate)
-        for name, value in (await self._check_rule(data, rule)).items():
+        for name, value in (await self.check_rule(data, rule)).items():
             setattr(rule, name, value)
         await self.db.flush()
         await self.sync.sync_rules([rule])

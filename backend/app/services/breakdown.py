@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.prompts import BreakdownContext, PrevStep, breakdown_messages
-from app.ai.schemas import AIBreakdown, with_choices
+from app.ai.schemas import AIBreakdown
 from app.core.config import settings
 from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc
@@ -37,6 +37,7 @@ from app.domain.planner import free_minutes
 from app.models import (
     ActionType,
     Area,
+    AreaType,
     BreakdownTemplate,
     Category,
     Event,
@@ -57,50 +58,29 @@ from app.schemas.ai import (
 )
 from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
+from app.services.ai_profile import AIContext, load_ai_context
 from app.services.base import UserScopedRepository
 from app.services.budgets import budget_index
 from app.services.calibration import coefficients
-from app.services.catalog import TaskTypes, ensure_defaults, load_task_types
+from app.services.catalog import ensure_defaults, load_task_types
 from app.services.replan import ReplanService, windows_from_json
 from app.services.tasks import TaskRepo
 
 
 @dataclass
 class Catalog:
-    """Справочники пользователя. ИИ отвечает ключами сида типов действий и
-    категорий (динамические списки — M21.2): ключ → строка справочника."""
+    """Типы действий пользователя: проверка ссылок шагов и шаблонов."""
 
-    action_by_key: dict[str, ActionType]
     actions: dict[uuid.UUID, ActionType]
-    category_by_key: dict[str, Category]
-
-    def action_id(self, key: str | None) -> uuid.UUID | None:
-        at = self.action_by_key.get(key) if key else None
-        return at.id if at else None
 
 
 async def load_catalog(db: AsyncSession, user_id: uuid.UUID) -> Catalog:
     if await ensure_defaults(db, user_id):
         await db.flush()
-    actions = list(
-        await db.scalars(
-            select(ActionType).where(ActionType.user_id == user_id, ActionType.deleted_at.is_(None))
-        )
+    actions = await db.scalars(
+        select(ActionType).where(ActionType.user_id == user_id, ActionType.deleted_at.is_(None))
     )
-    categories = list(
-        await db.scalars(
-            select(Category).where(
-                Category.user_id == user_id,
-                Category.deleted_at.is_(None),
-                Category.key.is_not(None),
-            )
-        )
-    )
-    return Catalog(
-        {a.key: a for a in actions if a.key},
-        {a.id: a for a in actions},
-        {c.key: c for c in categories if c.key},
-    )
+    return Catalog({a.id: a for a in actions})
 
 
 class _TemplateRepo(UserScopedRepository[BreakdownTemplate]):
@@ -160,15 +140,16 @@ class BreakdownService:
         )
 
     async def context(
-        self, task: Task, request: BreakdownRequest, task_types: TaskTypes
+        self, task: Task, request: BreakdownRequest, ai: AIContext
     ) -> tuple[BreakdownContext, int | None, float]:
-        """Контекст промпта, свободные минуты (в «её» темпе) и коэффициент калибровки."""
+        """Контекст промпта, свободные минуты (в темпе пользователя) и коэффициент калибровки."""
         catalog = await load_catalog(self.db, self.user_id)
         coefs = await coefficients(self.db, self.user_id)
         coef = coefs.get((task.task_type_id, task.action_type_id), 1.0)
         free = await self._free_minutes(task, catalog)
 
-        subject = await self.db.get(Area, task.area_id) if task.area_id else None
+        area = await self.db.get(Area, task.area_id) if task.area_id else None
+        area_type = await self.db.get(AreaType, area.area_type_id) if area else None
         project = await self.db.get(Project, task.project_id) if task.project_id else None
         done = await self.db.scalars(
             select(Subtask.title)
@@ -184,17 +165,17 @@ class BreakdownService:
         ctx = BreakdownContext(
             title=task.title,
             today=now.date(),
-            task_type=task_types.name_of(task.task_type_id),
+            task_type=ai.task_types.name_of(task.task_type_id),
             description=task.description,
-            subject=subject.name if subject else None,
+            area=(f"{area.name} ({area_type.name})" if area_type else area.name) if area else None,
             project=project.title if project else None,
             deadline=task.deadline.astimezone(self.tz) if task.deadline else None,
-            # ИИ оценивает «чистое» время; в её темпе свободного как бы меньше
+            # ИИ оценивает «чистое» время; в темпе пользователя свободного как бы меньше
             free_minutes=round(free / coef) if free is not None else None,
             done_steps=list(done),
             previous=[PrevStep(s.title, s.estimate_min) for s in request.previous],
             comment=request.comment,
-            task_types=task_types.hints(),
+            profile=ai.profile,
         )
         return ctx, free, coef
 
@@ -208,17 +189,17 @@ class BreakdownService:
             comment=payload.get("comment"),
             previous=[BreakdownStep.model_validate(s) for s in payload.get("previous") or []],
         )
-        task_types = await load_task_types(self.db, self.user_id)
-        ctx, free, coef = await self.context(task, request, task_types)
+        ai = await load_ai_context(self.db, self.user, local_date(now_utc(), self.tz))
+        ctx, free, coef = await self.context(task, request, ai)
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.breakdown,
             breakdown_messages(ctx),
-            with_choices(AIBreakdown, task_type=task_types.names()),
+            ai.schema(AIBreakdown),
             job_id=job.id,
         )
-        draft = await self.to_draft(task, answer, free, coef, task_types)
+        draft = await self.to_draft(task, answer, free, coef, ai)
         job.result = draft.model_dump(mode="json")
         return draft
 
@@ -228,9 +209,8 @@ class BreakdownService:
         answer: AIBreakdown,
         free: int | None,
         coef: float,
-        task_types: TaskTypes | None = None,
+        ai: AIContext | None = None,
     ) -> BreakdownDraft:
-        catalog = await load_catalog(self.db, self.user_id)
         normalized = normalize_steps(
             [
                 RawStep(
@@ -240,19 +220,18 @@ class BreakdownService:
             ]
         )
         # Тип задачи ИИ уточняет, только если его не задали руками
-        if task_types is None:
-            task_types = await load_task_types(self.db, self.user_id)
-        task_type_id = task.task_type_id or task_types.id_of(answer.task_type)
-        category = catalog.category_by_key.get(answer.category)
+        if ai is None:
+            ai = await load_ai_context(self.db, self.user, local_date(now_utc(), self.tz))
+        task_type_id = task.task_type_id or ai.task_types.id_of(answer.task_type)
         return BreakdownDraft(
             task_id=task.id,
             task_type_id=task_type_id,
-            category_id=task.category_id or (category.id if category else None),
+            category_id=task.category_id or ai.category_id(answer.category),
             steps=[
                 BreakdownStep(
                     title=s.title[:300],
                     estimate_min=s.estimate_min,
-                    action_type_id=catalog.action_id(s.action_type),
+                    action_type_id=ai.action_id(s.action_type),
                     depends_on=list(s.depends_on),
                     note=s.note,
                 )

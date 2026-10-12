@@ -14,11 +14,14 @@ async def make_task_type(client: AsyncClient, **over) -> dict:
 
 
 async def seed_task_type(session, user_id, key: str, name: str) -> uuid.UUID:
-    """Тип задачи с ключом сида — как у мигрированных пользователей Part 1 (словарь
-    быстрого ввода находит его по ключу до M21.1). Возвращает id."""
+    """Тип задачи с ключом сида и синонимами — как у мигрированных пользователей Part 1
+    (после M21.1). Возвращает id."""
     from app.models import TaskType
 
-    task_type = TaskType(user_id=user_id, key=key, name=name, synonyms=[], position=0)
+    from .student import TASK_TYPES
+
+    synonyms = next((list(syn) for k, _, _, syn in TASK_TYPES if k == key), [])
+    task_type = TaskType(user_id=user_id, key=key, name=name, synonyms=synonyms, position=0)
     session.add(task_type)
     await session.flush()
     type_id = task_type.id
@@ -53,9 +56,9 @@ async def test_create_task_with_defaults(auth_client):
     )
     types = await action_types(auth_client)
     cats = await categories(auth_client)
-    # Без явных значений: «Самостоятельная учёба» и её категория «Учёба»
+    # Без явных значений: тип по умолчанию («Сосредоточенная работа») и его категория
     assert task["action_type_id"] == types["study"]["id"]
-    assert task["category_id"] == cats["study"]["id"]
+    assert task["category_id"] == cats["work"]["id"]
     assert task["deadline"] == "2026-10-15T20:59:00Z"
     assert task["status"] == "active"
     assert task["priority"] == "normal"
@@ -182,7 +185,7 @@ async def test_schedule_subtask_and_calendar_sync(auth_client):
     assert event["source_type"] == "subtask"
     assert event["source_id"] == sub["id"]
     assert event["title"] == "Глава 1"
-    assert event["color"] == cats["study"]["color"]
+    assert event["color"] == cats["work"]["color"]
 
     # Перенос — тот же блок
     resp = await auth_client.post(url, json={"start": "2026-10-08T10:00:00+03:00"})

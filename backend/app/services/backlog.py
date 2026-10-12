@@ -17,7 +17,7 @@ from app.domain.quickparse import guess
 from app.models import ActionType, BacklogItem, Category, EventType, User
 from app.schemas.backlog import BacklogCreate, BacklogUpdate
 from app.services.base import UserScopedRepository
-from app.services.catalog import ensure_defaults, parse_words
+from app.services.catalog import ensure_defaults, vocabulary
 
 
 class BacklogRepo(UserScopedRepository[BacklogItem]):
@@ -89,7 +89,7 @@ class BacklogService:
         if fields["action_type_id"] is None:
             if await ensure_defaults(self.db, self.user_id):
                 await self.db.flush()
-            words = await parse_words(self.db, self.user_id)
+            words = await vocabulary(self.db, self.user_id)
             if isinstance(type_id := guess(data.title, words.action), uuid.UUID):
                 action_type = await self.action_types.get(type_id)
                 fields["action_type_id"] = type_id

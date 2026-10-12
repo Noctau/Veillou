@@ -4,7 +4,7 @@
 Время в правилах — «настенное» в TZ пользователя. В календарь правила попадают
 через материализацию в `events` (services/schedule_sync.py), генерация вхождений —
 domain/recurrence.py. Справочники не засеваются: у пользователей Part 1 типы
-«Пара», «Личное», «Отдых», «Экзамен» создала миграция.
+типы занятости создала миграция M17.1.
 """
 
 import uuid
@@ -50,18 +50,20 @@ class EventType(UserOwnedMixin, Base):
     show_now_next: Mapped[bool] = mapped_column(Boolean, default=False)  # «Сейчас / Дальше»
     is_rest: Mapped[bool] = mapped_column(Boolean, default=False)  # защищённый отдых
     supports_prep: Mapped[bool] = mapped_column(Boolean, default=False)  # подготовка к событию
-    # Подпись перед местом в текстах («ауд.» → «ауд. 1801»); пусто — место как есть
+    # Подпись перед местом в текстах («каб.» → «каб. 12»); пусто — место как есть
     location_label: Mapped[str] = mapped_column(String(20), default="")
     default_area_type_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("area_types.id", ondelete="SET NULL")
     )
     # Список FieldDef (domain/fields.py) — поля событий этого типа
     fields: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    # Слова быстрого ввода: «созвон», «смена»
+    synonyms: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
     position: Mapped[int] = mapped_column(SmallInteger, default=0)
 
 
 class Period(UserOwnedMixin, Base):
-    """Период (бывший семестр): границы правил, цикл недель и паузы."""
+    """Период (в Part 1 — semesters): границы правил, цикл недель и паузы."""
 
     __tablename__ = "periods"
 

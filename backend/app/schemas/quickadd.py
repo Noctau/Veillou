@@ -27,5 +27,8 @@ class QuickParseRead(BaseModel):
     action_type_id: uuid.UUID | None = Field(
         description="Тип действия по словам; похоже на задачу — тип по умолчанию"
     )
+    event_type_id: uuid.UUID | None = Field(
+        default=None, description="Тип занятости по словам — для события"
+    )
     kind_hint: KindHint
     needs_ai: bool = Field(description="Разбор неуверенный — стоит спросить ИИ")

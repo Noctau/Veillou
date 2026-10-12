@@ -132,13 +132,16 @@ def _new_id(taken: set[str]) -> str:
     return f"f{n}"
 
 
-def merge_defs(old: Sequence[FieldDef], new: Sequence[FieldDef]) -> list[FieldDef]:
+def merge_defs(
+    old: Sequence[FieldDef], new: Sequence[FieldDef], *, keep_ids: bool = False
+) -> list[FieldDef]:
     """Новый список полей поверх старого — без потери данных.
 
     - Поле с id из старого списка — то же поле: можно переименовать, поменять
       варианты и флаги, но не тип (значения другого типа станут мусором).
     - Поле с пустым или незнакомым id — новое: id выдаётся `f1`, `f2`, … (не занятые
-      ни живыми, ни удалёнными полями).
+      ни живыми, ни удалёнными полями). С `keep_ids` (импорт сборки) незнакомый
+      допустимый id остаётся — на него ссылаются значения из той же сборки.
     - Старое поле, которого нет в новом списке, остаётся с `deleted=True` в конце.
 
     Порядок живых полей — как в `new`. Ошибки — `FieldError` со всеми проблемами.
@@ -159,6 +162,8 @@ def merge_defs(old: Sequence[FieldDef], new: Sequence[FieldDef]) -> list[FieldDe
         if prev is not None and d.id not in seen:
             if prev.type != d.type:
                 problems.append(f"«{d.label}»: тип поля не меняется — создайте новое поле")
+        elif keep_ids and prev is None and d.id not in taken and _ID_RE.match(d.id):
+            taken.add(d.id)
         else:
             d = replace(d, id=_new_id(taken))
             taken.add(d.id)
@@ -479,7 +484,7 @@ def render_split(
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """Как `render_values`, но значения выбора (select, multiselect) — отдельно и без
     подписи: в строке события они читаются сами по себе («лекция»), остальное —
-    парами «подпись, текст» в порядке полей."""
+    кортежами «подпись, текст» в порядке полей."""
     inline: list[str] = []
     rest: list[tuple[str, str]] = []
     for d in active(defs):

@@ -15,6 +15,7 @@ from pydantic import ConfigDict, Field, StringConstraints, field_validator, mode
 from app.domain.enums import CategoryIcon
 from app.domain.recurrence import MAX_CYCLE_WEEKS, MAX_DAY_CYCLE, parse_rrule
 from app.schemas.area import FieldDefRead, FieldDefs, FieldValues
+from app.schemas.catalog import SYNONYMS_HELP, Synonym, _unique_words
 from app.schemas.common import (
     MAX_PERIOD,
     HexColor,
@@ -69,12 +70,14 @@ class EventTypeCreate(InputModel):
     is_rest: bool = Field(default=False, description="Защищённый отдых")
     supports_prep: bool = Field(default=False, description="Подготовка к событию")
     location_label: LocationLabel = Field(
-        default="", description="Подпись перед местом в текстах: «ауд.» → «ауд. 1801»"
+        default="", description="Подпись перед местом в текстах: «каб.» → «каб. 12»"
     )
     default_area_type_id: uuid.UUID | None = None
     fields: FieldDefs = Field(default_factory=list)
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30, description=SYNONYMS_HELP)
 
     _ch = field_validator("remind_channels")(_channels)
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class EventTypeUpdate(InputModel):
@@ -93,9 +96,11 @@ class EventTypeUpdate(InputModel):
     location_label: LocationLabel | None = None
     default_area_type_id: uuid.UUID | None = None
     fields: FieldDefs | None = Field(default=None, description="Полный список полей")
+    synonyms: list[Synonym] | None = Field(default=None, max_length=30)
     position: int | None = Field(default=None, ge=0, le=1000)
 
     _ch = field_validator("remind_channels")(_channels)
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class EventTypeRead(ReadModel):
@@ -116,6 +121,7 @@ class EventTypeRead(ReadModel):
     location_label: str
     default_area_type_id: uuid.UUID | None
     fields: list[FieldDefRead] = Field(description="Живые поля (удалённые не показываются)")
+    synonyms: list[str]
     position: int
 
     @field_validator("fields", mode="before")

@@ -271,12 +271,19 @@ class JobKind(StrEnum):
     ai_parse = "ai.parse"  # разобрать свободный текст (бот, ＋)
     ai_photo = "ai.photo"  # распознать фото задания
     ai_milestones = "ai.milestones"  # предложить этапы проекта (черновик)
+    ai_setup = "ai.setup"  # настройка по описанию: черновик сборки
     event_tasks_sync = "event_tasks.sync"  # автозадачи от событий и сроки «к следующему»
 
 
 # ИИ-джобы идут своей очередью: по одной, по порядку постановки, и ждут, если ИИ недоступен
 AI_JOB_KINDS = frozenset(
-    {JobKind.ai_breakdown, JobKind.ai_parse, JobKind.ai_photo, JobKind.ai_milestones}
+    {
+        JobKind.ai_breakdown,
+        JobKind.ai_parse,
+        JobKind.ai_photo,
+        JobKind.ai_milestones,
+        JobKind.ai_setup,
+    }
 )
 
 
@@ -340,6 +347,7 @@ class AIPurpose(StrEnum):
     parse = "parse"
     photo = "photo"
     milestones = "milestones"
+    setup = "setup"
 
 
 class AIOrigin(StrEnum):

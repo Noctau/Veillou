@@ -1,21 +1,14 @@
 {
   "today": "2026-10-08",
   "now_time": "14:30",
-  "subjects": [
-    "Климатология",
-    "Физика атмосферы",
-    "Синоптическая метеорология",
-    "Гидрология",
-    "Философия"
-  ],
   "cases": [
     {
       "text": "Реферат по климатологии про муссоны, 10 страниц, сдать до 20 октября",
       "expect": {
         "kind": "task",
         "task_type": "Реферат",
-        "subject": "Климатология",
-        "deadline_date": "2026-10-20"
+        "deadline_date": "2026-10-20",
+        "area": "Климатология"
       }
     },
     {
@@ -23,8 +16,8 @@
       "expect": {
         "kind": "task",
         "task_type": "ДЗ",
-        "subject": "Физика атмосферы",
-        "deadline_date": "2026-10-16"
+        "deadline_date": "2026-10-16",
+        "area": "Физика атмосферы"
       }
     },
     {
@@ -32,8 +25,8 @@
       "expect": {
         "kind": "task",
         "task_type": "Доклад",
-        "subject": "Синоптическая метеорология",
-        "deadline_date": "2026-10-15"
+        "deadline_date": "2026-10-15",
+        "area": "Синоптическая метеорология"
       }
     },
     {
@@ -41,8 +34,8 @@
       "expect": {
         "kind": "backlog",
         "task_type": null,
-        "subject": null,
-        "deadline_date": null
+        "deadline_date": null,
+        "area": null
       }
     },
     {
@@ -50,8 +43,8 @@
       "expect": {
         "kind": "task",
         "task_type": "Чтение",
-        "subject": "Гидрология",
-        "deadline_date": null
+        "deadline_date": null,
+        "area": "Гидрология"
       }
     },
     {
@@ -59,8 +52,8 @@
       "expect": {
         "kind": "task",
         "task_type": "Реферат",
-        "subject": "Философия",
-        "deadline_date": "2026-10-09"
+        "deadline_date": "2026-10-09",
+        "area": "Философия"
       }
     },
     {
@@ -68,9 +61,9 @@
       "expect": {
         "kind": "task",
         "task_type": null,
-        "subject": null,
         "deadline_date": null,
-        "action_type": "people"
+        "action_type": "Связь с людьми",
+        "area": null
       }
     },
     {
@@ -84,8 +77,8 @@
       "text": "Задание: построить климатограммы для Москвы, Якутска и Сочи по данным 1991–2020, срок — через две недели",
       "expect": {
         "kind": "task",
-        "subject": "Климатология",
-        "deadline_date": "2026-10-22"
+        "deadline_date": "2026-10-22",
+        "area": "Климатология"
       }
     },
     {
@@ -93,6 +86,160 @@
       "expect": {
         "kind": "backlog",
         "deadline_date": null
+      }
+    },
+    {
+      "profile": "tutor",
+      "text": "проверить дз маши до воскресенья",
+      "expect": {
+        "kind": "task",
+        "task_type": "Проверка ДЗ",
+        "area": "Маша",
+        "deadline_date": "2026-10-11"
+      }
+    },
+    {
+      "profile": "tutor",
+      "text": "подготовить урок для Пети по квадратным уравнениям к среде",
+      "expect": {
+        "kind": "task",
+        "task_type": "Подготовка урока",
+        "area": "Петя Иванов",
+        "deadline_date": "2026-10-14"
+      }
+    },
+    {
+      "profile": "tutor",
+      "text": "позвонить маме Ани насчёт переноса урока",
+      "expect": {
+        "area": "Аня Смирнова",
+        "action_type": "Связь с людьми"
+      }
+    },
+    {
+      "profile": "tutor",
+      "text": "составить методичку по тригонометрии",
+      "expect": {
+        "kind": "task",
+        "task_type": "Методичка",
+        "deadline_date": null
+      }
+    },
+    {
+      "profile": "shifts",
+      "text": "до 20 октября сдать в отдел кадров справку о прививках",
+      "expect": {
+        "kind": "task",
+        "deadline_date": "2026-10-20"
+      }
+    },
+    {
+      "profile": "shifts",
+      "text": "купить компрессионные чулки",
+      "expect": {
+        "kind": "backlog",
+        "action_type": "Вне дома",
+        "deadline_date": null
+      }
+    },
+    {
+      "profile": "shifts",
+      "text": "пройти курс повышения квалификации до конца ноября",
+      "expect": {
+        "kind": "task",
+        "task_type": "Обучение",
+        "deadline_date": "2026-11-30"
+      }
+    },
+    {
+      "profile": "shifts",
+      "text": "записаться к терапевту",
+      "expect": {
+        "kind": "backlog",
+        "action_type": "Учреждения",
+        "area": null
+      }
+    },
+    {
+      "profile": "office",
+      "text": "отчёт по продажам за квартал к пятнице",
+      "expect": {
+        "kind": "task",
+        "task_type": "Отчёт",
+        "deadline_date": "2026-10-09"
+      }
+    },
+    {
+      "profile": "office",
+      "text": "созвон с Ромашкой во вторник в 11:00",
+      "expect": {
+        "kind": "event",
+        "area": "Клиент Ромашка"
+      }
+    },
+    {
+      "profile": "office",
+      "text": "сделать код-ревью пул-реквеста по Альфе",
+      "expect": {
+        "kind": "task",
+        "task_type": "Код-ревью",
+        "area": "Проект Альфа"
+      }
+    },
+    {
+      "profile": "office",
+      "text": "подготовить презентацию для клиента Ромашка к 20.10",
+      "expect": {
+        "kind": "task",
+        "task_type": "Презентация",
+        "area": "Клиент Ромашка",
+        "deadline_date": "2026-10-20"
+      }
+    },
+    {
+      "profile": "school",
+      "text": "алгебра №245 к завтра",
+      "expect": {
+        "kind": "task",
+        "task_type": "ДЗ",
+        "area": "Алгебра",
+        "deadline_date": "2026-10-09"
+      }
+    },
+    {
+      "profile": "school",
+      "text": "сочинение по русскому про осень до понедельника",
+      "expect": {
+        "kind": "task",
+        "task_type": "Сочинение",
+        "area": "Русский язык",
+        "deadline_date": "2026-10-12"
+      }
+    },
+    {
+      "profile": "school",
+      "text": "выучить слова по английскому",
+      "expect": {
+        "kind": "task",
+        "area": "Английский"
+      }
+    },
+    {
+      "profile": "school",
+      "text": "проект по физике к 1 ноября",
+      "expect": {
+        "kind": "task",
+        "task_type": "Проект",
+        "area": "Физика",
+        "deadline_date": "2026-11-01"
+      }
+    },
+    {
+      "profile": "school",
+      "text": "тренировка по футболу в субботу в 10",
+      "expect": {
+        "kind": "event",
+        "area": null
       }
     }
   ]

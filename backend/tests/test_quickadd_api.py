@@ -1,10 +1,6 @@
-import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import update
-
-from app.models import TaskType
 
 from .test_catalog import action_types
 from .test_schedule_api import API, make_area, make_period
@@ -21,12 +17,8 @@ def frozen(monkeypatch):
 
 async def test_parse_with_user_subjects(auth_client, frozen, session):
     types = await action_types(auth_client)
+    # Словарь — названия и синонимы справочника (M21.1)
     essay = await make_task_type(auth_client)
-    # Словарь быстрого ввода Part 1 отдаёт ключи сида: у мигрированных типов есть key
-    await session.execute(
-        update(TaskType).where(TaskType.id == uuid.UUID(essay["id"])).values(key="essay")
-    )
-    await session.commit()
     sem = await make_period(auth_client)
     subj = await make_area(auth_client, sem["id"], synonyms=["климатуха"])
     resp = await auth_client.post(
@@ -45,6 +37,7 @@ async def test_parse_with_user_subjects(auth_client, frozen, session):
         "task_type_id": essay["id"],
         # Похоже на задачу — тип действия по умолчанию
         "action_type_id": types["study"]["id"],
+        "event_type_id": None,
         "kind_hint": "task",
         # Есть и срок, и предмет — ИИ не нужен
         "needs_ai": False,
@@ -75,3 +68,65 @@ async def test_event_time(auth_client, frozen):
 async def test_requires_auth(client):
     resp = await client.post(f"{API}/quick-add/parse", json={"text": "x"})
     assert resp.status_code == 401
+
+
+# ---------- словарь пользователя (M21.1) ----------
+
+
+async def test_schoolkid_one_line_homework_due_next_lesson(auth_client, user):
+    """Сценарий 4: «алгебра №245» — ДЗ по сфере со сроком к следующему уроку."""
+    from datetime import datetime as dt
+
+    from app.core.db import session_factory
+    from app.models import User
+    from app.services.quickadd import create_from_text
+
+    from .test_event_tasks import _ok, lessons, tutor
+
+    t = await tutor(auth_client)
+    await _ok(await auth_client.patch(f"{API}/areas/{t['area']['id']}", json={"name": "Алгебра"}))
+    hw = await _ok(
+        await auth_client.post(
+            f"{API}/task-types",
+            json={
+                "name": "ДЗ",
+                "synonyms": ["дз", "№"],
+                "deadline_rule": {"kind": "next_occurrence"},
+            },
+        )
+    )
+    parsed = (
+        await auth_client.post(f"{API}/quick-add/parse", json={"text": "алгебра №245"})
+    ).json()
+    assert (parsed["area_id"], parsed["task_type_id"]) == (t["area"]["id"], hw["id"])
+    assert parsed["kind_hint"] == "task"
+    async with session_factory() as db:
+        u = await db.get(User, user.id)
+        assert u is not None
+        created = await create_from_text(db, u, "алгебра №245")
+    task = await _ok(await auth_client.get(f"{API}/tasks/{created.id}"))
+    assert task["title"] == "№245"
+    assert dt.fromisoformat(task["deadline"]) == (await lessons(user))[0].start
+
+
+async def test_office_call_creates_event_of_type(auth_client, frozen):
+    """Сценарий 5/6: «созвон с клиентом в пт 15:00» — событие типа «Встреча», без ИИ."""
+    meeting = (
+        await auth_client.post(
+            f"{API}/event-types", json={"name": "Встреча", "synonyms": ["созвон", "стендап"]}
+        )
+    ).json()
+    resp = await auth_client.post(
+        f"{API}/quick-add/parse", json={"text": "созвон с клиентом в пт 15:00"}
+    )
+    data = resp.json()
+    assert (data["kind_hint"], data["event_type_id"]) == ("event", meeting["id"])
+    assert data["time"] == "15:00"
+    assert data["needs_ai"] is False
+
+
+async def test_task_without_area_is_sure_when_user_has_no_areas(auth_client, frozen):
+    """Нулевая настройка: задача со сроком без сферы — ИИ не нужен."""
+    resp = await auth_client.post(f"{API}/quick-add/parse", json={"text": "сдать отчёт к пятнице"})
+    data = resp.json()
+    assert (data["kind_hint"], data["area_id"], data["needs_ai"]) == ("task", None, False)

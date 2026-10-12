@@ -1,0 +1,1114 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "ref": "Учёба",
+      "name": "Учёба",
+      "color": "#3b82f6",
+      "icon": "graduation-cap"
+    },
+    {
+      "ref": "Работа",
+      "name": "Работа",
+      "color": "#8b5cf6",
+      "icon": "briefcase"
+    },
+    {
+      "ref": "Быт",
+      "name": "Быт",
+      "color": "#f59e0b",
+      "icon": "house"
+    },
+    {
+      "ref": "Личное",
+      "name": "Личное",
+      "color": "#ec4899",
+      "icon": "heart"
+    }
+  ],
+  "action_types": [
+    {
+      "ref": "Связь с людьми",
+      "name": "Связь с людьми",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "09:00",
+          "end": "19:00"
+        }
+      ],
+      "category": "Учёба",
+      "prefer_morning": true,
+      "synonyms": [
+        "научрук",
+        "руководитель",
+        "препод*",
+        "преподаватель",
+        "староста",
+        "куратор",
+        "одногруппник",
+        "позвонить",
+        "созвониться",
+        "спросить",
+        "договориться",
+        "согласовать"
+      ]
+    },
+    {
+      "ref": "Учреждения",
+      "name": "Учреждения",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "10:00",
+          "end": "18:00"
+        }
+      ],
+      "category": "Быт",
+      "prefer_morning": false,
+      "synonyms": [
+        "деканат",
+        "библиотека",
+        "врач",
+        "стоматолог",
+        "поликлиника",
+        "больница",
+        "мфц",
+        "банк",
+        "паспорт",
+        "справка",
+        "военкомат",
+        "налоговая",
+        "нотариус",
+        "записаться",
+        "запись"
+      ]
+    },
+    {
+      "ref": "Самостоятельная учёба",
+      "name": "Самостоятельная учёба",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "start": "07:00",
+          "end": "01:00"
+        }
+      ],
+      "category": "Учёба",
+      "prefer_morning": false,
+      "synonyms": []
+    },
+    {
+      "ref": "Вне дома",
+      "name": "Вне дома",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "start": "09:00",
+          "end": "21:00"
+        }
+      ],
+      "category": "Быт",
+      "prefer_morning": false,
+      "synonyms": [
+        "купить",
+        "магазин",
+        "аптека",
+        "посылка",
+        "почта",
+        "забрать",
+        "отнести",
+        "химчистка",
+        "ремонт"
+      ]
+    },
+    {
+      "ref": "Домашние дела",
+      "name": "Домашние дела",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "start": "08:00",
+          "end": "22:00"
+        }
+      ],
+      "category": "Быт",
+      "prefer_morning": false,
+      "synonyms": [
+        "убрать",
+        "убраться",
+        "уборка",
+        "постирать",
+        "стирка",
+        "приготовить",
+        "готовка",
+        "помыть",
+        "пропылесосить",
+        "разобрать",
+        "погладить",
+        "полить",
+        "вынести"
+      ]
+    },
+    {
+      "ref": "Личное",
+      "name": "Личное",
+      "windows": [
+        {
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "start": "18:00",
+          "end": "23:00"
+        },
+        {
+          "weekdays": [
+            6,
+            7
+          ],
+          "start": "10:00",
+          "end": "23:00"
+        }
+      ],
+      "category": "Личное",
+      "prefer_morning": false,
+      "synonyms": [
+        "спорт",
+        "зал",
+        "бассейн",
+        "йога",
+        "пробежка",
+        "кино",
+        "прогулка",
+        "погулять",
+        "подруга",
+        "друзья",
+        "день рождения"
+      ]
+    }
+  ],
+  "task_types": [
+    {
+      "ref": "ДЗ",
+      "name": "ДЗ",
+      "icon": "pencil",
+      "synonyms": [
+        "дз",
+        "домашка",
+        "домашнее задание",
+        "упражнение"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Доклад",
+      "name": "Доклад",
+      "icon": "presentation",
+      "synonyms": [
+        "доклад",
+        "презентация",
+        "выступление"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Реферат",
+      "name": "Реферат",
+      "icon": "file-text",
+      "synonyms": [
+        "реферат",
+        "эссе"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Лабораторная",
+      "name": "Лабораторная",
+      "icon": "flask-conical",
+      "synonyms": [
+        "лаба",
+        "лабораторная",
+        "практикум",
+        "лаборатор*"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Курсовая",
+      "name": "Курсовая",
+      "icon": "graduation-cap",
+      "synonyms": [
+        "курсовая",
+        "курсач"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Чтение",
+      "name": "Чтение",
+      "icon": "book-open",
+      "synonyms": [
+        "прочитать",
+        "дочитать",
+        "чтение",
+        "глава",
+        "читать",
+        "прочесть"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Подготовка к экзамену",
+      "name": "Подготовка к экзамену",
+      "icon": "clipboard-check",
+      "synonyms": [
+        "экзамен",
+        "зачёт",
+        "коллоквиум",
+        "контрольная"
+      ],
+      "action_type": null,
+      "category": null,
+      "default_estimate_min": null,
+      "deadline_rule": null
+    },
+    {
+      "ref": "Задание с работы",
+      "name": "Задание с работы",
+      "icon": "briefcase",
+      "synonyms": [],
+      "action_type": null,
+      "category": "Работа",
+      "default_estimate_min": null,
+      "deadline_rule": {
+        "kind": "days",
+        "days": 14
+      }
+    }
+  ],
+  "area_types": [
+    {
+      "ref": "Предмет",
+      "name": "Предмет",
+      "name_plural": "Предметы",
+      "icon": "graduation-cap",
+      "color": "#3b82f6",
+      "fields": [
+        {
+          "id": "f1",
+          "label": "Преподаватели",
+          "type": "contact",
+          "options": [],
+          "multiple": true,
+          "show_in_reminder": false,
+          "required": false
+        },
+        {
+          "id": "f2",
+          "label": "Форма контроля",
+          "type": "select",
+          "options": [
+            "Экзамен",
+            "Зачёт",
+            "Дифзачёт",
+            "Курсовая"
+          ],
+          "multiple": false,
+          "show_in_reminder": false,
+          "required": false
+        },
+        {
+          "id": "f3",
+          "label": "Ссылки",
+          "type": "link",
+          "options": [],
+          "multiple": true,
+          "show_in_reminder": false,
+          "required": false
+        }
+      ],
+      "sections": [
+        "schedule",
+        "tasks",
+        "notes",
+        "materials",
+        "prep"
+      ]
+    }
+  ],
+  "periods": [
+    {
+      "ref": "Осень 2026",
+      "name": "Осень 2026",
+      "start_date": "2026-09-01",
+      "end_date": "2027-01-25",
+      "cycle_weeks": 2,
+      "first_cycle_week": 1,
+      "pauses": [
+        {
+          "from": "2026-12-28",
+          "to": "2027-01-08",
+          "title": "Перерыв"
+        },
+        {
+          "from": "2027-01-09",
+          "to": "2027-01-25",
+          "title": "Сессия"
+        }
+      ]
+    }
+  ],
+  "days_off": [
+    {
+      "ref": "День факультета",
+      "period": null,
+      "date_from": "2026-12-10",
+      "date_to": "2026-12-10",
+      "title": "День факультета"
+    },
+    {
+      "ref": "Новогодние каникулы",
+      "period": null,
+      "date_from": "2026-12-31",
+      "date_to": "2027-01-08",
+      "title": "Новогодние каникулы"
+    }
+  ],
+  "slot_grids": [
+    {
+      "ref": "Звонки",
+      "period": "Осень 2026",
+      "name": "Звонки",
+      "schedules": [
+        {
+          "weekday": null,
+          "slots": [
+            {
+              "number": 1,
+              "start": "09:00",
+              "end": "10:35"
+            },
+            {
+              "number": 2,
+              "start": "10:45",
+              "end": "12:20"
+            },
+            {
+              "number": 3,
+              "start": "13:00",
+              "end": "14:35"
+            },
+            {
+              "number": 4,
+              "start": "14:45",
+              "end": "16:20"
+            },
+            {
+              "number": 5,
+              "start": "16:30",
+              "end": "18:05"
+            }
+          ]
+        },
+        {
+          "weekday": 6,
+          "slots": [
+            {
+              "number": 1,
+              "start": "10:00",
+              "end": "11:30"
+            },
+            {
+              "number": 2,
+              "start": "11:40",
+              "end": "13:10"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "areas": [
+    {
+      "ref": "Английский язык",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Английский язык",
+      "short_name": "англ",
+      "color": "#f59e0b",
+      "synonyms": [],
+      "fields": {
+        "f2": "Зачёт"
+      },
+      "notes": ""
+    },
+    {
+      "ref": "Динамическая метеорология",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Динамическая метеорология",
+      "short_name": "динмет",
+      "color": "#8b5cf6",
+      "synonyms": [],
+      "fields": {
+        "f2": "Экзамен"
+      },
+      "notes": ""
+    },
+    {
+      "ref": "Климатология",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Климатология",
+      "short_name": "клим",
+      "color": "#10b981",
+      "synonyms": [
+        "климат"
+      ],
+      "fields": {
+        "f1": [
+          {
+            "name": "Иванов Пётр Сергеевич",
+            "role": "лектор",
+            "email": "ivanov@example.com"
+          },
+          {
+            "name": "Смирнова Анна",
+            "role": "семинарист"
+          }
+        ],
+        "f2": "Экзамен",
+        "f3": [
+          {
+            "url": "https://example.com/clim",
+            "title": "Курс на сайте кафедры"
+          }
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "ref": "Математический анализ",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Математический анализ",
+      "short_name": "матан",
+      "color": "#ef4444",
+      "synonyms": [],
+      "fields": {
+        "f2": "Дифзачёт"
+      },
+      "notes": ""
+    },
+    {
+      "ref": "Спутниковая метеорология",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Спутниковая метеорология",
+      "short_name": "спутмет",
+      "color": "#14b8a6",
+      "synonyms": [],
+      "fields": {
+        "f2": "Зачёт"
+      },
+      "notes": "Спецкурс, по выбору"
+    },
+    {
+      "ref": "Физика атмосферы",
+      "area_type": "Предмет",
+      "period": "Осень 2026",
+      "name": "Физика атмосферы",
+      "short_name": "физат",
+      "color": "#3b82f6",
+      "synonyms": [],
+      "fields": {
+        "f2": "Экзамен"
+      },
+      "notes": ""
+    }
+  ],
+  "event_types": [
+    {
+      "ref": "Пара",
+      "name": "Пара",
+      "name_plural": "Пары",
+      "icon": "graduation-cap",
+      "color": "#3b82f6",
+      "buffer_before_min": 40,
+      "buffer_after_min": 40,
+      "merge_buffers": true,
+      "remind_before_min": 20,
+      "remind_channels": [
+        "push",
+        "telegram"
+      ],
+      "show_now_next": true,
+      "is_rest": false,
+      "supports_prep": false,
+      "location_label": "ауд.",
+      "default_area_type": null,
+      "fields": [
+        {
+          "id": "class_type",
+          "label": "Вид занятия",
+          "type": "select",
+          "options": [
+            "лекция",
+            "семинар",
+            "лаба"
+          ],
+          "multiple": false,
+          "show_in_reminder": true,
+          "required": false
+        },
+        {
+          "id": "teacher",
+          "label": "Преподаватель",
+          "type": "text",
+          "options": [],
+          "multiple": false,
+          "show_in_reminder": true,
+          "required": false
+        }
+      ],
+      "synonyms": []
+    },
+    {
+      "ref": "Личное",
+      "name": "Личное",
+      "name_plural": "Личное",
+      "icon": "user",
+      "color": "#64748b",
+      "buffer_before_min": 0,
+      "buffer_after_min": 0,
+      "merge_buffers": false,
+      "remind_before_min": null,
+      "remind_channels": [
+        "push",
+        "telegram"
+      ],
+      "show_now_next": false,
+      "is_rest": false,
+      "supports_prep": false,
+      "location_label": "",
+      "default_area_type": null,
+      "fields": [],
+      "synonyms": []
+    },
+    {
+      "ref": "Отдых",
+      "name": "Отдых",
+      "name_plural": "Отдых",
+      "icon": "coffee",
+      "color": "#22c55e",
+      "buffer_before_min": 0,
+      "buffer_after_min": 0,
+      "merge_buffers": false,
+      "remind_before_min": null,
+      "remind_channels": [
+        "push",
+        "telegram"
+      ],
+      "show_now_next": false,
+      "is_rest": true,
+      "supports_prep": false,
+      "location_label": "",
+      "default_area_type": null,
+      "fields": [],
+      "synonyms": []
+    },
+    {
+      "ref": "Экзамен",
+      "name": "Экзамен",
+      "name_plural": "Экзамены",
+      "icon": "clipboard-check",
+      "color": "#ef4444",
+      "buffer_before_min": 0,
+      "buffer_after_min": 0,
+      "merge_buffers": false,
+      "remind_before_min": null,
+      "remind_channels": [
+        "push",
+        "telegram"
+      ],
+      "show_now_next": true,
+      "is_rest": false,
+      "supports_prep": true,
+      "location_label": "ауд.",
+      "default_area_type": null,
+      "fields": [],
+      "synonyms": []
+    }
+  ],
+  "budgets": [
+    {
+      "ref": "Учёба",
+      "name": "Учёба",
+      "minutes_per_day": 300,
+      "action_types": [
+        "Самостоятельная учёба"
+      ],
+      "event_types": []
+    }
+  ],
+  "day_profiles": [
+    {
+      "ref": "Будни",
+      "name": "Будни",
+      "wake": "08:00",
+      "sleep": "00:00",
+      "lunch": {
+        "start": "13:00",
+        "end": "14:00"
+      },
+      "work_windows": [
+        {
+          "start": "09:00",
+          "end": "22:00"
+        }
+      ],
+      "rest_evening_ok": true,
+      "rest_halfday_ok": false,
+      "quiet_follows_sleep": false
+    },
+    {
+      "ref": "Выходные",
+      "name": "Выходные",
+      "wake": "08:00",
+      "sleep": "00:00",
+      "lunch": {
+        "start": "13:00",
+        "end": "14:00"
+      },
+      "work_windows": [
+        {
+          "start": "11:00",
+          "end": "19:00"
+        }
+      ],
+      "rest_evening_ok": true,
+      "rest_halfday_ok": true,
+      "quiet_follows_sleep": false
+    }
+  ],
+  "day_profile_rules": [
+    {
+      "ref": "Будни: weekdays",
+      "profile": "Будни",
+      "kind": "weekdays",
+      "date_from": null,
+      "date_to": null,
+      "event_type": null,
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "ref": "Выходные: weekdays",
+      "profile": "Выходные",
+      "kind": "weekdays",
+      "date_from": null,
+      "date_to": null,
+      "event_type": null,
+      "weekdays": [
+        6,
+        7
+      ]
+    }
+  ],
+  "schedule_rules": [
+    {
+      "ref": "Английский язык",
+      "event_type": "Пара",
+      "area": "Английский язык",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          2
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 4,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "516",
+      "color": null,
+      "fields": {
+        "teacher": "Brown J.",
+        "class_type": "семинар"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Английский язык 2",
+      "event_type": "Пара",
+      "area": "Английский язык",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          6
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 1,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "516",
+      "color": null,
+      "fields": {
+        "class_type": "семинар"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Динамическая метеорология",
+      "event_type": "Пара",
+      "area": "Динамическая метеорология",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          2
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 3,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "1801",
+      "color": null,
+      "fields": {
+        "class_type": "лекция"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Динамическая метеорология 2",
+      "event_type": "Пара",
+      "area": "Динамическая метеорология",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          1
+        ],
+        "cycle_weeks": [
+          2
+        ]
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 2,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "1805",
+      "color": null,
+      "fields": {
+        "class_type": "семинар"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Климатология",
+      "event_type": "Пара",
+      "area": "Климатология",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          1
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 1,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "1801",
+      "color": null,
+      "fields": {
+        "teacher": "Иванов П. С.",
+        "class_type": "лекция"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Климатология 2",
+      "event_type": "Пара",
+      "area": "Климатология",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          4
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 3,
+      "slot_to": null,
+      "valid_from": "2026-09-15",
+      "valid_to": null,
+      "title": null,
+      "location": "1805",
+      "color": null,
+      "fields": {
+        "class_type": "семинар"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Математический анализ",
+      "event_type": "Пара",
+      "area": "Математический анализ",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          3
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 2,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "02",
+      "color": null,
+      "fields": {
+        "class_type": "лекция"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Спутниковая метеорология",
+      "event_type": "Пара",
+      "area": "Спутниковая метеорология",
+      "period": "Осень 2026",
+      "slot_grid": null,
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          5
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": "18:30",
+      "end_time": "20:00",
+      "slot_from": null,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "ИКИ, к. 200",
+      "color": null,
+      "fields": {},
+      "note": ""
+    },
+    {
+      "ref": "Физика атмосферы",
+      "event_type": "Пара",
+      "area": "Физика атмосферы",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          4
+        ],
+        "cycle_weeks": [
+          2
+        ]
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 1,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "1810",
+      "color": null,
+      "fields": {
+        "class_type": "лаба"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Физика атмосферы 2",
+      "event_type": "Пара",
+      "area": "Физика атмосферы",
+      "period": "Осень 2026",
+      "slot_grid": "Звонки",
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          1
+        ],
+        "cycle_weeks": [
+          1
+        ]
+      },
+      "start_time": null,
+      "end_time": null,
+      "slot_from": 2,
+      "slot_to": null,
+      "valid_from": null,
+      "valid_to": null,
+      "title": null,
+      "location": "1805",
+      "color": null,
+      "fields": {
+        "class_type": "семинар"
+      },
+      "note": ""
+    },
+    {
+      "ref": "Прогулка",
+      "event_type": "Отдых",
+      "area": null,
+      "period": null,
+      "slot_grid": null,
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          7
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": "15:00",
+      "end_time": "18:00",
+      "slot_from": null,
+      "slot_to": null,
+      "valid_from": "2026-09-06",
+      "valid_to": null,
+      "title": "Прогулка",
+      "location": null,
+      "color": null,
+      "fields": {},
+      "note": ""
+    },
+    {
+      "ref": "Бассейн",
+      "event_type": "Личное",
+      "area": null,
+      "period": null,
+      "slot_grid": null,
+      "pattern": {
+        "kind": "weekly",
+        "weekdays": [
+          2,
+          4
+        ],
+        "cycle_weeks": null
+      },
+      "start_time": "19:00",
+      "end_time": "20:30",
+      "slot_from": null,
+      "slot_to": null,
+      "valid_from": "2026-09-01",
+      "valid_to": null,
+      "title": "Бассейн",
+      "location": "СК МГУ",
+      "color": null,
+      "fields": {},
+      "note": ""
+    }
+  ],
+  "event_rules": [],
+  "settings": {
+    "default_action_type": "Самостоятельная учёба"
+  }
+}

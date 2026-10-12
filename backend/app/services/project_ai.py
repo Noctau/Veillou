@@ -8,25 +8,26 @@
 """
 
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.prompts import ExistingMilestone, MilestonesContext, milestones_messages
+from app.ai.prompts import ExistingMilestone, MilestonesContext, Profile, milestones_messages
 from app.ai.schemas import AIMilestones
 from app.core.config import settings
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.time import get_tz, local_date, now_utc
 from app.domain.enums import AIPurpose, JobKind, JobStatus, MilestoneStatus, TaskStatus
 from app.domain.projects import RawMilestone, normalize_milestones
-from app.models import Job, Milestone, Project, Task, User
+from app.models import Job, Milestone, Period, Project, Task, User
 from app.schemas.ai import MilestonesApply, MilestonesDraft, MilestonesRequest, MilestoneSuggestion
 from app.schemas.project import ProjectDetail
 from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
 from app.services.projects import ProjectService
+from app.services.settings import effective_settings
 
 # Сколько заданий проекта показать ИИ
 MAX_TASKS = 30
@@ -82,9 +83,10 @@ class ProjectAIService:
             .order_by(Task.deadline.asc().nulls_last(), Task.created_at)
             .limit(MAX_TASKS)
         )
+        today = local_date(now_utc(), self.tz)
         return MilestonesContext(
             title=project.title,
-            today=local_date(now_utc(), self.tz),
+            today=today,
             description=project.description,
             deadline=project.deadline,
             weekly_norm_min=project.weekly_norm_min,
@@ -98,7 +100,30 @@ class ProjectAIService:
                 for m in request.previous
             ],
             comment=request.comment,
+            pauses=await self._pauses(today, project.deadline),
+            profile=Profile(about=effective_settings(self.user).about),
         )
+
+    async def _pauses(self, today: date, until: date | None) -> list[str]:
+        """Паузы периодов от сегодня до срока проекта (или на год вперёд)."""
+        end = until or today + timedelta(days=365)
+        periods = await self.db.scalars(
+            select(Period)
+            .where(
+                Period.user_id == self.user_id,
+                Period.deleted_at.is_(None),
+                Period.end_date >= today,
+                Period.start_date <= end,
+            )
+            .order_by(Period.start_date)
+        )
+        result = []
+        for period in periods:
+            for pause in period.pauses or []:
+                if pause["to"] >= today.isoformat() and pause["from"] <= end.isoformat():
+                    title = pause.get("title") or "Пауза"
+                    result.append(f"{title} ({period.name}): {pause['from']} — {pause['to']}")
+        return result
 
     async def run(self, job: Job) -> MilestonesDraft:
         """Обработчик джобы: черновик в `job.result`."""

@@ -16,6 +16,7 @@ import { CHOICE_TYPES, type FieldDraft, fromDraft, toDraft } from '@/features/ar
 import { FieldDefsEditor } from '@/features/areas/FieldDefsEditor'
 import { CategoryIcon } from '@/features/catalog/CategoryIcon'
 import { IconPicker } from '@/features/catalog/IconPicker'
+import { parseSynonyms } from '@/features/catalog/synonyms'
 import { type CategoryIconName, useBudgets, useUpdateBudget } from '@/features/catalog/useCatalog'
 import { EventRulesEditor } from '@/features/eventrules/EventRulesEditor'
 import { paletteColor } from '@/lib/colors'
@@ -98,6 +99,7 @@ function EventTypeForm({ eventType, onDone }: { eventType?: EventType; onDone: (
   const [rest, setRest] = useState(eventType?.is_rest ?? false)
   const [prep, setPrep] = useState(eventType?.supports_prep ?? false)
   const [label, setLabel] = useState(eventType?.location_label ?? '')
+  const [synonyms, setSynonyms] = useState(eventType?.synonyms.join(', ') ?? '')
   const [fields, setFields] = useState<FieldDraft[]>(() => eventType?.fields.map(toDraft) ?? [])
   const initialBudgets = budgets.filter((b) => eventType && b.event_type_ids.includes(eventType.id)).map((b) => b.id)
   const [budgetIds, setBudgetIds] = useState<string[]>(initialBudgets)
@@ -134,6 +136,7 @@ function EventTypeForm({ eventType, onDone }: { eventType?: EventType; onDone: (
       supports_prep: prep,
       location_label: label.trim(),
       fields: fields.map(fromDraft),
+      synonyms: parseSynonyms(synonyms),
     }
     try {
       const saved = eventType
@@ -252,6 +255,11 @@ function EventTypeForm({ eventType, onDone }: { eventType?: EventType; onDone: (
             <FieldLabel htmlFor="et-label">{T.locationLabel}</FieldLabel>
             <Input id="et-label" maxLength={20} className="w-32" value={label} onChange={(e) => setLabel(e.target.value)} />
             <FieldDescription>{T.locationLabelHint}</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="et-synonyms">{T.synonyms}</FieldLabel>
+            <Input id="et-synonyms" value={synonyms} onChange={(e) => setSynonyms(e.target.value)} />
+            <FieldDescription>{T.synonymsHint}</FieldDescription>
           </Field>
           <FieldDefsEditor value={fields} onChange={setFields} legend={T.fields} hint={T.fieldsHint} />
           {eventType ? (

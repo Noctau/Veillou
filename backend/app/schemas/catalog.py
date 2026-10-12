@@ -66,6 +66,21 @@ class CategoryRead(ReadModel):
     position: int
 
 
+# ---------- слова быстрого ввода ----------
+
+Synonym = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+SYNONYMS_HELP = "Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание"
+
+
+def _unique_words(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    seen: dict[str, str] = {}
+    for word in value:
+        seen.setdefault(word.lower(), word)
+    return list(seen.values())
+
+
 # ---------- типы действий ----------
 
 TypeWindows = Annotated[list[TimeWindow], Field(min_length=1, max_length=14)]
@@ -76,6 +91,9 @@ class ActionTypeCreate(InputModel):
     windows: TypeWindows
     default_category_id: uuid.UUID | None = None
     prefer_morning: bool = False
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30, description=SYNONYMS_HELP)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class ActionTypeUpdate(InputModel):
@@ -83,7 +101,10 @@ class ActionTypeUpdate(InputModel):
     windows: TypeWindows | None = None
     default_category_id: uuid.UUID | None = None
     prefer_morning: bool | None = None
+    synonyms: list[Synonym] | None = Field(default=None, max_length=30)
     position: int | None = Field(default=None, ge=0, le=1000)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class ActionTypeRead(ReadModel):
@@ -93,12 +114,11 @@ class ActionTypeRead(ReadModel):
     default_category_id: uuid.UUID | None
     windows: list[TimeWindow]
     prefer_morning: bool = Field(description="Лёгкое предпочтение утра в плане")
+    synonyms: list[str]
     position: int
 
 
 # ---------- типы задач ----------
-
-Synonym = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 
 
 class DeadlineDays(InputModel):
@@ -129,19 +149,10 @@ DeadlineRule = Annotated[
 ]
 
 
-def _unique_words(value: list[str] | None) -> list[str] | None:
-    if value is None:
-        return None
-    seen: dict[str, str] = {}
-    for word in value:
-        seen.setdefault(word.lower(), word)
-    return list(seen.values())
-
-
 class TaskTypeCreate(InputModel):
     name: CatalogName
     icon: CategoryIcon = CategoryIcon.tag
-    synonyms: list[Synonym] = Field(default_factory=list, max_length=30)
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30, description=SYNONYMS_HELP)
     default_action_type_id: uuid.UUID | None = None
     default_category_id: uuid.UUID | None = None
     default_estimate_min: int | None = Field(default=None, ge=5, le=10_000)
