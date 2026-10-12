@@ -30,7 +30,7 @@ export function ProjectList({ areaId }: { areaId?: string }) {
       {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
       {projects && projects.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Проектов нет. ВКР, поступление в магистратуру — всё, что на месяцы вперёд.
+          Проектов нет. Диплом, ремонт, запуск сайта — всё, что на месяцы вперёд.
         </p>
       )}
       <ul className="grid gap-3 sm:grid-cols-2">

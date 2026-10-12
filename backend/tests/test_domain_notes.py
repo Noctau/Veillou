@@ -13,7 +13,7 @@ def test_short_date():
 
 def test_default_title():
     assert default_title(date(2026, 10, 6), "Климатология") == "Климатология · 6 окт"
-    assert default_title(date(2026, 10, 6)) == "Конспект 6 окт"
+    assert default_title(date(2026, 10, 6)) == "Заметка 6 окт"
 
 
 @pytest.mark.parametrize(

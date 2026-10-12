@@ -416,7 +416,7 @@ export function TaskView({ taskId }: { taskId: string }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/areas?tab=tasks', { replace: true }) })}
+              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/tasks', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>

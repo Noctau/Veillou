@@ -124,7 +124,7 @@ FieldValues = Annotated[dict[str, Any], Field(description="Значения по
 
 class AreaCreate(InputModel):
     area_type_id: uuid.UUID
-    period_id: uuid.UUID | None = Field(default=None, description="Период (семестр); null — всегда")
+    period_id: uuid.UUID | None = Field(default=None, description="Период; null — всегда")
     name: Name
     short_name: ShortName | None = None
     color: HexColor = "#3b82f6"

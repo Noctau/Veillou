@@ -1,4 +1,4 @@
-"""Конспекты."""
+"""Заметки."""
 
 import uuid
 from datetime import date
@@ -15,12 +15,12 @@ Body = Annotated[str, StringConstraints(max_length=200_000)]
 
 class NoteCreate(InputModel):
     title: Title | None = Field(
-        default=None, description="null — «Пара · 6 окт» по паре или «Конспект 6 окт»"
+        default=None, description="null — «<сфера> · 6 окт» по событию или «Заметка 6 окт»"
     )
     kind: NoteKind = NoteKind.text
-    area_id: uuid.UUID | None = Field(default=None, description="null — сфера пары")
-    event_id: uuid.UUID | None = Field(default=None, description="Пара, к которой конспект")
-    class_date: SaneDate | None = Field(default=None, description="null — дата пары или сегодня")
+    area_id: uuid.UUID | None = Field(default=None, description="null — сфера события")
+    event_id: uuid.UUID | None = Field(default=None, description="Событие, к которому заметка")
+    class_date: SaneDate | None = Field(default=None, description="null — дата события или сегодня")
     body_md: Body = ""
     url: HttpUrl | None = None
 
@@ -36,7 +36,7 @@ class NoteUpdate(InputModel):
 
 
 class NoteEvent(ReadModel):
-    """Событие конспекта — коротко, для подписи «слот 2 · 1801»."""
+    """Событие заметки — коротко, для подписи «слот 2 · 12»."""
 
     id: uuid.UUID
     title: str

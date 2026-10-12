@@ -295,7 +295,7 @@ function DayLimitSection({
   )
 }
 
-/** «Убрать дела из ящика»: снять взятые на неделю — их время отдать учёбе. */
+/** «Убрать дела из ящика»: снять взятые на неделю — их время отдать задачам. */
 function DropBacklogSection({ onDone }: { onDone: () => void }) {
   const { data: items } = useBacklog('active')
   const take = useTakeForWeek()
@@ -337,7 +337,7 @@ function BacklogOptions({ risk, onDone }: { risk: PlanRisk; onDone: () => void }
     <div className="flex flex-col gap-3 text-sm">
       {risk.reason === 'rest' && <RestNote />}
       <p className="text-muted-foreground">
-        Сначала план ставит учёбу, дела из ящика — в оставшиеся окна, подходящие под их условия. Можно снять дело с недели:
+        Сначала план ставит задачи, дела из ящика — в оставшиеся окна, подходящие под их условия. Можно снять дело с недели:
         оно вернётся в следующий разбор.
       </p>
       <div className="flex justify-end gap-2">

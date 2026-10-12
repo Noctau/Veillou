@@ -69,5 +69,5 @@ class Event(UserOwnedMixin, Base):
     )
     # Значения полей типа занятости: {field_id: value}
     fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    # Номер слота сетки (бывший номер пары)
+    # Номер слота сетки (в Part 1 — pair_number)
     slot: Mapped[int | None] = mapped_column(SmallInteger)

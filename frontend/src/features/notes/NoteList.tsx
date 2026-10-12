@@ -17,7 +17,7 @@ import { NOTE_KIND, NOTE_KINDS } from './labels'
 import { useSearch } from './useSearch'
 import { type NoteCreate, type NoteListItem, useCreateNote, useNotes } from './useNotes'
 
-/** «＋ Конспект» → вид → сразу открыть новый конспект. */
+/** «＋ Заметка» → вид → сразу открыть новую заметку. */
 export function NewNoteButton({ draft = {}, size = 'sm' }: { draft?: Partial<NoteCreate>; size?: 'sm' | 'default' }) {
   const navigate = useNavigate()
   const create = useCreateNote()
@@ -27,7 +27,7 @@ export function NewNoteButton({ draft = {}, size = 'sm' }: { draft?: Partial<Not
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size={size} variant="ghost" disabled={create.isPending}>
-          <PlusIcon /> Конспект
+          <PlusIcon /> Заметка
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -85,7 +85,7 @@ export function NoteRow({ note, showArea, snippet }: { note: NoteListItem; showA
 
 type Props = {
   areaId?: string
-  /** Показывать сферу у каждого конспекта (общий список). */
+  /** Показывать сферу у каждой заметки (общий список). */
   showArea?: boolean
   limit?: number
 }
@@ -139,7 +139,7 @@ function SearchResultsList({ text, areaId, showArea }: { text: string; areaId?: 
   )
 }
 
-/** Конспекты сферы (или все): свежие пары первыми. */
+/** Заметки сферы (или все): свежие первыми. */
 export function NoteList({ areaId, showArea, limit }: Props) {
   const [text, setText] = useState('')
   const searching = text.trim().length > 0
@@ -153,8 +153,8 @@ export function NoteList({ areaId, showArea, limit }: Props) {
             type="search"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Поиск по конспектам и литературе"
-            aria-label="Поиск по конспектам"
+            placeholder="Поиск по заметкам и материалам"
+            aria-label="Поиск по заметкам"
             className="pr-8 pl-8 [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
@@ -178,7 +178,7 @@ export function NoteList({ areaId, showArea, limit }: Props) {
           {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
           {notes && notes.length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Конспектов пока нет. Текст с формулами, фото тетради, PDF или ссылка на Диск.
+              Заметок пока нет. Текст с формулами, фото страниц, PDF или ссылка на Диск.
             </p>
           )}
           <ul className="flex flex-col gap-1">

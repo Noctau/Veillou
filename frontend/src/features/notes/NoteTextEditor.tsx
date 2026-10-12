@@ -122,8 +122,8 @@ export function NoteTextEditor({ value, onSave, autoFocus }: Props) {
           autoFocus={autoFocus}
           onChange={(e) => change(e.target.value)}
           onBlur={() => flush()}
-          placeholder={'# Тема лекции\n\nТекст, списки, формулы: $p = \\rho R T$\n\n$$\n\\frac{dp}{dz} = -\\rho g\n$$'}
-          aria-label="Текст конспекта"
+          placeholder={'# Тема\n\nТекст, списки, формулы: $p = \\rho R T$\n\n$$\n\\frac{dp}{dz} = -\\rho g\n$$'}
+          aria-label="Текст заметки"
           className={cn('min-h-72 font-mono text-sm lg:min-h-[28rem]', mode === 'view' && 'max-lg:hidden')}
         />
         <div

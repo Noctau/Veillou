@@ -69,7 +69,7 @@ class Task(UserOwnedMixin, Base):
     milestone_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("milestones.id", ondelete="SET NULL")
     )
-    # Регулярное задание («встреча с научруком по чт»): вхождения — подзадачи с датой
+    # Регулярное задание («созвон с руководителем по чт»): вхождения — подзадачи с датой
     recurrence: Mapped[str | None] = mapped_column(String(500))
     recurrence_start: Mapped[date | None] = mapped_column(Date)
     # Не раньше этого момента (окно автозадачи «после события»)

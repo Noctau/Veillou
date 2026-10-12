@@ -14,14 +14,14 @@ WallTime = Annotated[
 HexColor = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
 Weekday = Annotated[int, Field(ge=1, le=7, description="ISO: 1 = Пн, 7 = Вс")]
 
-# Разумный диапазон дат на входе: без него семестр до 9999 года давал OverflowError
+# Разумный диапазон дат на входе: без него период до 9999 года давал OverflowError
 # и сотни тысяч вхождений пар одним запросом
 MIN_DATE = date(2000, 1, 1)
 MAX_DATE = date(2100, 12, 31)
 # Самое длинное событие (поездка, сессия) и самый длинный блок дела
 MAX_EVENT_DURATION = timedelta(days=31)
 MAX_BLOCK_DURATION = timedelta(hours=24)
-# Семестр с сессией, выходные/каникулы — не длиннее года
+# Период с паузами, исключения — не длиннее года
 MAX_PERIOD = timedelta(days=366)
 
 

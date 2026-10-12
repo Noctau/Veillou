@@ -14,7 +14,7 @@ export function timeRange(e: CalendarEvent, tz: string): string {
   return `${wallTime(e.start, tz)}–${wallTime(e.end, tz)}`
 }
 
-/** Место с подписью типа: «ауд. 1801» / «СК МГУ». */
+/** Место с подписью типа: «каб. 12» / «Бассейн „Волна“». */
 export function placeOf(e: CalendarEvent, type?: EventType): string | null {
   if (!e.location) return null
   return type?.location_label ? `${type.location_label} ${e.location}` : e.location
@@ -37,7 +37,7 @@ export function useEventView() {
       return e.kind === 'busy' && (!t || (!t.is_rest && !t.show_now_next))
     }
     const color = (e: CalendarEvent) => e.color ?? typeOf(e)?.color ?? KIND_COLORS[e.kind]
-    /** «семинар · ауд. 1801 · Иванова» — поля «в напоминании» и место. */
+    /** «практика · каб. 12 · Иванова» — поля «в напоминании» и место. */
     const details = (e: CalendarEvent, { withPlace = true } = {}) => {
       const t = typeOf(e)
       const fields = t ? renderFields(t.fields, e.fields, { onlyReminder: true }).map((f) => f.text) : []

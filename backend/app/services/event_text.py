@@ -18,7 +18,7 @@ from app.notify.message import fmt_range
 class EventParts:
     inline: tuple[str, ...]  # значения выбора: «лекция»
     details: tuple[tuple[str, str], ...]  # остальные поля: («Преподаватель», «Иванов»)
-    place: str | None  # «ауд. 1801» / «СК МГУ»
+    place: str | None  # «каб. 12» / «Бассейн»
 
 
 def place(e: Event, event_type: EventType | None) -> str | None:
@@ -36,7 +36,7 @@ def event_parts(e: Event, event_type: EventType | None) -> EventParts:
 
 
 def busy_line(e: Event, event_type: EventType | None, tz: ZoneInfo) -> str:
-    """Строка события секции типа: «09:00–10:35 Климатология (лекция) · ауд. 1801»."""
+    """Строка события секции типа: «09:00–10:35 Алгебра (практика) · каб. 12»."""
     parts = event_parts(e, event_type)
     head = f"{fmt_range(e.start, e.end, tz)} {e.title}"
     if parts.inline:

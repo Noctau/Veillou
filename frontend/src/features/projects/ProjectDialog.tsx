@@ -69,7 +69,7 @@ function ProjectForm({ areaId: initialArea, onDone }: { areaId?: string; onDone:
     >
       <Field>
         <FieldLabel htmlFor="pr-title">Название</FieldLabel>
-        <Input id="pr-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ВКР, поступление в магистратуру…" />
+        <Input id="pr-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Диплом, ремонт, запуск сайта…" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field>
@@ -78,7 +78,7 @@ function ProjectForm({ areaId: initialArea, onDone }: { areaId?: string; onDone:
         </Field>
         <Field>
           <FieldLabel htmlFor="pr-category">Категория</FieldLabel>
-          <CategorySelect id="pr-category" value={categoryId} onChange={setCategoryId} emptyLabel="Учёба" />
+          <CategorySelect id="pr-category" value={categoryId} onChange={setCategoryId} emptyLabel="По умолчанию" />
         </Field>
       </div>
       <Field>

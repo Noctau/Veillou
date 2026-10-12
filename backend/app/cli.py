@@ -55,7 +55,8 @@ async def _roll_series() -> None:
 
 
 def _vapid_keys() -> None:
-    """Пара ключей P-256 в формате, который ждут браузер (applicationServerKey) и pywebpush."""
+    """Ключи P-256 (закрытый и открытый) в формате, который ждут браузер
+    (applicationServerKey) и pywebpush."""
     import base64
 
     from cryptography.hazmat.primitives.asymmetric import ec

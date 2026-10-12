@@ -1,9 +1,10 @@
 import uuid
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
 from app.core.security import MAX_PASSWORD_LENGTH
+from app.core.time import is_valid_tz
 
 
 class LoginRequest(BaseModel):
@@ -18,3 +19,16 @@ class UserRead(BaseModel):
     id: uuid.UUID
     email: str
     timezone: str
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timezone: Annotated[str, StringConstraints(strip_whitespace=True, max_length=64)] | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _tz(cls, value: str | None) -> str | None:
+        if value is not None and not is_valid_tz(value):
+            raise ValueError("Неизвестный часовой пояс")
+        return value

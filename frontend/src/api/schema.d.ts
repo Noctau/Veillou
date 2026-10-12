@@ -69,7 +69,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Me
+         * @description Часовой пояс: расписание пересобирается в новом поясе (настенное время то же).
+         */
+        patch: operations["patch_me"];
         trace?: never;
     };
     "/api/v1/me/settings": {
@@ -1156,13 +1160,13 @@ export interface paths {
         };
         /**
          * List Notes
-         * @description Свежие пары первыми. `event_id` можно повторять — конспекты этих пар.
+         * @description Свежие первыми. `event_id` можно повторять — заметки этих событий.
          */
         get: operations["list_notes"];
         put?: never;
         /**
          * Create Note
-         * @description С `event_id` сфера и дата берутся из пары, если не указаны.
+         * @description С `event_id` сфера и дата берутся из события, если не указаны.
          */
         post: operations["create_note"];
         delete?: never;
@@ -1182,8 +1186,8 @@ export interface paths {
         put?: never;
         /**
          * Note For Event
-         * @description «Конспект к этой паре»: открывает уже начатый конспект пары (200) или
-         *     создаёт новый со сферой, датой и названием из пары (201).
+         * @description «Заметка к событию»: открывает уже начатую заметку события (200) или
+         *     создаёт новую со сферой, датой и названием из события (201).
          */
         post: operations["note_for_event"];
         delete?: never;
@@ -1286,7 +1290,7 @@ export interface paths {
         };
         /**
          * Search
-         * @description Конспекты (название и текст) и литература (название, автор, заметка).
+         * @description Заметки (название и текст) и литература (название, автор, заметка).
          *     Каждое слово — префикс: искать можно по мере набора. Самое подходящее — первым.
          */
         get: operations["search"];
@@ -2301,7 +2305,7 @@ export interface components {
             area_type_id: string;
             /**
              * Period Id
-             * @description Период (семестр); null — всегда
+             * @description Период; null — всегда
              */
             period_id?: string | null;
             /** Name */
@@ -4735,24 +4739,24 @@ export interface components {
         NoteCreate: {
             /**
              * Title
-             * @description null — «Пара · 6 окт» по паре или «Конспект 6 окт»
+             * @description null — «<сфера> · 6 окт» по событию или «Заметка 6 окт»
              */
             title?: string | null;
             /** @default text */
             kind: components["schemas"]["NoteKind"];
             /**
              * Area Id
-             * @description null — сфера пары
+             * @description null — сфера события
              */
             area_id?: string | null;
             /**
              * Event Id
-             * @description Пара, к которой конспект
+             * @description Событие, к которому заметка
              */
             event_id?: string | null;
             /**
              * Class Date
-             * @description null — дата пары или сегодня
+             * @description null — дата события или сегодня
              */
             class_date?: string | null;
             /**
@@ -4765,7 +4769,7 @@ export interface components {
         };
         /**
          * NoteEvent
-         * @description Событие конспекта — коротко, для подписи «слот 2 · 1801».
+         * @description Событие заметки — коротко, для подписи «слот 2 · 12».
          */
         NoteEvent: {
             /**
@@ -7189,6 +7193,12 @@ export interface components {
             /** End */
             end: string;
         };
+        /**
+         * TodayCard
+         * @description Карточки «Сегодня», которые можно выключить.
+         * @enum {string}
+         */
+        TodayCard: "now_next" | "progress" | "review" | "day" | "free" | "deadlines";
         /** UserRead */
         UserRead: {
             /**
@@ -7304,6 +7314,16 @@ export interface components {
              * @default false
              */
             onboarding_done: boolean;
+            /**
+             * Nav
+             * @description Вкладки после закреплённых «Сегодня», «Календарь», «＋»: areas, tasks, projects, notes, inbox, area:<id>, area_type:<id>
+             */
+            nav: string[];
+            /**
+             * Today Cards
+             * @description Включённые карточки «Сегодня»
+             */
+            today_cards: components["schemas"]["TodayCard"][];
         };
         /** UserSettingsPatch */
         UserSettingsPatch: {
@@ -7337,6 +7357,21 @@ export interface components {
              * @description Первичная настройка пройдена или пропущена
              */
             onboarding_done?: boolean | null;
+            /**
+             * Nav
+             * @description Вкладки после закреплённых «Сегодня», «Календарь», «＋»: areas, tasks, projects, notes, inbox, area:<id>, area_type:<id>
+             */
+            nav?: string[] | null;
+            /**
+             * Today Cards
+             * @description Включённые карточки «Сегодня»
+             */
+            today_cards?: components["schemas"]["TodayCard"][] | null;
+        };
+        /** UserUpdate */
+        UserUpdate: {
+            /** Timezone */
+            timezone?: string | null;
         };
         /** WeekConfirm */
         WeekConfirm: {
@@ -7702,6 +7737,102 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

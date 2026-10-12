@@ -15,7 +15,6 @@ from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain.backlog import week_start
 from app.domain.enums import (
     AttachmentOwner,
-    CategoryKey,
     EventStatus,
     MilestoneStatus,
     ProjectStatus,
@@ -35,7 +34,7 @@ from app.schemas.project import (
 )
 from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
-from app.services.catalog import ensure_defaults
+from app.services.catalog import default_action_type
 
 
 class ProjectRepo(UserScopedRepository[Project]):
@@ -65,6 +64,7 @@ _MILESTONE_ORDER = [Milestone.date.asc().nulls_last(), Milestone.position, Miles
 class ProjectService:
     def __init__(self, db: AsyncSession, user: User) -> None:
         self.db = db
+        self.user = user
         self.user_id = user.id
         self.tz = get_tz(user.timezone)
         self.projects = ProjectRepo(db, user.id)
@@ -233,12 +233,9 @@ class ProjectService:
         if data.category_id:
             await self.categories.get_or_404(data.category_id)
         else:
-            if await ensure_defaults(self.db, self.user_id):
-                await self.db.flush()
-            study = await self.db.scalar(
-                self.categories.select().where(Category.key == CategoryKey.study)
-            )
-            fields["category_id"] = study.id if study else None
+            # Категория типа действия по умолчанию (у пользователей Part 1 — «Учёба», как было)
+            default = await default_action_type(self.db, self.user)
+            fields["category_id"] = default.default_category_id if default else None
         project = Project(status=ProjectStatus.active, **fields)
         self.projects.add(project)
         await self.db.commit()

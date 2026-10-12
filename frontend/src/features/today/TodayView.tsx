@@ -17,6 +17,7 @@ import { cycleWeek } from '@/features/schedule/cycle'
 import { useCurrentPeriod } from '@/features/schedule/useCurrentPeriod'
 import { NoteForEventButton } from '@/features/notes/NoteForEventButton'
 import { useNotes } from '@/features/notes/useNotes'
+import { useSettings, type UserSettings } from '@/features/settings/useSettings'
 import { plural } from '@/features/plan/labels'
 import { useAskFeel } from '@/features/plan/useAskFeel'
 import { FreeDialog } from '@/features/review/FreeDialog'
@@ -186,6 +187,9 @@ export function TodayView() {
   const [opened, setOpened] = useState<CalendarEvent | null>(null)
   const [creating, setCreating] = useState(false)
   const [free, setFree] = useState(false)
+  const { data: settings } = useSettings()
+  // Карточки, которые выключили в Настройках (по умолчанию — все)
+  const show = (card: UserSettings['today_cards'][number]) => !settings || settings.today_cards.includes(card)
 
   const events = data?.events ?? []
   const nowNext = events.filter((e) => view.typeOf(e)?.show_now_next)
@@ -223,7 +227,7 @@ export function TodayView() {
 
       {data && (
         <>
-          {(nowNext.length > 0 || [...view.types.values()].some((t) => t.show_now_next)) && (
+          {show('now_next') && (nowNext.length > 0 || [...view.types.values()].some((t) => t.show_now_next)) && (
             <NowNextCard
               events={nowNext}
               now={now}
@@ -234,7 +238,7 @@ export function TodayView() {
             />
           )}
 
-          {doable.length > 0 && (
+          {show('progress') && doable.length > 0 && (
             <div className="flex items-center gap-3">
               <Progress value={(doneCount / doable.length) * 100} className="h-2 flex-1" aria-label="Прогресс дня" />
               <span className="text-sm text-muted-foreground tabular-nums">
@@ -243,41 +247,50 @@ export function TodayView() {
             </div>
           )}
 
-          {unmarked.length > 0 && (
+          {show('review') && unmarked.length > 0 && (
             <ReviewLink
               to="/review"
               icon={ClipboardCheckIcon}
               text={`Не отмечено ${unmarked.length} ${plural(unmarked.length, 'блок', 'блока', 'блоков')} — разобрать`}
             />
           )}
-          {weekend && <ReviewLink to="/review/week" icon={CalendarCheckIcon} text="Разбор недели: итоги и дела из ящика" />}
+          {show('review') && weekend && <ReviewLink to="/review/week" icon={CalendarCheckIcon} text="Разбор недели: итоги и дела из ящика" />}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">День</CardTitle>
-              <CardAction className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => setFree(true)}>
-                  <TimerIcon /> Есть время
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
-                  <PlusIcon /> Событие
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="pt-2">
-              {events.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">Пусто — свободный день.</p>
-              ) : (
-                <ul className="flex flex-col">
-                  {events.map((e) => (
-                    <FeedRow key={e.id} event={e} now={now} tz={tz} onToggle={toggle} onOpen={setOpened} view={view} />
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          {show('day') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">День</CardTitle>
+                <CardAction className="flex gap-1">
+                  {show('free') && (
+                    <Button variant="ghost" size="sm" onClick={() => setFree(true)}>
+                      <TimerIcon /> Есть время
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+                    <PlusIcon /> Событие
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {events.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">Пусто — свободный день.</p>
+                ) : (
+                  <ul className="flex flex-col">
+                    {events.map((e) => (
+                      <FeedRow key={e.id} event={e} now={now} tz={tz} onToggle={toggle} onOpen={setOpened} view={view} />
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {!show('day') && show('free') && (
+            <Button variant="outline" className="self-start" onClick={() => setFree(true)}>
+              <TimerIcon /> Есть время
+            </Button>
+          )}
 
-          <DeadlinesCard tz={tz} now={now} />
+          {show('deadlines') && <DeadlinesCard tz={tz} now={now} />}
         </>
       )}
 

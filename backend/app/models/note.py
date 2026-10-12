@@ -1,6 +1,6 @@
-"""Конспект: текст (Markdown + LaTeX), фото тетради, файл или ссылка (ТЗ §4.1).
+"""Заметка: текст (Markdown + LaTeX), фото страниц, файл или ссылка (ТЗ §4.1).
 
-Привязан к предмету и, по желанию, к конкретной паре (`event_id`). Страницы
+Привязан к предмету и, по желанию, к конкретному событию (`event_id`). Страницы
 фото и файлы — вложения с `owner_type=note`, порядок — `Attachment.position`.
 """
 
@@ -30,11 +30,11 @@ class Note(UserOwnedMixin, Base):
     area_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
-    # Событие, к которому конспект (обычно вхождение правила расписания)
+    # Событие, к которому заметка (обычно вхождение правила расписания)
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("events.id", ondelete="SET NULL"), index=True
     )
-    # Дата пары: из события или вручную. Остаётся, даже если вхождение пропадёт
+    # Дата события: из него или вручную. Остаётся, даже если вхождение пропадёт
     class_date: Mapped[date | None] = mapped_column(Date)
     title: Mapped[str] = mapped_column(String(300))
     kind: Mapped[str] = mapped_column(String(10), default=NoteKind.text)

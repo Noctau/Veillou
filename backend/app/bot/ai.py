@@ -57,7 +57,7 @@ AI_PREFIX = "ai:"
 THINKING = "🤖 Разбираю…"
 # Сколько названий «под угрозой» перечислять (остальное — «и ещё N»): лимит Telegram
 PLAN_RISK_TITLES = 10
-KIND_TITLE = {KindHint.task: "Задание", KindHint.backlog: "В ящик", KindHint.event: "Событие"}
+KIND_TITLE = {KindHint.task: "Задача", KindHint.backlog: "В ящик", KindHint.event: "Событие"}
 
 
 def _cb(op: str, id: uuid.UUID) -> str:

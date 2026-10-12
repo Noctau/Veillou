@@ -106,6 +106,27 @@ class Rest(_Model):
 
 About = Annotated[str, StringConstraints(max_length=1000)]
 
+# Вкладка навигации (M22.2): раздел или конкретная сфера / тип сфер
+NavItem = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^(areas|tasks|projects|notes|inbox|(area|area_type):[0-9a-f-]{36})$"
+    ),
+]
+MAX_NAV = 6
+
+
+class TodayCard(StrEnum):
+    """Карточки «Сегодня», которые можно выключить."""
+
+    now_next = "now_next"  # «Сейчас / Дальше»
+    progress = "progress"  # прогресс дня
+    review = "review"  # «Не отмечено — разобрать», разбор недели
+    day = "day"  # лента дня
+    free = "free"  # «Есть время»
+    deadlines = "deadlines"  # ближайшие дедлайны
+
+
 class UserSettings(_Model):
     """Сон, обед и рабочие часы — в режимах дня (`day_profiles`, M18)."""
 
@@ -132,6 +153,20 @@ class UserSettings(_Model):
     onboarding_done: bool = Field(
         default=False, description="Первичная настройка пройдена или пропущена"
     )
+    nav: list[NavItem] = Field(
+        default_factory=lambda: ["areas", "inbox"],
+        max_length=MAX_NAV,
+        description="Вкладки после закреплённых «Сегодня», «Календарь», «＋»: areas, tasks, "
+        "projects, notes, inbox, area:<id>, area_type:<id>",
+    )
+    today_cards: list[TodayCard] = Field(
+        default_factory=lambda: list(TodayCard), description="Включённые карточки «Сегодня»"
+    )
+
+    @field_validator("nav", "today_cards")
+    @classmethod
+    def _unique(cls, value: list[Any]) -> list[Any]:
+        return list(dict.fromkeys(value))
 
 
 # ---------- частичное обновление ----------

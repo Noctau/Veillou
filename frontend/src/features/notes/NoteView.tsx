@@ -54,7 +54,7 @@ function TitleEditor({ note, onSave }: { note: Note; onSave: (title: string) => 
     <Textarea
       value={value}
       rows={1}
-      aria-label="Название конспекта"
+      aria-label="Название заметки"
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -121,7 +121,7 @@ function Meta({ note, patch }: { note: Note; patch: (body: NoteUpdate) => void }
       </div>
       <Input
         type="date"
-        aria-label="Дата пары"
+        aria-label="Дата события"
         value={note.class_date ?? ''}
         onChange={(e) => patch({ class_date: e.target.value || null })}
         className="h-8 w-40"
@@ -191,7 +191,7 @@ export function NoteView({ noteId }: { noteId: string }) {
               </DropdownMenuItem>
             )}
             <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-              <Trash2Icon /> Удалить конспект
+              <Trash2Icon /> Удалить заметку
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -234,7 +234,7 @@ export function NoteView({ noteId }: { noteId: string }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить «{note.title}»?</AlertDialogTitle>
-            <AlertDialogDescription>Текст, страницы и файлы конспекта удалятся.</AlertDialogDescription>
+            <AlertDialogDescription>Текст, страницы и файлы заметки удалятся.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>

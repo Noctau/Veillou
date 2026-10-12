@@ -1,4 +1,4 @@
-"""Конспекты: CRUD, привязка к предмету и паре, сводка по вложениям для списка."""
+"""Заметки: CRUD, привязка к сфере и событию, сводка по вложениям для списка."""
 
 import uuid
 from collections.abc import Sequence
@@ -24,7 +24,7 @@ class NoteRepo(UserScopedRepository[Note]):
 
 class _EventRepo(UserScopedRepository[Event]):
     model = Event
-    not_found_message = "Пара не найдена"
+    not_found_message = "Событие не найдено"
 
 
 class _AreaRepo(UserScopedRepository[Area]):
@@ -133,7 +133,7 @@ class NoteService:
         return await self.get(note.id)
 
     async def for_event(self, event_id: uuid.UUID, kind: NoteKind) -> tuple[NoteRead, bool]:
-        """«Конспект к этой паре»: уже начатый конспект пары или новый. (конспект, создан?)"""
+        """«Заметка к событию»: уже начатая заметка события или новая. (заметка, создана?)"""
         await self.events.get_or_404(event_id)
         existing = await self.notes.find_all(
             Note.event_id == event_id, order_by=[Note.created_at], limit=1
@@ -151,7 +151,7 @@ class NoteService:
         if "url" in changes:
             changes["url"] = str(patch.url) if patch.url else None
         if changes.get("event_id") and changes["event_id"] != note.event_id:
-            # Новая пара задаёт предмет и дату, если их не прислали явно
+            # Событие задаёт сферу и дату, если их не прислали явно
             event = await self.events.get_or_404(changes["event_id"])
             changes.setdefault("area_id", event.area_id or note.area_id)
             changes.setdefault("class_date", local_date(event.start, self.tz))

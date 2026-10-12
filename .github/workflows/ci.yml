@@ -50,6 +50,8 @@ jobs:
           uv run ruff format --check .
       - name: mypy (strict)
         run: uv run mypy
+      - name: lexicon (студенческие слова только в данных)
+        run: uv run python -m scripts.check_lexicon
       - name: dependencies declared (deptry)
         run: uv run deptry .
       - name: migrations match models

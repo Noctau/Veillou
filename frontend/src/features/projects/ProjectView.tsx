@@ -111,7 +111,7 @@ function RecurringList({ projectId }: { projectId: string }) {
   const { data: tasks } = useTasks({ status: ['active'], project_id: projectId })
   const recurring = tasks?.filter((t) => t.recurrence) ?? []
   if (!recurring.length) {
-    return <p className="text-sm text-muted-foreground">Например, встреча или письмо научруку раз в неделю.</p>
+    return <p className="text-sm text-muted-foreground">Например, созвон с руководителем или отчёт раз в неделю.</p>
   }
   return (
     <ul className="flex flex-col gap-1">
@@ -210,7 +210,7 @@ function Header({ project }: { project: ProjectDetail }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/areas?tab=projects', { replace: true }) })}
+              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/projects', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>

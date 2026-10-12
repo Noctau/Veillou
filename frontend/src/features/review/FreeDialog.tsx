@@ -15,7 +15,7 @@ import { useFree, useStartFree } from './useReview'
 
 const CHOICES = [15, 30, 45, 60, 90, 120]
 
-/** «У меня есть N минут»: лучшее подходящее дело и пара альтернатив; «Начать» — блок на сейчас. */
+/** «У меня есть N минут»: лучшее подходящее дело и две-три альтернативы; «Начать» — блок на сейчас. */
 export function FreeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const tz = useTimeZone()
   const [minutes, setMinutes] = useState<number | null>(null)

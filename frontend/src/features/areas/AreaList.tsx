@@ -81,7 +81,7 @@ function TypeGroup({
         open={creating}
         onOpenChange={setCreating}
         areaTypeId={areaType.id}
-        // Период по умолчанию — если сферы этого типа живут по периодам (предметы по семестрам)
+        // Период по умолчанию — если сферы этого типа живут по периодам (предметы по четвертям)
         periodId={areas.some((a) => a.period_id) ? periodId : undefined}
         colorIndex={all.length}
       />
@@ -89,8 +89,9 @@ function TypeGroup({
   )
 }
 
-/** Сферы по типам. `periodId` — текущий период: сферы других периодов не показываются. */
-export function AreaList({ periodId }: { periodId?: string }) {
+/** Сферы по типам. `periodId` — текущий период: сферы других периодов не показываются;
+ *  `typeId` — только один тип («Ученики» во вкладке навигации). */
+export function AreaList({ periodId, typeId }: { periodId?: string; typeId?: string }) {
   const { data, isPending, isError, error } = useAreas()
   const { data: types, isPending: typesPending } = useAreaTypes()
   const [creatingType, setCreatingType] = useState(false)
@@ -112,7 +113,9 @@ export function AreaList({ periodId }: { periodId?: string }) {
         </div>
       )}
       {data &&
-        types?.map((t) => (
+        types
+          ?.filter((t) => !typeId || t.id === typeId)
+          .map((t) => (
           <TypeGroup
             key={t.id}
             areaType={t}

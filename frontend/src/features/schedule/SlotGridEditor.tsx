@@ -32,7 +32,7 @@ function toDrafts(grid: SlotGrid | undefined): Draft[] {
     .map((r) => ({ weekday: r.weekday, slots: r.slots.map((s) => ({ ...s })) }))
 }
 
-/** Сетка слотов периода (звонки, пары, уроки): общие слоты + свои для дней недели. */
+/** Сетка слотов периода (звонки, уроки): общие слоты + свои для дней недели. */
 export function SlotGridEditor({
   grid,
   periodId,

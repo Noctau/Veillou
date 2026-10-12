@@ -5,10 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import ConflictError
 from app.core.security import MAX_PASSWORD_LENGTH, hash_password_async
-from app.core.time import is_valid_tz, now_utc
-from app.models import User, UserSession
+from app.core.time import get_tz, is_valid_tz, now_utc
+from app.models import ScheduleRule, User, UserSession
+from app.schemas.user import UserUpdate
 from app.services.catalog import ensure_defaults
 from app.services.day_profiles import ensure_day_profiles
+from app.services.schedule_sync import SeriesSync
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -66,3 +68,19 @@ async def set_password(session: AsyncSession, user: User, password: str) -> None
         .values(deleted_at=now_utc())
     )
     await session.commit()
+
+
+async def update_me(db: AsyncSession, user: User, data: UserUpdate) -> User:
+    """Смена часового пояса: правила расписания — «настенное» время, их вхождения
+    пересобираются в новом поясе (ручные события остаются в своём моменте). Коммитит."""
+    if data.timezone and data.timezone != user.timezone:
+        user.timezone = data.timezone
+        await db.flush()
+        rules = await db.scalars(
+            select(ScheduleRule).where(
+                ScheduleRule.user_id == user.id, ScheduleRule.deleted_at.is_(None)
+            )
+        )
+        await SeriesSync(db, user.id, get_tz(user.timezone)).sync_rules(list(rules))
+    await db.commit()
+    return user

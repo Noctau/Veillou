@@ -25,7 +25,7 @@ async function registration(timeoutMs = SW_TIMEOUT_MS): Promise<ServiceWorkerReg
 
 /**
  * Отписать это устройство: сначала на сервере (иначе воркер продолжит слать), потом в браузере.
- * `quick` — при выходе: не ждать service worker дольше пары секунд.
+ * `quick` — при выходе: не ждать service worker дольше двух секунд.
  */
 export async function unsubscribeThisDevice({ quick = false } = {}): Promise<void> {
   if (pushUnsupportedReason() !== null) return

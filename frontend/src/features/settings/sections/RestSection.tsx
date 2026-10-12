@@ -27,7 +27,7 @@ export function RestSection({ settings }: { settings: UserSettings }) {
   return (
     <SettingsSection
       title="Отдых и ящик"
-      description="Минимум отдыха в неделю: сюда планировщик не поставит учёбу и дела. Если без него не успеть — план предупредит."
+      description="Минимум отдыха в неделю: сюда планировщик не поставит задачи и дела. Если без него не успеть — план предупредит."
       onSubmit={form.handleSubmit((values) => update.mutate(values))}
       isDirty={isDirty}
       isSaving={update.isPending}
@@ -56,7 +56,7 @@ export function RestSection({ settings }: { settings: UserSettings }) {
         id="backlog_per_week"
         label="Дел из ящика"
         suffix="в неделю"
-        description="Столько дел предложит недельный разбор; ставятся после учёбы."
+        description="Столько дел предложит недельный разбор; ставятся после задач."
         step={1}
         min={0}
         max={7}

@@ -7,7 +7,7 @@ import { useNoteForEvent } from './useNotes'
 
 type Props = {
   eventId: string
-  /** У пары уже есть конспект — кнопка его откроет. */
+  /** У события уже есть заметка — кнопка её откроет. */
   hasNote?: boolean
   size?: 'sm' | 'default'
   variant?: 'default' | 'outline' | 'secondary' | 'ghost'
@@ -16,7 +16,7 @@ type Props = {
   label?: string
 }
 
-/** «Конспект к этой паре»: открывает начатый конспект пары или создаёт новый со сферой и датой. */
+/** «Заметка к событию»: открывает начатую заметку события или создаёт новую со сферой и датой. */
 export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'outline', onDone, className, label }: Props) {
   const navigate = useNavigate()
   const open = useNoteForEvent()
@@ -38,7 +38,7 @@ export function NoteForEventButton({ eventId, hasNote, size = 'sm', variant = 'o
         )
       }
     >
-      <NotebookPenIcon /> {label ?? (hasNote ? 'Открыть конспект' : 'Конспект к этой паре')}
+      <NotebookPenIcon /> {label ?? (hasNote ? 'Открыть заметку' : 'Заметка к событию')}
     </Button>
   )
 }

@@ -1,4 +1,4 @@
-"""Чистая логика конспектов: название по умолчанию и короткий текст для списка."""
+"""Чистая логика заметок: название по умолчанию и короткий текст для списка."""
 
 import re
 from datetime import date
@@ -25,8 +25,8 @@ def short_date(day: date) -> str:
 
 
 def default_title(day: date, subject: str | None = None) -> str:
-    """«Климатология · 6 окт» или «Конспект 6 окт»."""
-    return f"{subject} · {short_date(day)}" if subject else f"Конспект {short_date(day)}"
+    """«Алгебра · 6 окт» или «Заметка 6 окт»."""
+    return f"{subject} · {short_date(day)}" if subject else f"Заметка {short_date(day)}"
 
 
 # Блоки формул и кода в выдержку не попадают — в списке это шум
@@ -34,7 +34,7 @@ _FENCED = re.compile(r"```.*?(```|$)|\$\$.*?(\$\$|$)", re.DOTALL)
 _INLINE_MATH = re.compile(r"\$[^$\n]+\$")
 # Классы символов не пересекаются со скобками-разделителями: без этого незакрытые «[»
 # или «(» давали квадратичный откат (тело до 200 000 символов → минуты CPU).
-# В адресе допускается одна пара скобок: https://ru.wikipedia.org/wiki/A_(b)
+# В адресе допускается одни скобки: https://ru.wikipedia.org/wiki/A_(b)
 _LINK = re.compile(r"!?\[([^\[\]]*)\]\((?:[^()]|\([^()]*\))*\)")
 _MARKUP = re.compile(r"^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+|[*_`~]+", re.MULTILINE)
 _SPACES = re.compile(r"\s+")

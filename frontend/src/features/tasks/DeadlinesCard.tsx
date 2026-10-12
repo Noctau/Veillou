@@ -78,7 +78,7 @@ export function DeadlinesCard({ tz, now }: { tz: string; now: Date }) {
           })}
         </ul>
         {tasks && tasks.length > LIMIT && (
-          <Link to="/areas?tab=tasks" className="mt-2 block px-2 text-xs text-muted-foreground underline-offset-4 hover:underline">
+          <Link to="/tasks" className="mt-2 block px-2 text-xs text-muted-foreground underline-offset-4 hover:underline">
             Ещё {tasks.length - LIMIT}
           </Link>
         )}

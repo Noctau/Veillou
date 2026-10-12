@@ -5,6 +5,7 @@ import { AreaTypesSection } from '@/features/areas/AreaTypesSection'
 import { ActionTypesSection } from '@/features/catalog/ActionTypesSection'
 import { BudgetsSection } from '@/features/catalog/BudgetsSection'
 import { TaskTypesSection } from '@/features/catalog/TaskTypesSection'
+import { NavSection } from '@/features/navigation/NavSection'
 import { NotificationsSection } from '@/features/notifications/NotificationsSection'
 import { CalibrationSection } from '@/features/plan/CalibrationSection'
 import { CategoriesSection } from '@/features/catalog/CategoriesSection'
@@ -45,6 +46,7 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           <AboutSection settings={settings} />
           <BundleSection />
+          <NavSection settings={settings} />
           <DayProfilesSection />
           <StudySection settings={settings} />
           <EventTypesSection />

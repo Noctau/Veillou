@@ -86,7 +86,7 @@ export function useUpdateNote() {
     onSuccess: (data) => queryClient.setQueryData(queryKeys.note(data.id), data),
     onError: (error, { id }, context) => {
       if (context?.prev) queryClient.setQueryData(queryKeys.note(id), context.prev)
-      toast.error(errorMessage(error, 'Не удалось сохранить конспект'))
+      toast.error(errorMessage(error, 'Не удалось сохранить заметку'))
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notesList }),
   })
@@ -104,13 +104,13 @@ export function useDeleteNote() {
     onSuccess: (_data, id) => {
       queryClient.removeQueries({ queryKey: queryKeys.note(id) })
       queryClient.invalidateQueries({ queryKey: queryKeys.notesList })
-      toast.success('Конспект удалён')
+      toast.success('Заметка удалена')
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
 }
 
-/** «Конспект к этой паре»: открыть начатый конспект пары или создать новый. */
+/** «Заметка к событию»: открыть начатую заметку события или создать новую. */
 export function useNoteForEvent() {
   const queryClient = useQueryClient()
   return useMutation({

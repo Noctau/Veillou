@@ -44,7 +44,8 @@ async def test_project_crud_and_progress(auth_client):
         deadline="2027-06-15",
         contacts=[{"name": "Петров П. П.", "role": "научный руководитель", "contact": "p@msu.ru"}],
     )
-    assert project["category_id"] == cats["study"]["id"]
+    # Без категории — категория типа действия по умолчанию (нейтральный сид — «Работа»)
+    assert project["category_id"] == cats["work"]["id"]
     assert project["contacts"][0]["role"] == "научный руководитель"
     assert project["milestones"] == []
     assert project["next_milestone"] is None
