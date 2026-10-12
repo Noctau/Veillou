@@ -1,19 +1,22 @@
 """Когда присылать напоминания. Чистая логика, без БД.
 
-На входе — простые описания пар, заданий и блоков; на выходе — список
+На входе — простые описания событий, заданий и блоков; на выходе — список
 `Planned` с итоговым временем и ключом дедупликации. Сервис
 (services/reminders.py) сверяет этот список с таблицей `reminders`.
 
 Правила:
-- перед парой — за N минут (по умолчанию 15), позже начала пары смысла нет;
+- перед событием — за N минут по типу занятости (`remind_before_min`), позже
+  начала события смысла нет;
 - дедлайны — за 3 дня, за 1 день и в день сдачи, во время утренней сводки
   (склеиваются с ней в одно сообщение);
-- утренняя сводка — каждый день в заданное время;
-- вечерний разбор — каждый день, недельный — в выбранный день недели (пустой
-  разбор отправитель пропускает: нечего разбирать — нечего и присылать);
+- утренняя сводка — каждый день, через N минут после подъёма режима дня;
+- вечерний разбор — каждый день за N минут до отбоя режима, недельный — в
+  выбранный день недели (пустой разбор отправитель пропускает: нечего
+  разбирать — нечего и присылать);
 - начало подзадачи — в момент начала блока (по умолчанию выключено);
-- тихие часы: ничего не приходит — переносится на их конец;
-- окно типа действия: «написать научруку» в 22:00 переносится на начало
+- тихие часы: ничего не приходит — переносится на их конец. Ночь после дня с
+  режимом «тихие часы — сон» — это сон режима, иначе — общие тихие часы;
+- окно типа действия: «позвонить в банк» в 22:00 переносится на начало
   ближайшего окна (утро буднего дня). Если перенос вперёд опоздал бы к сроку,
   дедлайн-напоминание сдвигается назад — на последний допустимый момент;
 - склейка: напоминания в пределах минуты получают одно время, воркер
@@ -21,7 +24,7 @@
 """
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from typing import Any
@@ -57,6 +60,21 @@ class TimeRange:
     end: time
 
 
+Interval = tuple[datetime, datetime]
+
+
+@dataclass(frozen=True)
+class Quiet:
+    """Тихие часы по ночам: ночь после даты `d` — `nights[d]` (сон режима дня), для
+    остальных дат — ежедневный `default` (None — без тихих часов)."""
+
+    default: TimeRange | None = None
+    nights: Mapping[date, Interval] = field(default_factory=dict)
+
+
+QuietHours = Quiet | TimeRange | None
+
+
 @dataclass(frozen=True)
 class Candidate:
     kind: ReminderKind
@@ -89,9 +107,13 @@ class Planned:
 
 
 @dataclass(frozen=True)
-class ClassInfo:
+class EventInfo:
+    """Жёсткое событие типа с напоминанием: за сколько минут и куда."""
+
     event_id: uuid.UUID
     start: datetime
+    minutes_before: int
+    channels: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -125,37 +147,45 @@ def _stamp(dt: datetime) -> str:
     return dt.strftime("%Y%m%dT%H%MZ")
 
 
-def class_candidates(
-    classes: Iterable[ClassInfo], minutes_before: int, channels: Sequence[str]
-) -> list[Candidate]:
+def event_candidates(events: Iterable[EventInfo]) -> list[Candidate]:
     return [
         Candidate(
-            kind=ReminderKind.before_class,
-            key=f"before_class:{c.event_id}:{_stamp(c.start)}",
-            fire_at=c.start - timedelta(minutes=minutes_before),
-            channels=tuple(channels),
+            kind=ReminderKind.before_event,
+            key=f"before_event:{e.event_id}:{_stamp(e.start)}",
+            fire_at=e.start - timedelta(minutes=e.minutes_before),
+            channels=e.channels,
             entity_type="event",
-            entity_id=c.event_id,
-            expires_at=c.start,
-            payload={"start": c.start.isoformat()},
+            entity_id=e.event_id,
+            expires_at=e.start,
+            payload={"start": e.start.isoformat()},
         )
-        for c in classes
+        for e in events
+        if e.channels
     ]
+
+
+Moment = Callable[[date], datetime]
+
+
+def daily_at(at: time, tz: ZoneInfo) -> Moment:
+    """Каждый день в одно настенное время."""
+    return lambda d: wall_to_utc(d, at, tz)
 
 
 def deadline_candidates(
     tasks: Iterable[DeadlineInfo],
     days_before: Iterable[int],
-    at: time,
+    digest_at: Moment,
     tz: ZoneInfo,
     channels: Sequence[str],
 ) -> list[Candidate]:
+    """`digest_at(дата)` — время утренней сводки этой даты."""
     result = []
     days = sorted(set(days_before), reverse=True)
     for t in tasks:
         due_day = local_date(t.deadline, tz)
         for n in days:
-            fire_at = wall_to_utc(due_day - timedelta(days=n), at, tz)
+            fire_at = digest_at(due_day - timedelta(days=n))
             if fire_at >= t.deadline:  # сдать в 7:00, а сводка в 8:00
                 continue
             result.append(
@@ -175,16 +205,14 @@ def deadline_candidates(
     return result
 
 
-def digest_candidates(
-    days: Iterable[date], at: time, tz: ZoneInfo, channels: Sequence[str]
-) -> list[Candidate]:
+def digest_candidates(days: Iterable[date], at: Moment, channels: Sequence[str]) -> list[Candidate]:
     return [
         Candidate(
             kind=ReminderKind.morning_digest,
             key=f"morning_digest:{d.isoformat()}",
-            fire_at=wall_to_utc(d, at, tz),
+            fire_at=at(d),
             channels=tuple(channels),
-            expires_at=wall_to_utc(d, at, tz) + DIGEST_TTL,
+            expires_at=at(d) + DIGEST_TTL,
             payload={"date": d.isoformat()},
         )
         for d in days
@@ -194,19 +222,18 @@ def digest_candidates(
 def review_candidates(
     kind: ReminderKind,
     days: Iterable[date],
-    at: time,
-    tz: ZoneInfo,
+    at: Moment,
     channels: Sequence[str],
     ttl: timedelta,
 ) -> list[Candidate]:
-    """Вечерний / недельный разбор: в заданное время выбранных дней."""
+    """Вечерний / недельный разбор: в своё время выбранных дней."""
     return [
         Candidate(
             kind=kind,
             key=f"{kind}:{d.isoformat()}",
-            fire_at=wall_to_utc(d, at, tz),
+            fire_at=at(d),
             channels=tuple(channels),
-            expires_at=wall_to_utc(d, at, tz) + ttl,
+            expires_at=at(d) + ttl,
             payload={"date": d.isoformat()},
         )
         for d in days
@@ -231,8 +258,6 @@ def subtask_candidates(blocks: Iterable[BlockInfo], channels: Sequence[str]) -> 
 
 
 # ---------- допустимое время ----------
-
-Interval = tuple[datetime, datetime]
 
 
 def _daily(d: date, start: time, end: time, tz: ZoneInfo) -> Interval:
@@ -269,10 +294,24 @@ def _subtract(base: list[Interval], holes: list[Interval]) -> list[Interval]:
     return result
 
 
+def _quiet_holes(quiet: QuietHours, dates: Sequence[date], tz: ZoneInfo) -> list[Interval]:
+    if quiet is None:
+        return []
+    if isinstance(quiet, TimeRange):
+        quiet = Quiet(quiet)
+    holes = []
+    for d in dates:
+        if (night := quiet.nights.get(d)) is not None:
+            holes.append(night)
+        elif quiet.default is not None:
+            holes.append(_daily(d, quiet.default.start, quiet.default.end, tz))
+    return holes
+
+
 def allowed_intervals(
     around: datetime,
     windows: Sequence[Window],
-    quiet: TimeRange | None,
+    quiet: QuietHours,
     tz: ZoneInfo,
     days: int = SEARCH_DAYS,
 ) -> list[Interval]:
@@ -288,11 +327,10 @@ def allowed_intervals(
         ]
     else:
         base = [(wall_to_utc(dates[0], time(0), tz), wall_to_utc(dates[-1], time(0), tz))]
-    holes = [_daily(d, quiet.start, quiet.end, tz) for d in dates] if quiet else []
-    return _subtract(_merge(base), _merge(holes))
+    return _subtract(_merge(base), _merge(_quiet_holes(quiet, dates, tz)))
 
 
-def adjust(c: Candidate, quiet: TimeRange | None, tz: ZoneInfo) -> datetime | None:
+def adjust(c: Candidate, quiet: QuietHours, tz: ZoneInfo) -> datetime | None:
     """Ближайшее допустимое время для напоминания или None, если такого нет до срока."""
     intervals = allowed_intervals(c.fire_at, c.windows, quiet, tz)
     for start, end in intervals:
@@ -321,7 +359,7 @@ def merge_close(planned: list[Planned], window: timedelta = MERGE_WINDOW) -> lis
     return result
 
 
-def build(candidates: Iterable[Candidate], quiet: TimeRange | None, tz: ZoneInfo) -> list[Planned]:
+def build(candidates: Iterable[Candidate], quiet: QuietHours, tz: ZoneInfo) -> list[Planned]:
     planned = []
     for c in candidates:
         moment = adjust(c, quiet, tz)
@@ -342,7 +380,7 @@ def build(candidates: Iterable[Candidate], quiet: TimeRange | None, tz: ZoneInfo
     return merge_close(planned)
 
 
-def next_allowed(moment: datetime, quiet: TimeRange | None, tz: ZoneInfo) -> datetime:
+def next_allowed(moment: datetime, quiet: QuietHours, tz: ZoneInfo) -> datetime:
     """Ближайший момент не в тихие часы (для «+15 мин» и «На завтра»)."""
     probe = Candidate(kind=ReminderKind.test, key="", fire_at=moment, channels=())
     return adjust(probe, quiet, tz) or moment

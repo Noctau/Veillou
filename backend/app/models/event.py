@@ -1,15 +1,20 @@
 """Всё, что видно в календаре, — строка в `events`.
 
-Вхождения шаблонов (пары, личные повторы) материализуются сюда с
-`template_type/template_id` и ключом `occurrence_date` — локальной датой, на
-которую вхождение приходится по шаблону. Ключ не меняется при переносе, поэтому
-перенесённая вручную пара (`detached=true`) не создаётся заново на старом месте.
+Вхождения правил расписания материализуются сюда с `template_type/template_id`
+и ключом `occurrence_date` — локальной датой, на которую вхождение приходится по
+правилу. Ключ не меняется при переносе, поэтому перенесённое вручную вхождение
+(`detached=true`) не создаётся заново на старом месте.
+
+`kind` — поведение в планировщике (EventKind): жёсткое `busy` со своим типом
+занятости или гибкие блоки. Смысл жёсткого события задаёт `event_type_id`.
 """
 
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime
+from typing import Any
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, SmallInteger, String, Text, Time, text
+from sqlalchemy import Boolean, Date, ForeignKey, Index, SmallInteger, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -51,34 +56,18 @@ class Event(UserOwnedMixin, Base):
     source_type: Mapped[str | None] = mapped_column(String(30))
     source_id: Mapped[uuid.UUID | None] = mapped_column()
 
-    subject_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL"), index=True
+    area_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("areas.id", ondelete="SET NULL"), index=True
     )
     location: Mapped[str | None] = mapped_column(String(200))
     color: Mapped[str | None] = mapped_column(String(16))
     note: Mapped[str] = mapped_column(Text, default="")
 
-    # Только для пар
-    class_type: Mapped[str | None] = mapped_column(String(20))
-    pair_number: Mapped[int | None] = mapped_column(SmallInteger)
-    teacher: Mapped[str | None] = mapped_column(String(200))
-
-
-class RecurringEvent(UserOwnedMixin, Base):
-    """Личный блок или отдых с повтором («по Вт, Чт 19:00–20:30»).
-
-    Материализуется в `events` на скользящие 90 дней; ночная джоба докатывает окно.
-    """
-
-    __tablename__ = "recurring_events"
-
-    kind: Mapped[str] = mapped_column(String(20))  # personal | rest
-    title: Mapped[str] = mapped_column(String(300))
-    rrule: Mapped[str] = mapped_column(String(500))  # без DTSTART: «FREQ=WEEKLY;BYDAY=TU,TH»
-    start_date: Mapped[date] = mapped_column(Date)
-    until: Mapped[date | None] = mapped_column(Date)
-    start_time: Mapped[time] = mapped_column(Time)
-    end_time: Mapped[time] = mapped_column(Time)  # <= start_time — до следующего дня
-    location: Mapped[str | None] = mapped_column(String(200))
-    color: Mapped[str | None] = mapped_column(String(16))
-    note: Mapped[str] = mapped_column(Text, default="")
+    # Тип занятости жёсткого события; NULL — просто занято (без буферов и напоминаний)
+    event_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("event_types.id", ondelete="SET NULL"), index=True
+    )
+    # Значения полей типа занятости: {field_id: value}
+    fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # Номер слота сетки (в Part 1 — pair_number)
+    slot: Mapped[int | None] = mapped_column(SmallInteger)

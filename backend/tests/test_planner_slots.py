@@ -5,15 +5,16 @@ from datetime import date, datetime, time, timedelta
 from app.core.time import get_tz, wall_to_utc
 from app.domain.planner import (
     Block,
+    Budget,
     Busy,
     FixedBlock,
     PlanInput,
-    PlanSettings,
-    TimeRange,
     Window,
     available_slots,
 )
 from app.domain.planner.grid import Grid, intersect, merge, prepare, subtract
+
+from .test_planner import days_like
 
 TZ = get_tz("Europe/Moscow")
 MON = date(2026, 10, 12)  # понедельник
@@ -79,8 +80,7 @@ def test_sleep_cuts_late_study_window():
 
 
 def test_night_study_when_sleep_is_late():
-    settings = PlanSettings(sleep=TimeRange(time(1, 30), time(9)))
-    data = inp(Block("b", 60, windows=STUDY), settings=settings)
+    data = inp(Block("b", 60, windows=STUDY), days=days_like(sleep=time(1, 30), wake=time(9)))
     tue = MON + timedelta(days=1)
     # Пн 09:00–13:00, 14:00–… до 01:00 вторника (окно), сон с 01:30
     assert (time(14), time(1)) in [
@@ -106,10 +106,12 @@ def test_now_cuts_today():
 # ---------- дорога и жёсткие события ----------
 
 
-def test_travel_buffer_around_class_day():
+def test_travel_buffer_around_merged_day():
     busy = (
-        Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),
-        Busy(at(MON, 13, 0), at(MON, 14, 35), is_class=True),
+        Busy(
+            at(MON, 10, 45), at(MON, 12, 20), buffer_before=60, buffer_after=60, merge_key="class"
+        ),
+        Busy(at(MON, 13, 0), at(MON, 14, 35), buffer_before=60, buffer_after=60, merge_key="class"),
     )
     data = inp(Block("b", 30), busy=busy)
     # 09:00–09:45 (до 10:45 − 60), окно между парами 12:20→12:30–13:00 обед, после — 15:35→15:45
@@ -129,10 +131,39 @@ def test_no_travel_buffer_around_personal_events():
     ]
 
 
-def test_travel_buffer_setting_zero():
-    busy = (Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),)
-    data = inp(Block("b", 30), busy=busy, settings=PlanSettings(travel_buffer_min=0))
+def test_zero_buffer_and_merge_key():
+    busy = (Busy(at(MON, 10, 45), at(MON, 12, 20), merge_key="class"),)
+    data = inp(Block("b", 30), busy=busy)
     assert free_on(data, MON)[:2] == [(time(9), time(10, 45)), (time(12, 30), time(13))]
+
+
+def test_buffers_without_merge_per_event():
+    # Без склейки дорога — вокруг каждого события; до и после — разной длины
+    busy = (
+        Busy(at(MON, 10), at(MON, 11), buffer_before=30, buffer_after=15),
+        Busy(at(MON, 15), at(MON, 16), buffer_before=30, buffer_after=15),
+    )
+    assert free_on(inp(Block("b", 30), busy=busy), MON) == [
+        (time(9), time(9, 30)),
+        (time(11, 15), time(13)),
+        (time(14), time(14, 30)),
+        (time(16, 15), time(21)),
+    ]
+
+
+def test_merge_only_same_key():
+    # Разные места (ключи) — буфер у каждой группы свой, в том числе между ними
+    busy = (
+        Busy(at(MON, 10), at(MON, 11), buffer_before=60, buffer_after=60, merge_key="A"),
+        Busy(at(MON, 16), at(MON, 17), buffer_before=60, buffer_after=60, merge_key="A"),
+        Busy(at(MON, 12), at(MON, 12, 30), buffer_before=60, buffer_after=60, merge_key="B"),
+    )
+    # A — одна группа на день: дорога до 10:00 и после 17:00, между событиями A её нет;
+    # у B своя дорога 11:00–12:00 и 12:30–13:30
+    assert free_on(inp(Block("b", 30), busy=busy), MON) == [
+        (time(14), time(16)),
+        (time(18), time(21)),
+    ]
 
 
 def test_fixed_block_is_busy():
@@ -231,11 +262,15 @@ def test_rest_candidate_with_pinned_block_is_excluded():
 
 def test_fixed_blocks_count_in_daily_limits():
     fixed = (
-        FixedBlock("f1", at(MON, 9), at(MON, 11), group_id="t"),
-        FixedBlock("f2", at(MON, 14), at(MON, 15), group_id="t", counts_as_study=False),
+        FixedBlock("f1", at(MON, 9), at(MON, 11), group_id="t", budgets=frozenset({"a", "b"})),
+        FixedBlock("f2", at(MON, 14), at(MON, 15), group_id="t", budgets=frozenset({"x"})),
     )
-    prep = prepare(inp(Block("b", 30), fixed=fixed, now=at(MON, 16)))
-    assert prep.fixed_study == {0: 8}
+    budgets = (Budget("a", 240), Budget("b", 120))
+    prep = prepare(inp(Block("b", 30), fixed=fixed, now=at(MON, 16), budgets=budgets))
+    # «x» во входе нет — не считается
+    assert prep.fixed_budget == {("a", 0): 8, ("b", 0): 8}
+    assert prep.remaining("a", 0) == 8
+    assert prep.remaining("b", 0) == 0
     assert prep.fixed_per_group == {("t", 0): 2}
 
 
@@ -247,7 +282,7 @@ def test_dst_transition_keeps_wall_time():
         now=wall_to_utc(sun - timedelta(days=1), time(0), berlin),
         tz=berlin,
         blocks=(Block("b", 60, windows=(Window(frozenset(range(1, 8)), time(9), time(19)),)),),
-        settings=PlanSettings(lunch=None),
+        days=days_like(berlin, sun - timedelta(days=3), 20, lunch=None),
     )
     prep = prepare(data)
     for lo, hi in prep.by_id["b"].free[:4]:

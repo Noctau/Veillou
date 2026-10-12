@@ -1,18 +1,19 @@
 """CP-SAT модель планировщика.
 
 Каждый блок — одна или две (разрезанный) optional-части; presence = «размещён».
-Свободное время зашито в домены стартов (сон, обед, пары, дорога, окна уже
+Свободное время зашито в домены стартов (сон, обед, занятость, дорога, окна уже
 вычтены в grid.py), поэтому NoOverlap нужен только между гибкими блоками,
 закреплёнными блоками и выбранными окнами отдыха.
 
-Жёстко: окна, дедлайн, зависимости, перерыв после длинных блоков, лимит учёбы
-в день, ≤ N подзадач одного задания в день, минимум отдыха.
+Жёстко: окна, дедлайн, зависимости, перерыв после длинных блоков, лимиты
+нагрузки (по каждому сочетанию «лимит, день»), ≤ N подзадач одного задания в день,
+минимум отдыха.
 Мягко (минимизируем): приоритет × время завершения, огромный штраф за
 непостановку (у дел из ящика — на порядки меньше: только в оставшееся время),
 недобор недельной нормы проекта (дороже дел из ящика; резервные блоки нормы
 своего штрафа за непостановку не имеют), опоздание к внутреннему сроку,
-сдвиг относительно прошлого плана (сегодня/завтра — дорого), утро для «связи
-с людьми», разрезание, порядок шагов задания (`sequence`).
+сдвиг относительно прошлого плана (сегодня/завтра — дорого), утро для типов
+действий с `prefer_morning`, разрезание, порядок шагов задания (`sequence`).
 
 Норма не должна отнимать время у сроков: если есть нормы, блок, который в
 жадном решении (там резерв ставится после основного) успевает к внутреннему
@@ -37,7 +38,7 @@ W_QUOTA = 30_000  # слот недобора нормы: час (4 слота) 
 W_LATE = 400  # × приоритет: позже внутреннего срока
 W_STABLE_NEAR = 40  # сдвиг блока, который стоял на сегодня/завтра
 W_STABLE_FAR = 1  # сдвиг остальных
-W_MORNING = 1  # «связь с людьми»: позже от начала дня
+W_MORNING = 1  # prefer_morning: позже от начала дня
 W_SPLIT = 200  # блок разрезан: только если иначе заметно хуже
 W_ORDER = 300  # шаг задания начат раньше конца предыдущего по порядку
 OVERDUE_BOOST = 3  # приоритет просроченного
@@ -58,7 +59,7 @@ class _Part:
     length: cp_model.IntVar | int
     pres: cp_model.IntVar
     days: dict[int, LinearExpr] = field(default_factory=dict)  # день → 0/1
-    # день → слотов (только у блоков, которые считаются в учёбу или в норму)
+    # день → слотов (только у блоков, которые считаются в лимиты или в норму)
     minutes: dict[int, LinearExpr] = field(default_factory=dict)
 
 
@@ -81,9 +82,9 @@ def miss_weight(pb: PreparedBlock) -> int:
     return effective_priority(pb) * (W_MISS_FILLER if pb.block.filler else W_MISS)
 
 
-def counted(pb: PreparedBlock) -> bool:
-    """Нужны ли минуты блока по дням: для лимита учёбы или для нормы."""
-    return pb.block.counts_as_study or pb.block.quota is not None
+def counted(prep: Prepared, pb: PreparedBlock) -> bool:
+    """Нужны ли минуты блока по дням: для лимитов нагрузки или для нормы."""
+    return bool(prep.budgets_of(pb.block.budgets)) or pb.block.quota is not None
 
 
 class _Builder:
@@ -132,7 +133,7 @@ class _Builder:
             m.add(start <= hi).only_enforce_if(x)
             xs.append(x)
             part.days[day] = x
-            if counted(pb):
+            if counted(self.prep, pb):
                 part.minutes[day] = pb.dur * x
         m.add(sum(xs) == pres)
         return part
@@ -174,7 +175,7 @@ class _Builder:
         for day, vs in by_day.items():
             x = sum(vs)
             part.days[day] = x
-            if counted(pb):
+            if counted(prep, pb):
                 minutes = m.new_int_var(0, pb.dur, f"m{name}_{day}")
                 m.add(minutes <= pb.dur * x)
                 m.add(minutes <= length)
@@ -256,13 +257,13 @@ class _Builder:
 
     def add_daily(self) -> None:
         prep, m = self.prep, self.m
-        study: dict[int, list[LinearExpr]] = defaultdict(list)
+        load: dict[tuple[BlockId, int], list[LinearExpr]] = defaultdict(list)
         per_group: dict[tuple[BlockId, int], list[LinearExpr]] = defaultdict(list)
         for b in self.blocks.values():
-            if b.pb.block.counts_as_study:
+            for budget in prep.budgets_of(b.pb.block.budgets):
                 for p in b.parts:
                     for day, expr in p.minutes.items():
-                        study[day].append(expr)
+                        load[(budget, day)].append(expr)
             group = b.pb.block.group_id
             if group is None:
                 continue
@@ -276,8 +277,8 @@ class _Builder:
                     for x in xs:
                         m.add(y >= x)
                     per_group[(group, day)].append(y)
-        for day, exprs in study.items():
-            m.add(sum(exprs) <= max(0, prep.limit(day) - prep.fixed_study.get(day, 0)))
+        for (budget, day), exprs in load.items():
+            m.add(sum(exprs) <= prep.remaining(budget, day))
         for key, exprs in per_group.items():
             if len(exprs) + prep.fixed_per_group.get(key, 0) > prep.max_per_group:
                 m.add(sum(exprs) <= max(0, prep.max_per_group - prep.fixed_per_group.get(key, 0)))

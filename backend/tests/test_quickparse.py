@@ -8,23 +8,33 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.domain.enums import ActionTypeKey, TaskType
-from app.domain.quickparse import KindHint, SubjectRef, guess_action_type, parse
+from app.domain.enums import ActionTypeKey, TaskTypeKey
+from app.domain.quickparse import AreaRef, KindHint, Term, guess, needs_ai, parse
+
+from .student import M21, PART1_ACTION_TYPES, TASK_TYPES
 
 MSK = ZoneInfo("Europe/Moscow")
 NOW = datetime(2026, 10, 6, 15, 0, tzinfo=MSK)
 
 SUBJECTS = [
-    SubjectRef("clim", ("Климатология", "клим", "климат")),
-    SubjectRef("fiz", ("Физика атмосферы", "физат")),
-    SubjectRef("dyn", ("Динамическая метеорология", "динмет")),
-    SubjectRef("eng", ("Английский язык", "англ")),
-    SubjectRef("matan", ("Математический анализ", "матан")),
+    AreaRef("clim", ("Климатология", "клим", "климат")),
+    AreaRef("fiz", ("Физика атмосферы", "физат")),
+    AreaRef("dyn", ("Динамическая метеорология", "динмет")),
+    AreaRef("eng", ("Английский язык", "англ")),
+    AreaRef("matan", ("Математический анализ", "матан")),
+]
+
+
+# Словарь студентки после миграции M21.1: id типа = его ключ сида
+TASK_TERMS = [Term(TaskTypeKey(key), (name, *syn)) for key, name, _, syn in TASK_TYPES]
+ACTION_TERMS = [
+    Term(ActionTypeKey(key), (name, *M21.ACTION_WORDS.get(key, [])))
+    for key, (name, _) in PART1_ACTION_TYPES.items()
 ]
 
 
 def p(text: str, now: datetime = NOW, subjects=SUBJECTS):
-    return parse(text, now, subjects)
+    return parse(text, now, subjects, TASK_TERMS, ACTION_TERMS)
 
 
 def eod(d: date) -> datetime:
@@ -37,8 +47,8 @@ def eod(d: date) -> datetime:
 def test_essay_with_subject_and_deadline():
     r = p("реферат климатология до 15 окт")
     assert r.title == "Реферат"
-    assert r.subject_id == "clim"
-    assert r.task_type == TaskType.essay
+    assert r.area_id == "clim"
+    assert r.task_type == TaskTypeKey.essay
     assert r.date == date(2026, 10, 15)
     assert r.deadline == eod(date(2026, 10, 15))
     assert r.is_deadline
@@ -47,14 +57,14 @@ def test_essay_with_subject_and_deadline():
 
 def test_report_by_friday_inflected_subject():
     r = p("доклад по физике атмосферы к пятнице")
-    assert (r.title, r.subject_id, r.task_type) == ("Доклад", "fiz", TaskType.report)
+    assert (r.title, r.area_id, r.task_type) == ("Доклад", "fiz", TaskTypeKey.report)
     assert r.date == date(2026, 10, 9)
     assert r.is_deadline
 
 
 def test_homework_in_two_weeks():
     r = p("дз по матану через 2 недели")
-    assert (r.title, r.subject_id, r.task_type) == ("Дз", "matan", TaskType.homework)
+    assert (r.title, r.area_id, r.task_type) == ("Дз", "matan", TaskTypeKey.homework)
     assert r.date == date(2026, 10, 20)
     assert r.kind_hint == KindHint.task
 
@@ -68,15 +78,15 @@ def test_number_words():
 def test_reading_chapter_numeric_date():
     r = p("прочитать главу 3 учебника по климатологии к 12.10")
     assert r.title == "Прочитать главу 3 учебника"
-    assert r.subject_id == "clim"
-    assert r.task_type == TaskType.reading
+    assert r.area_id == "clim"
+    assert r.task_type == TaskTypeKey.reading
     assert r.date == date(2026, 10, 12)
     assert r.is_deadline
 
 
 def test_lab_short_name_bare_date():
     r = p("лаба по физат 20.10")
-    assert (r.title, r.subject_id, r.task_type) == ("Лаба", "fiz", TaskType.lab)
+    assert (r.title, r.area_id, r.task_type) == ("Лаба", "fiz", TaskTypeKey.lab)
     assert r.date == date(2026, 10, 20)
     assert r.kind_hint == KindHint.task
 
@@ -84,15 +94,15 @@ def test_lab_short_name_bare_date():
 def test_submit_coursework_month_name():
     r = p("сдать курсовую 1 декабря")
     assert r.title == "Сдать курсовую"
-    assert r.task_type == TaskType.coursework
+    assert r.task_type == TaskTypeKey.coursework
     assert r.date == date(2026, 12, 1)
     assert r.is_deadline
 
 
 def test_exam_prep_next_year():
     r = p("подготовиться к экзамену по климатологии до 20 января")
-    assert r.task_type == TaskType.exam_prep
-    assert r.subject_id == "clim"
+    assert r.task_type == TaskTypeKey.exam_prep
+    assert r.area_id == "clim"
     assert r.date == date(2027, 1, 20)
     assert r.title == "Подготовиться к экзамену"
 
@@ -104,12 +114,12 @@ def test_past_day_month_rolls_to_next_year():
 def test_explicit_year_kept():
     r = p("зачёт по англу 15.10.2026")
     assert r.date == date(2026, 10, 15)
-    assert (r.title, r.subject_id, r.task_type) == ("Зачёт", "eng", TaskType.exam_prep)
+    assert (r.title, r.area_id, r.task_type) == ("Зачёт", "eng", TaskTypeKey.exam_prep)
 
 
 def test_presentation_day_after_tomorrow():
     r = p("сделать презентацию к докладу послезавтра")
-    assert r.task_type == TaskType.report
+    assert r.task_type == TaskTypeKey.report
     assert r.date == date(2026, 10, 8)
     assert r.title == "Сделать презентацию к докладу"
 
@@ -140,7 +150,7 @@ def test_message_supervisor_by_friday():
 def test_word_srok_marks_deadline():
     r = p("лабораторная по физат, срок 30 октября")
     assert r.title == "Лабораторная"
-    assert r.subject_id == "fiz"
+    assert r.area_id == "fiz"
     assert r.date == date(2026, 10, 30)
     assert r.is_deadline
 
@@ -149,7 +159,7 @@ def test_task_without_date():
     r = p("сдать реферат")
     assert r.date is None
     assert r.deadline is None
-    assert r.task_type == TaskType.essay
+    assert r.task_type == TaskTypeKey.essay
     assert r.kind_hint == KindHint.task
 
 
@@ -160,7 +170,7 @@ def test_tomorrow_at_14_is_event():
     r = p("завтра в 14 консультация по динмету")
     assert r.kind_hint == KindHint.event
     assert r.title == "Консультация"
-    assert r.subject_id == "dyn"
+    assert r.area_id == "dyn"
     assert (r.date, r.time) == (date(2026, 10, 7), time(14, 0))
 
 
@@ -305,24 +315,24 @@ def test_bare_dotted_time_and_latin_c():
 
 
 def test_ambiguous_subject_ignored():
-    subjects = [SubjectRef("a", ("Физика атмосферы",)), SubjectRef("b", ("Физика облаков",))]
-    assert p("доклад по физике", subjects=subjects).subject_id is None
+    subjects = [AreaRef("a", ("Физика атмосферы",)), AreaRef("b", ("Физика облаков",))]
+    assert p("доклад по физике", subjects=subjects).area_id is None
 
 
 def test_longest_subject_wins():
-    subjects = [SubjectRef("a", ("Физика",)), SubjectRef("b", ("Физика атмосферы",))]
-    assert p("доклад по физике атмосферы", subjects=subjects).subject_id == "b"
+    subjects = [AreaRef("a", ("Физика",)), AreaRef("b", ("Физика атмосферы",))]
+    assert p("доклад по физике атмосферы", subjects=subjects).area_id == "b"
 
 
 def test_short_name_needs_exact_match():
-    subjects = [SubjectRef("m", ("мат",))]
-    assert p("купить материалы", subjects=subjects).subject_id is None
-    assert p("дз по мат", subjects=subjects).subject_id == "m"
+    subjects = [AreaRef("m", ("мат",))]
+    assert p("купить материалы", subjects=subjects).area_id is None
+    assert p("дз по мат", subjects=subjects).area_id == "m"
 
 
 def test_subject_kept_in_title_if_nothing_else():
     r = p("климатология завтра")
-    assert r.subject_id == "clim"
+    assert r.area_id == "clim"
     assert r.title == "Климатология"
 
 
@@ -351,8 +361,6 @@ def test_naive_now_rejected():
         ("забрать посылку", ActionTypeKey.outside),
         ("разобрать шкаф на следующей неделе", ActionTypeKey.home),
         ("бассейн с 19 до 20:30", ActionTypeKey.personal),
-        ("реферат климатология до 15 окт", ActionTypeKey.study),
-        ("написать главу 1", ActionTypeKey.study),
         ("что-то непонятное", None),
     ],
 )
@@ -360,6 +368,122 @@ def test_action_type(text, expected):
     assert p(text).action_type == expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("реферат климатология до 15 окт", True),
+        ("написать главу 1", True),
+        ("записаться к стоматологу", False),  # тип узнан по словам
+        ("разобрать шкаф", False),
+        ("что-то непонятное", False),
+    ],
+)
+def test_default_action_for_task_like(text, expected):
+    """Похоже на задачу, а тип действия не узнан — сервис подставит тип по умолчанию."""
+    assert p(text).default_action is expected
+
+
 def test_guess_action_type_plain():
-    assert guess_action_type("МФЦ, паспорт") == ActionTypeKey.institutions
-    assert guess_action_type("Глава 1") is None
+    assert guess("МФЦ, паспорт", ACTION_TERMS) == ActionTypeKey.institutions
+    assert guess("Глава 1", ACTION_TERMS) is None
+    assert guess("МФЦ, паспорт", []) is None
+
+
+def test_without_words_types_unknown():
+    """Пустые словари (нет типов у пользователя) — типы не угадываются, остальное как было."""
+    r = parse("реферат климатология до 15 окт", NOW, SUBJECTS)
+    assert (r.task_type, r.action_type) == (None, None)
+    assert r.kind_hint == KindHint.task
+
+
+# ---------- словарь пользователя (M21.1) ----------
+
+SCHOOL_AREAS = [AreaRef("algebra", ("Алгебра",)), AreaRef("geom", ("Геометрия", "геома"))]
+SCHOOL_TASKS = [Term("hw", ("ДЗ", "дз", "№", "упр"))]
+TUTOR_AREAS = [AreaRef("masha", ("Маша",)), AreaRef("petya", ("Петя Иванов", "петя"))]
+TUTOR_TASKS = [
+    Term("hw", ("ДЗ",)),
+    Term("check", ("Проверка ДЗ", "проверить дз")),
+    Term("prep", ("Подготовка урока", "подготовить урок")),
+]
+OFFICE_EVENTS = [Term("meet", ("Встреча", "созвон", "стендап")), Term("trip", ("Командировка",))]
+OFFICE_ACTIONS = [Term("people", ("Связь с людьми", "позвонить", "клиент"))]
+
+
+def test_schoolkid_homework_number():
+    """«алгебра №245»: сфера по названию, тип по синониму «№» (срок — по типу, в сервисе)."""
+    r = parse("алгебра №245", NOW, SCHOOL_AREAS, SCHOOL_TASKS)
+    assert (r.area_id, r.task_type, r.kind_hint) == ("algebra", "hw", KindHint.task)
+    assert r.title == "№245"
+    assert r.date is None
+    r = parse("геома упр 12 к пятнице", NOW, SCHOOL_AREAS, SCHOOL_TASKS)
+    assert (r.area_id, r.task_type, r.date) == ("geom", "hw", date(2026, 10, 9))
+
+
+def test_tutor_check_homework_dative_name():
+    """«проверить дз маше»: ученица в дательном падеже, длинное совпадение типа важнее «ДЗ»."""
+    r = parse("проверить дз маше", NOW, TUTOR_AREAS, TUTOR_TASKS)
+    assert (r.area_id, r.task_type, r.kind_hint) == ("masha", "check", KindHint.task)
+    assert r.title == "Проверить дз"
+    assert parse("подготовить урок пете на завтра", NOW, TUTOR_AREAS, TUTOR_TASKS).area_id == (
+        "petya"
+    )
+    # «машина» — не «Маша»
+    assert parse("помыть машину", NOW, TUTOR_AREAS, TUTOR_TASKS).area_id is None
+
+
+def test_office_call_with_client_is_event_of_type():
+    r = parse("созвон с клиентом в пт 15:00", NOW, (), (), OFFICE_ACTIONS, OFFICE_EVENTS)
+    assert r.kind_hint == KindHint.event
+    assert (r.date, r.time) == (date(2026, 10, 9), time(15, 0))
+    assert (r.event_type, r.action_type) == ("meet", "people")
+    assert r.title == "Созвон с клиентом"
+
+
+def test_event_type_with_time_beats_task_type():
+    """Слово типа занятости со временем — событие, даже если это и тип задачи."""
+    events = [Term("exam", ("Экзамен", "зачёт"))]
+    r = parse("зачёт по англу 15.10 в 10:00", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert (r.kind_hint, r.event_type, r.area_id) == (KindHint.event, "exam", "eng")
+    # Без времени — задача, тип занятости не нужен
+    r = parse("зачёт по англу 15.10", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert (r.kind_hint, r.event_type) == (KindHint.task, None)
+    # «к 10:00» — срок, а не начало события
+    r = parse("зачёт по англу 15.10 к 10:00", NOW, SUBJECTS, TASK_TERMS, (), events)
+    assert r.kind_hint == KindHint.task
+
+
+@pytest.mark.parametrize(
+    ("word", "text", "found"),
+    [
+        ("реферат", "два реферата", True),
+        ("курсовая", "сдать курсовую", True),
+        ("презентация", "сделать презентацию", True),
+        ("записаться", "записалась к врачу", True),
+        ("лаба", "лабораторка", False),
+        ("лаборатор*", "лабораторку", True),
+        ("пара", "в парк", False),
+        ("пара", "после пары", True),
+        ("часть", "через час", False),
+        ("зал", "залить", False),
+        ("домашнее задание", "домашнего задания нет", True),
+        ("день рождения", "дня рождения", False),
+        ("мфц", "в МФЦ", True),
+        ("№", "№245", True),
+    ],
+)
+def test_synonym_inflection(word, text, found):
+    assert (guess(text, [Term("t", (word,))]) == "t") is found
+
+
+def test_needs_ai_without_areas():
+    """Задача без сферы — не неуверенность, если сфер у пользователя нет вовсе."""
+    r = parse("отчёт к пятнице", NOW)
+    assert r.kind_hint == KindHint.task
+    assert r.area_id is None
+    assert needs_ai("отчёт к пятнице", r)
+    assert not needs_ai("отчёт к пятнице", r, has_areas=False)
+    # Без срока — всё ещё неуверенно
+    r = parse("реферат", NOW, (), TASK_TERMS)
+    assert r.kind_hint == KindHint.task
+    assert needs_ai("реферат", r, has_areas=False)

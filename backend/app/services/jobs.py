@@ -30,6 +30,8 @@ KEEP_FINISHED = timedelta(days=14)
 REMINDERS_DEBOUNCE = timedelta(seconds=3)
 # То же для пересчёта превью плана (солвер дороже — ждём дольше)
 PLAN_DEBOUNCE = timedelta(seconds=5)
+# Автозадачи — раньше превью плана: новые задачи попадут в тот же пересчёт
+EVENT_TASKS_DEBOUNCE = timedelta(seconds=2)
 
 Handler = Callable[[AsyncSession, Job], Awaitable[None]]
 CRASHED_MESSAGE = "Не получилось — попробуйте ещё раз"
@@ -152,6 +154,25 @@ def enqueue_reminders_sync_sync(conn: Connection, user_ids: set[uuid.UUID]) -> N
                 payload=None,
                 run_at=run_at,
                 dedupe_key=reminders_sync_key(user_id),
+            )
+        )
+
+
+def event_tasks_key(user_id: uuid.UUID) -> str:
+    return f"{JobKind.event_tasks_sync}:{user_id}"
+
+
+def enqueue_event_tasks_sync(conn: Connection, user_ids: set[uuid.UUID]) -> None:
+    """Пересчитать автозадачи от событий (из обработчика after_flush)."""
+    run_at = now_utc() + EVENT_TASKS_DEBOUNCE
+    for user_id in user_ids:
+        conn.execute(
+            _insert(
+                JobKind.event_tasks_sync,
+                user_id=user_id,
+                payload=None,
+                run_at=run_at,
+                dedupe_key=event_tasks_key(user_id),
             )
         )
 

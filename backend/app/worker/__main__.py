@@ -35,7 +35,10 @@ from app.models import Reminder
 from app.notify.notifier import Notifier, Sender, TelegramSender, WebPushSender
 from app.services import auth, jobs, login_guard
 from app.services.ai import prune_log
+from app.services.ai_setup import handle_setup_job
 from app.services.dispatch import dispatch_due, next_due_at
+from app.services.event_tasks import handle_sync_job as handle_event_tasks_job
+from app.services.event_tasks import sync_all as sync_all_event_tasks
 from app.services.project_ai import handle_milestones_job
 from app.services.recurring_tasks import roll_all_recurring_tasks
 from app.services.reminders import handle_sync_job, sync_all_users
@@ -54,7 +57,9 @@ def build_handlers(bot: Bot | None) -> dict[str, jobs.Handler]:
     return {
         JobKind.reminders_sync: handle_sync_job,
         JobKind.plan_preview: handle_preview_job,
+        JobKind.event_tasks_sync: handle_event_tasks_job,
         JobKind.ai_milestones: handle_milestones_job,
+        JobKind.ai_setup: handle_setup_job,
         **make_handlers(bot),
     }
 
@@ -73,6 +78,7 @@ async def nightly() -> None:
     async with session_factory() as db:
         created = await roll_all_users(db)
         subtasks = await roll_all_recurring_tasks(db)
+        auto = await sync_all_event_tasks(db)
         await jobs.prune(db)
         await prune_log(db)
         await login_guard.prune(db)
@@ -85,9 +91,10 @@ async def nightly() -> None:
         )
         await db.commit()
     log.info(
-        "Ночная докатка: %d вхождений повторов, %d подзадач регулярных заданий",
+        "Ночная докатка: %d вхождений повторов, %d подзадач регулярных заданий, %d автозадач",
         created,
         subtasks,
+        auto,
     )
     async with session_factory() as db:
         users = await nightly_replan(db)

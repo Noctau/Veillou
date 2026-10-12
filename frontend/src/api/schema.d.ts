@@ -69,7 +69,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Me
+         * @description Часовой пояс: расписание пересобирается в новом поясе (настенное время то же).
+         */
+        patch: operations["patch_me"];
         trace?: never;
     };
     "/api/v1/me/settings": {
@@ -131,25 +135,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/semesters": {
+    "/api/v1/event-types": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Semesters */
-        get: operations["list_semesters"];
+        /** List Event Types */
+        get: operations["list_event_types"];
         put?: never;
-        /** Create Semester */
-        post: operations["create_semester"];
+        /** Create Event Type */
+        post: operations["create_event_type"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/semesters/{semester_id}": {
+    "/api/v1/event-types/{type_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -159,30 +163,92 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Semester */
-        delete: operations["delete_semester"];
+        /**
+         * Delete Event Type
+         * @description Удаляет тип, его правила (с будущими вхождениями) и участие в лимитах.
+         */
+        delete: operations["delete_event_type"];
         options?: never;
         head?: never;
-        /** Update Semester */
-        patch: operations["update_semester"];
+        /** Update Event Type */
+        patch: operations["update_event_type"];
         trace?: never;
     };
-    "/api/v1/semesters/{semester_id}/bells": {
+    "/api/v1/periods": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Bells */
-        get: operations["list_bells"];
+        /** List Periods */
+        get: operations["list_periods"];
+        put?: never;
+        /** Create Period */
+        post: operations["create_period"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/periods/{period_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Period */
+        delete: operations["delete_period"];
+        options?: never;
+        head?: never;
+        /** Update Period */
+        patch: operations["update_period"];
+        trace?: never;
+    };
+    "/api/v1/slot-grids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         /**
-         * Replace Bells
-         * @description Заменяет все звонки семестра: общие (weekday = null) + переопределения дней.
+         * List Slot Grids
+         * @description Строки всех сеток (или сеток периода): сетка — строки с одним (period_id, name).
          */
-        put: operations["replace_bells"];
+        get: operations["list_slot_grids"];
+        /**
+         * Put Slot Grid
+         * @description Сетка целиком: общие слоты (weekday = null) + переопределения дней.
+         */
+        put: operations["put_slot_grid"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/slot-grids/{grid_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Slot Grid
+         * @description Удаляет сетку (по id общей строки); если по ней есть правила — 409.
+         */
+        delete: operations["delete_slot_grid"];
         options?: never;
         head?: never;
         patch?: never;
@@ -224,62 +290,25 @@ export interface paths {
         patch: operations["update_day_off"];
         trace?: never;
     };
-    "/api/v1/subjects": {
+    "/api/v1/schedule-rules": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Subjects */
-        get: operations["list_subjects"];
+        /** List Schedule Rules */
+        get: operations["list_schedule_rules"];
         put?: never;
-        /** Create Subject */
-        post: operations["create_subject"];
+        /** Create Schedule Rule */
+        post: operations["create_schedule_rule"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/subjects/{subject_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Subject */
-        get: operations["read_subject"];
-        put?: never;
-        post?: never;
-        /** Delete Subject */
-        delete: operations["delete_subject"];
-        options?: never;
-        head?: never;
-        /** Update Subject */
-        patch: operations["update_subject"];
-        trace?: never;
-    };
-    "/api/v1/class-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Class Rules */
-        get: operations["list_class_rules"];
-        put?: never;
-        /** Create Class Rule */
-        post: operations["create_class_rule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/class-rules/{rule_id}": {
+    "/api/v1/schedule-rules/{rule_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -289,12 +318,98 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Class Rule */
-        delete: operations["delete_class_rule"];
+        /** Delete Schedule Rule */
+        delete: operations["delete_schedule_rule"];
         options?: never;
         head?: never;
-        /** Update Class Rule */
-        patch: operations["update_class_rule"];
+        /** Update Schedule Rule */
+        patch: operations["update_schedule_rule"];
+        trace?: never;
+    };
+    "/api/v1/area-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Area Types */
+        get: operations["list_area_types"];
+        put?: never;
+        /** Create Area Type */
+        post: operations["create_area_type"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/area-types/{area_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Area Type
+         * @description Тип с живыми сферами не удаляется — 409.
+         */
+        delete: operations["delete_area_type"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Area Type
+         * @description `fields` — полный список: поле без id — новое, пропавшее — удалено (значения
+         *     сфер остаются и вернутся, если поле с тем же id прислать снова).
+         */
+        patch: operations["update_area_type"];
+        trace?: never;
+    };
+    "/api/v1/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Areas
+         * @description Все сферы (и архивные — у них `archived_at`), по названию.
+         */
+        get: operations["list_areas"];
+        put?: never;
+        /** Create Area */
+        post: operations["create_area"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/areas/{area_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Area */
+        get: operations["read_area"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Area
+         * @description Удаляет сферу и её правила расписания; задачи и заметки остаются.
+         */
+        delete: operations["delete_area"];
+        options?: never;
+        head?: never;
+        /** Update Area */
+        patch: operations["update_area"];
         trace?: never;
     };
     "/api/v1/events": {
@@ -331,7 +446,7 @@ export interface paths {
         head?: never;
         /**
          * Update Event
-         * @description Правка вхождения пары/повтора (отмена, перенос, аудитория) ставит detached=true.
+         * @description Правка вхождения правила (отмена, перенос, место, поля) ставит detached=true.
          */
         patch: operations["update_event"];
         trace?: never;
@@ -348,7 +463,7 @@ export interface paths {
         /**
          * Reset Event
          * @description Вернуть вхождение как в расписании (снять detached). Если в этот день по
-         *     шаблону вхождения больше нет — событие удаляется (404 при следующем чтении).
+         *     правилу вхождения больше нет — событие удаляется (404 при следующем чтении).
          */
         post: operations["reset_event"];
         delete?: never;
@@ -366,8 +481,8 @@ export interface paths {
         };
         /**
          * Read Calendar
-         * @description Всё, что пересекает [from, to): пары, личные блоки, отдых (включая отменённые)
-         *     и выходные. Даты — с часовым поясом.
+         * @description Всё, что пересекает [from, to): жёсткие события (включая отменённые), блоки
+         *     плана и исключения. Даты — с часовым поясом.
          */
         get: operations["read_calendar"];
         put?: never;
@@ -376,45 +491,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/v1/recurring-events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Recurring Events */
-        get: operations["list_recurring_events"];
-        put?: never;
-        /**
-         * Create Recurring Event
-         * @description Повтор материализуется в календарь на 90 дней вперёд.
-         */
-        post: operations["create_recurring_event"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/recurring-events/{recurring_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Recurring Event */
-        delete: operations["delete_recurring_event"];
-        options?: never;
-        head?: never;
-        /** Update Recurring Event */
-        patch: operations["update_recurring_event"];
         trace?: never;
     };
     "/api/v1/categories": {
@@ -466,7 +542,8 @@ export interface paths {
         /** List Action Types */
         get: operations["list_action_types"];
         put?: never;
-        post?: never;
+        /** Create Action Type */
+        post: operations["create_action_type"];
         delete?: never;
         options?: never;
         head?: never;
@@ -483,7 +560,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Action Type
+         * @description Дела с этим типом получают тип по умолчанию (настройки), из лимитов тип выходит.
+         */
+        delete: operations["delete_action_type"];
         options?: never;
         head?: never;
         /** Update Action Type */
@@ -501,13 +582,278 @@ export interface paths {
         put?: never;
         /**
          * Reset Action Type
-         * @description Вернуть окна, название и категорию по умолчанию (ТЗ §4.8).
+         * @description Вернуть окна, название и категорию по умолчанию (ТЗ §4.8). Только у засеянных.
          */
         post: operations["reset_action_type"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Types */
+        get: operations["list_task_types"];
+        put?: never;
+        /** Create Task Type */
+        post: operations["create_task_type"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-types/{task_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task Type
+         * @description Задачи этого типа остаются — без типа.
+         */
+        delete: operations["delete_task_type"];
+        options?: never;
+        head?: never;
+        /** Update Task Type */
+        patch: operations["update_task_type"];
+        trace?: never;
+    };
+    "/api/v1/load-budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Budgets
+         * @description Лимиты нагрузки с составом и разовыми лимитами на сегодня и дальше.
+         */
+        get: operations["list_budgets"];
+        put?: never;
+        /** Create Budget */
+        post: operations["create_budget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/load-budgets/{budget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Budget */
+        delete: operations["delete_budget"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Budget
+         * @description `action_type_ids` — состав целиком.
+         */
+        patch: operations["update_budget"];
+        trace?: never;
+    };
+    "/api/v1/load-budgets/{budget_id}/overrides/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Override
+         * @description «Расширить часы в этот день»: лимит на дату вместо обычного.
+         */
+        put: operations["put_override"];
+        post?: never;
+        /** Delete Override */
+        delete: operations["delete_override"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Profiles
+         * @description Режимы дня по позиции: первый — режим по умолчанию.
+         */
+        get: operations["list_profiles"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Profile
+         * @description Удаляет режим и его правила назначения.
+         */
+        delete: operations["delete_profile"];
+        options?: never;
+        head?: never;
+        /** Update Profile */
+        patch: operations["update_profile"];
+        trace?: never;
+    };
+    "/api/v1/day-profiles/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Days
+         * @description Режим каждой даты отрезка [start, end] (не длиннее 93 дней).
+         */
+        get: operations["list_days"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profiles/days/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Day
+         * @description Режим одной даты («сегодня — выходной»); null — снова по правилам.
+         */
+        put: operations["set_day"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profile-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rules */
+        get: operations["list_rules"];
+        put?: never;
+        /** Create Rule */
+        post: operations["create_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/day-profile-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Rule */
+        delete: operations["delete_rule"];
+        options?: never;
+        head?: never;
+        /** Update Rule */
+        patch: operations["update_rule"];
+        trace?: never;
+    };
+    "/api/v1/event-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Event Rules
+         * @description Автозадачи типа занятости или правила расписания (без фильтра — все).
+         */
+        get: operations["list_event_rules"];
+        put?: never;
+        /**
+         * Create Event Rule
+         * @description Создаёт правило и сразу задачи на горизонт вхождений.
+         */
+        post: operations["create_event_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Event Rule
+         * @description Удаляет правило и его будущие несделанные задачи.
+         */
+        delete: operations["delete_event_rule"];
+        options?: never;
+        head?: never;
+        /** Update Event Rule */
+        patch: operations["update_event_rule"];
         trace?: never;
     };
     "/api/v1/tasks": {
@@ -524,29 +870,13 @@ export interface paths {
          */
         get: operations["list_tasks"];
         put?: never;
-        /** Create Task */
-        post: operations["create_task"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tasks/work": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         /**
-         * Create Work Task
-         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней,
-         *     проект — «по умолчанию для заданий с работы» (ВКР), если не указан другой.
+         * Create Task
+         * @description С `task_type_id` — умолчания типа в пустые поля: тип действия, категория,
+         *     оценка, шаги из шаблона, срок по правилу типа (выдача или сегодня + N дней,
+         *     23:59) и проект — если `project_id` не передан (явный null — «без проекта»).
          */
-        post: operations["create_work_task"];
+        post: operations["create_task"];
         delete?: never;
         options?: never;
         head?: never;
@@ -660,10 +990,10 @@ export interface paths {
         put?: never;
         /**
          * Parse Quick Add
-         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, предмет, тип.
+         * @description Разбор строки быстрого ввода «на лету»: название, дата/время, сфера, типы.
          *
          *     Ничего не сохраняет — клиент создаёт задание / дело / событие обычными запросами.
-         *     `needs_ai` — разбор неуверенный (длинный текст, задание без срока или предмета):
+         *     `needs_ai` — разбор неуверенный (длинный текст, задание без срока или сферы):
          *     стоит спросить ИИ (`POST /quick-add/ai-parse`).
          */
         post: operations["parse_quick_add"];
@@ -782,10 +1112,7 @@ export interface paths {
         delete: operations["delete_project"];
         options?: never;
         head?: never;
-        /**
-         * Update Project
-         * @description is_work_default=true снимает флаг с остальных проектов.
-         */
+        /** Update Project */
         patch: operations["update_project"];
         trace?: never;
     };
@@ -833,13 +1160,13 @@ export interface paths {
         };
         /**
          * List Notes
-         * @description Свежие пары первыми. `event_id` можно повторять — конспекты этих пар.
+         * @description Свежие первыми. `event_id` можно повторять — заметки этих событий.
          */
         get: operations["list_notes"];
         put?: never;
         /**
          * Create Note
-         * @description С `event_id` предмет и дата берутся из пары, если не указаны.
+         * @description С `event_id` сфера и дата берутся из события, если не указаны.
          */
         post: operations["create_note"];
         delete?: never;
@@ -859,8 +1186,8 @@ export interface paths {
         put?: never;
         /**
          * Note For Event
-         * @description «Конспект к этой паре»: открывает уже начатый конспект пары (200) или
-         *     создаёт новый с предметом, датой и названием из пары (201).
+         * @description «Заметка к событию»: открывает уже начатую заметку события (200) или
+         *     создаёт новую со сферой, датой и названием из события (201).
          */
         post: operations["note_for_event"];
         delete?: never;
@@ -945,7 +1272,7 @@ export interface paths {
         put?: never;
         /**
          * Create Reading Task
-         * @description Задание «прочитать …» (тип «чтение», предмет источника, ссылка в описании).
+         * @description Задание «прочитать …» (тип «чтение», сфера источника, ссылка в описании).
          */
         post: operations["create_reading_task"];
         delete?: never;
@@ -963,7 +1290,7 @@ export interface paths {
         };
         /**
          * Search
-         * @description Конспекты (название и текст) и литература (название, автор, заметка).
+         * @description Заметки (название и текст) и литература (название, автор, заметка).
          *     Каждое слово — префикс: искать можно по мере набора. Самое подходящее — первым.
          */
         get: operations["search"];
@@ -1186,47 +1513,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/plan/day-limits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Day Limits
-         * @description Разовые лимиты учёбы на сегодня и дальше.
-         */
-        get: operations["list_day_limits"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/plan/day-limits/{day}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Put Day Limit
-         * @description «Расширить часы в этот день»: лимит учёбы на дату вместо общего.
-         */
-        put: operations["put_day_limit"];
-        post?: never;
-        /** Delete Day Limit */
-        delete: operations["delete_day_limit"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/calibration": {
         parameters: {
             query?: never;
@@ -1236,7 +1522,7 @@ export interface paths {
         };
         /**
          * List Calibration
-         * @description Коэффициенты оценок по (тип задания, тип действия) — только где есть отметки.
+         * @description Коэффициенты оценок по (тип задачи, тип действия) — только где есть отметки.
          */
         get: operations["list_calibration"];
         put?: never;
@@ -1267,7 +1553,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams": {
+    "/api/v1/prep-plans": {
         parameters: {
             query?: never;
             header?: never;
@@ -1275,45 +1561,45 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Exams
-         * @description Экзамены (ближайшие первыми); с subject_id — только по предмету.
+         * List Plans
+         * @description Планы подготовки сферы или события; ближайшие — первыми.
          */
-        get: operations["list_exams"];
+        get: operations["list_plans"];
         put?: never;
         /**
-         * Create Exam
-         * @description Экзамен сразу появляется в календаре жёстким событием.
+         * Create Plan
+         * @description План к событию (существующему или новому) или к дате.
          */
-        post: operations["create_exam"];
+        post: operations["create_plan"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}": {
+    "/api/v1/prep-plans/{plan_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Read Exam
-         * @description Вопросы со статусами и план подготовки по дням (с сегодняшнего).
-         */
-        get: operations["read_exam"];
+        /** Read Plan */
+        get: operations["read_plan"];
         put?: never;
         post?: never;
-        /** Delete Exam */
-        delete: operations["delete_exam"];
+        /**
+         * Delete Plan
+         * @description Удаляет план (пункты и дни); `with_event` — и само событие.
+         */
+        delete: operations["delete_plan"];
         options?: never;
         head?: never;
-        /** Update Exam */
-        patch: operations["update_exam"];
+        /** Update Plan */
+        patch: operations["update_plan"];
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/questions/import": {
+    "/api/v1/prep-plans/{plan_id}/items/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -1323,17 +1609,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Import Questions
-         * @description Вставка списком: «1. …», «1) …» или по одному в строке — добавляются в конец.
+         * Import Items
+         * @description Пункты списком: нумерация «1. …», «1) …», «Билет 1 …» или по одному в строке.
          */
-        post: operations["import_questions"];
+        post: operations["import_items"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/questions": {
+    "/api/v1/prep-plans/{plan_id}/items": {
         parameters: {
             query?: never;
             header?: never;
@@ -1342,15 +1628,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Question */
-        post: operations["add_question"];
+        /** Add Item */
+        post: operations["add_item"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/plan": {
+    "/api/v1/prep-plans/{plan_id}/enable": {
         parameters: {
             query?: never;
             header?: never;
@@ -1360,21 +1646,34 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Enable Exam Plan
-         * @description «Построить план подготовки»: дни по билетам + превью плана (GET /plan).
+         * Enable Plan
+         * @description Построить план: дни подготовки + превью плана (применяет пользователь).
          */
-        post: operations["enable_exam_plan"];
-        /**
-         * Disable Exam Plan
-         * @description Убрать план подготовки: будущие дни удаляются, их блоки уберёт превью.
-         */
-        delete: operations["disable_exam_plan"];
+        post: operations["enable_plan"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exam-questions/{question_id}": {
+    "/api/v1/prep-plans/{plan_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Plan */
+        post: operations["disable_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prep-items/{item_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1384,15 +1683,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Question */
-        delete: operations["delete_question"];
+        /** Delete Item */
+        delete: operations["delete_item"];
         options?: never;
         head?: never;
-        /**
-         * Update Question
-         * @description Статус «повторить» возвращает вопрос в цикл повторений; план пересобирается.
-         */
-        patch: operations["update_question"];
+        /** Update Item */
+        patch: operations["update_item"];
         trace?: never;
     };
     "/api/v1/review/evening": {
@@ -1404,7 +1700,8 @@ export interface paths {
         };
         /**
          * Read Evening Review
-         * @description Вечерний разбор: начатые и прошедшие блоки дня без отметки.
+         * @description Вечерний разбор: начатые и прошедшие блоки дня без отметки и предложения
+         *     автозадач.
          */
         get: operations["read_evening_review"];
         put?: never;
@@ -1750,7 +2047,7 @@ export interface paths {
         /**
          * Ai Parse
          * @description Разобрать текст ИИ (когда quickparse не уверен). Ничего не создаёт —
-         *     в результате карточка: что это, название, предмет, тип, дедлайн.
+         *     в результате карточка: что это, название, сфера, тип, дедлайн.
          */
         post: operations["ai_parse"];
         delete?: never;
@@ -1771,7 +2068,7 @@ export interface paths {
         /**
          * Recognize Photo
          * @description Распознать фото задания (его вложения-картинки): текст — в описание,
-         *     дедлайн, предмет и тип — если их ещё нет.
+         *     дедлайн, сфера и тип — если их ещё нет.
          */
         post: operations["recognize_photo"];
         delete?: never;
@@ -1861,6 +2158,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Config
+         * @description Вся конфигурация (сферы, занятость, расписание, режимы, лимиты, типы,
+         *     категории, автозадачи) одной сборкой со ссылками `ref` вместо id.
+         */
+        get: operations["export_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Config
+         * @description Импорт сборки поверх текущей конфигурации: новое добавляется, совпадающее по
+         *     названию обновляется, ничего не удаляется. `dry_run=true` (по умолчанию) — только
+         *     отчёт, что добавится и изменится.
+         */
+        post: operations["import_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config/ai-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Ai Setup
+         * @description «Настроить по описанию»: ИИ собирает черновик сборки (джоба `ai.setup`,
+         *     результат — `GET /jobs/{id}`, тип `setup`). Ничего не меняется до импорта.
+         */
+        post: operations["start_ai_setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1869,6 +2230,25 @@ export interface components {
         AIParseRequest: {
             /** Text */
             text: string;
+        };
+        /** ActionTypeCreate */
+        ActionTypeCreate: {
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Input"][];
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
+            synonyms?: string[];
         };
         /**
          * ActionTypeKey
@@ -1883,20 +2263,25 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            key: components["schemas"]["ActionTypeKey"];
+            /** @description Ключ сида; у своих типов — null */
+            key: components["schemas"]["ActionTypeKey"] | null;
             /** Name */
             name: string;
             /** Default Category Id */
             default_category_id: string | null;
             /** Windows */
             windows: components["schemas"]["TimeWindow-Output"][];
+            /**
+             * Prefer Morning
+             * @description Лёгкое предпочтение утра в плане
+             */
+            prefer_morning: boolean;
+            /** Synonyms */
+            synonyms: string[];
             /** Position */
             position: number;
         };
-        /**
-         * ActionTypeUpdate
-         * @description Набор типов фиксирован; правятся название, окна и категория по умолчанию.
-         */
+        /** ActionTypeUpdate */
         ActionTypeUpdate: {
             /** Name */
             name?: string | null;
@@ -1904,6 +2289,187 @@ export interface components {
             windows?: components["schemas"]["TimeWindow-Input"][] | null;
             /** Default Category Id */
             default_category_id?: string | null;
+            /** Prefer Morning */
+            prefer_morning?: boolean | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** AreaCreate */
+        AreaCreate: {
+            /**
+             * Area Type Id
+             * Format: uuid
+             */
+            area_type_id: string;
+            /**
+             * Period Id
+             * @description Период; null — всегда
+             */
+            period_id?: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name?: string | null;
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Synonyms */
+            synonyms?: string[];
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** AreaRead */
+        AreaRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Area Type Id
+             * Format: uuid
+             */
+            area_type_id: string;
+            /** Period Id */
+            period_id: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name: string | null;
+            /** Color */
+            color: string;
+            /** Synonyms */
+            synonyms: string[];
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes: string;
+            /** Archived At */
+            archived_at: string | null;
+        };
+        /**
+         * AreaSection
+         * @description Разделы страницы сферы.
+         * @enum {string}
+         */
+        AreaSection: "schedule" | "tasks" | "notes" | "materials" | "prep" | "projects";
+        /** AreaTypeCreate */
+        AreaTypeCreate: {
+            /**
+             * Name
+             * @description В единственном числе: «Ученик»
+             */
+            name: string;
+            /**
+             * Name Plural
+             * @description Во множественном: «Ученики»
+             */
+            name_plural: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /**
+             * Sections
+             * @description Разделы страницы сферы по порядку
+             */
+            sections?: components["schemas"]["AreaSection"][];
+        };
+        /** AreaTypeRead */
+        AreaTypeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Key
+             * @description Ключ сида/миграции; у своих типов — null
+             */
+            key: string | null;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural: string;
+            icon: components["schemas"]["CategoryIcon"];
+            /** Color */
+            color: string;
+            /**
+             * Fields
+             * @description Живые поля (удалённые не показываются)
+             */
+            fields: components["schemas"]["FieldDefRead"][];
+            /** Sections */
+            sections: components["schemas"]["AreaSection"][];
+            /** Position */
+            position: number;
+        };
+        /** AreaTypeUpdate */
+        AreaTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Name Plural */
+            name_plural?: string | null;
+            icon?: components["schemas"]["CategoryIcon"] | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Полный список полей
+             */
+            fields?: components["schemas"]["FieldDefIn"][] | null;
+            /** Sections */
+            sections?: components["schemas"]["AreaSection"][] | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** AreaUpdate */
+        AreaUpdate: {
+            /** Period Id */
+            period_id?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Short Name */
+            short_name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /**
+             * Fields
+             * @description Все значения полей разом
+             */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Archived
+             * @description В архив / из архива
+             */
+            archived?: boolean | null;
         };
         /**
          * AttachmentOrder
@@ -1976,7 +2542,7 @@ export interface components {
          * @description Условия дела — фиксированный набор чипов, без свободного текста.
          * @enum {string}
          */
-        BacklogCondition: "weekday_daytime" | "on_class_days" | "needs_laptop" | "institution_hours";
+        BacklogCondition: "weekday_daytime" | "needs_laptop";
         /** BacklogCreate */
         BacklogCreate: {
             /** Title */
@@ -1999,6 +2565,16 @@ export interface components {
             desired_by?: string | null;
             /** Conditions */
             conditions?: components["schemas"]["BacklogCondition"][];
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id?: string | null;
+            /**
+             * Days Event Type Id
+             * @description Только в дни, когда есть события этого типа занятости
+             */
+            days_event_type_id?: string | null;
             /** Time Window */
             time_window?: components["schemas"]["TimeWindow-Input"][] | null;
         };
@@ -2023,6 +2599,16 @@ export interface components {
             desired_by: string | null;
             /** Conditions */
             conditions: components["schemas"]["BacklogCondition"][];
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id: string | null;
+            /**
+             * Days Event Type Id
+             * @description Только в дни, когда есть события этого типа занятости
+             */
+            days_event_type_id: string | null;
             /** Time Window */
             time_window: components["schemas"]["TimeWindow-Output"][] | null;
             status: components["schemas"]["BacklogStatus"];
@@ -2062,82 +2648,19 @@ export interface components {
             desired_by?: string | null;
             /** Conditions */
             conditions?: components["schemas"]["BacklogCondition"][] | null;
+            /**
+             * Hours Action Type Id
+             * @description Только в часы этого типа действия (окна типа), например «Учреждения»
+             */
+            hours_action_type_id?: string | null;
+            /**
+             * Days Event Type Id
+             * @description Только в дни, когда есть события этого типа занятости
+             */
+            days_event_type_id?: string | null;
             /** Time Window */
             time_window?: components["schemas"]["TimeWindow-Input"][] | null;
             status?: components["schemas"]["BacklogStatus"] | null;
-        };
-        /** BeforeClassRule */
-        BeforeClassRule: {
-            /**
-             * Enabled
-             * @default true
-             */
-            enabled: boolean;
-            /** Channels */
-            channels: components["schemas"]["Channel"][];
-            /**
-             * Minutes Before
-             * @default 15
-             */
-            minutes_before: number;
-        };
-        /** BeforeClassRulePatch */
-        BeforeClassRulePatch: {
-            /** Enabled */
-            enabled?: boolean | null;
-            /** Channels */
-            channels?: components["schemas"]["Channel"][] | null;
-            /** Minutes Before */
-            minutes_before?: number | null;
-        };
-        /** BellScheduleIn */
-        BellScheduleIn: {
-            /**
-             * Weekday
-             * @description null — общие звонки
-             */
-            weekday?: number | null;
-            /** Slots */
-            slots: components["schemas"]["BellSlot-Input"][];
-        };
-        /** BellScheduleRead */
-        BellScheduleRead: {
-            /** Weekday */
-            weekday: number | null;
-            /** Slots */
-            slots: components["schemas"]["BellSlot-Output"][];
-        };
-        /** BellSlot */
-        "BellSlot-Input": {
-            /** Number */
-            number: number;
-            /**
-             * Start
-             * Format: time
-             */
-            start: string;
-            /**
-             * End
-             * Format: time
-             */
-            end: string;
-        };
-        /** BellSlot */
-        "BellSlot-Output": {
-            /** Number */
-            number: number;
-            /** Start */
-            start: string;
-            /** End */
-            end: string;
-        };
-        /**
-         * BellsReplace
-         * @description Полный набор звонков семестра: общие + переопределения дней.
-         */
-        BellsReplace: {
-            /** Schedules */
-            schedules: components["schemas"]["BellScheduleIn"][];
         };
         /** Body_replace_attachment */
         Body_replace_attachment: {
@@ -2167,7 +2690,8 @@ export interface components {
         BreakdownApply: {
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Category Id */
             category_id?: string | null;
             /**
@@ -2197,7 +2721,8 @@ export interface components {
              * Format: uuid
              */
             task_id: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Category Id */
             category_id: string | null;
             /** Steps */
@@ -2260,6 +2785,607 @@ export interface components {
              */
             note: string;
         };
+        /** BudgetOverridePut */
+        BudgetOverridePut: {
+            /** Minutes */
+            minutes: number;
+        };
+        /** BudgetOverrideRead */
+        BudgetOverrideRead: {
+            /**
+             * Budget Id
+             * Format: uuid
+             */
+            budget_id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Minutes */
+            minutes: number;
+        };
+        /** BundleActionType */
+        "BundleActionType-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Input"][];
+            /** Category */
+            category?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /** BundleActionType */
+        "BundleActionType-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindow-Output"][];
+            /** Category */
+            category?: string | null;
+            /**
+             * Prefer Morning
+             * @default false
+             */
+            prefer_morning: boolean;
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /** BundleArea */
+        BundleArea: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Area Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            area_type: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name?: string | null;
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Synonyms */
+            synonyms?: string[];
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** BundleAreaType */
+        BundleAreaType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #3b82f6
+             */
+            color: string;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /** Sections */
+            sections?: components["schemas"]["AreaSection"][];
+        };
+        /** BundleBudget */
+        BundleBudget: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Minutes Per Day */
+            minutes_per_day: number;
+            /** Action Types */
+            action_types?: string[];
+            /** Event Types */
+            event_types?: string[];
+        };
+        /** BundleCategory */
+        BundleCategory: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+        };
+        /** BundleChange */
+        BundleChange: {
+            /** Section */
+            section: string;
+            /** Ref */
+            ref: string;
+            /**
+             * Name
+             * @description Как показать человеку: название кирпича
+             */
+            name: string;
+            /**
+             * Fields
+             * @description changed: какие поля другие
+             */
+            fields: string[];
+        };
+        /** BundleDayOff */
+        BundleDayOff: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** BundleDayProfile */
+        "BundleDayProfile-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /**
+             * Wake
+             * Format: time
+             */
+            wake: string;
+            /**
+             * Sleep
+             * Format: time
+             */
+            sleep: string;
+            lunch?: components["schemas"]["Lunch-Input"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span-Input"][];
+            /**
+             * Rest Evening Ok
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
+        };
+        /** BundleDayProfile */
+        "BundleDayProfile-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Wake */
+            wake: string;
+            /** Sleep */
+            sleep: string;
+            lunch?: components["schemas"]["Lunch-Output"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span-Output"][];
+            /**
+             * Rest Evening Ok
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
+        };
+        /** BundleDayProfileRule */
+        BundleDayProfileRule: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Profile
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            profile: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Weekdays */
+            weekdays?: number[];
+        };
+        /** BundleEventRule */
+        BundleEventRule: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Event Type */
+            event_type?: string | null;
+            /** Schedule Rule */
+            schedule_rule?: string | null;
+            /** @default before */
+            when: components["schemas"]["EventRuleWhen"];
+            /** Title Template */
+            title_template: string;
+            /**
+             * Estimate Min
+             * @default 30
+             */
+            estimate_min: number;
+            /** Action Type */
+            action_type?: string | null;
+            /** Task Type */
+            task_type?: string | null;
+            /**
+             * Offset Min
+             * @default 0
+             */
+            offset_min: number;
+            /** Within Days */
+            within_days?: number | null;
+            /**
+             * Until Next
+             * @default false
+             */
+            until_next: boolean;
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** BundleEventType */
+        BundleEventType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural?: string | null;
+            /** @default calendar */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #64748b
+             */
+            color: string;
+            /**
+             * Buffer Before Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_before_min: number;
+            /**
+             * Buffer After Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_after_min: number;
+            /**
+             * Merge Buffers
+             * @default false
+             */
+            merge_buffers: boolean;
+            /** Remind Before Min */
+            remind_before_min?: number | null;
+            /** Remind Channels */
+            remind_channels?: components["schemas"]["Channel"][];
+            /**
+             * Show Now Next
+             * @default false
+             */
+            show_now_next: boolean;
+            /**
+             * Is Rest
+             * @default false
+             */
+            is_rest: boolean;
+            /**
+             * Supports Prep
+             * @default false
+             */
+            supports_prep: boolean;
+            /**
+             * Location Label
+             * @default
+             */
+            location_label: string;
+            /** Default Area Type */
+            default_area_type?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /** Synonyms */
+            synonyms?: string[];
+        };
+        /**
+         * BundleImportResult
+         * @description Что добавится / изменится / уже есть. dry_run — ничего не записано.
+         */
+        BundleImportResult: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** Added */
+            added: components["schemas"]["BundleChange"][];
+            /** Changed */
+            changed: components["schemas"]["BundleChange"][];
+            /** Skipped */
+            skipped: components["schemas"]["BundleChange"][];
+        };
+        /** BundlePeriod */
+        BundlePeriod: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Cycle Weeks
+             * @default 1
+             */
+            cycle_weeks: number;
+            /**
+             * First Cycle Week
+             * @default 1
+             */
+            first_cycle_week: number;
+            /** Pauses */
+            pauses?: components["schemas"]["Pause"][];
+        };
+        /** BundleScheduleRule */
+        "BundleScheduleRule-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Event Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            event_type: string;
+            /** Area */
+            area?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Slot Grid */
+            slot_grid?: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** BundleScheduleRule */
+        "BundleScheduleRule-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /**
+             * Event Type
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            event_type: string;
+            /** Area */
+            area?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Slot Grid */
+            slot_grid?: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** BundleSettings */
+        BundleSettings: {
+            /**
+             * Default Action Type
+             * @description Тип действия по умолчанию для задач и дел
+             */
+            default_action_type?: string | null;
+        };
+        /** BundleSlotGrid */
+        "BundleSlotGrid-Input": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Schedules */
+            schedules: components["schemas"]["SlotGridDay-Input"][];
+        };
+        /** BundleSlotGrid */
+        "BundleSlotGrid-Output": {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Period */
+            period?: string | null;
+            /** Name */
+            name: string;
+            /** Schedules */
+            schedules: components["schemas"]["SlotGridDay-Output"][];
+        };
+        /** BundleTaskType */
+        BundleTaskType: {
+            /**
+             * Ref
+             * @description Локальная ссылка внутри сборки (уникальна в разделе)
+             */
+            ref: string;
+            /** Name */
+            name: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /** Synonyms */
+            synonyms?: string[];
+            /** Action Type */
+            action_type?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            /** Deadline Rule */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
+        };
         /** CalendarDayOff */
         CalendarDayOff: {
             /**
@@ -2267,6 +3393,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Period Id */
+            period_id: string | null;
             /**
              * Date From
              * Format: date
@@ -2289,8 +3417,16 @@ export interface components {
         };
         /** CalibrationRead */
         CalibrationRead: {
-            task_type: components["schemas"]["TaskType"];
-            action_type: components["schemas"]["ActionTypeKey"];
+            /**
+             * Task Type Id
+             * @description null — задачи без типа
+             */
+            task_type_id: string | null;
+            /**
+             * Action Type Id
+             * @description null — шаги без типа действия
+             */
+            action_type_id: string | null;
             /**
              * Coef
              * @description Множитель оценок: 1.2 — делаешь на 20% дольше
@@ -2313,7 +3449,7 @@ export interface components {
          * @description Иконки категорий (имена lucide-react в kebab-case).
          * @enum {string}
          */
-        CategoryIcon: "graduation-cap" | "briefcase" | "house" | "heart" | "shopping-cart" | "stethoscope" | "file-text" | "dumbbell" | "users" | "plane" | "star" | "tag";
+        CategoryIcon: "graduation-cap" | "briefcase" | "house" | "heart" | "shopping-cart" | "stethoscope" | "file-text" | "dumbbell" | "users" | "plane" | "star" | "tag" | "pencil" | "presentation" | "flask-conical" | "book-open" | "clipboard-check" | "user" | "coffee" | "calendar" | "clock";
         /**
          * CategoryKey
          * @description Системные категории (ТЗ §4.8). Пользовательские категории — без ключа.
@@ -2359,117 +3495,137 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
-        /** ClassRuleCreate */
-        ClassRuleCreate: {
+        /**
+         * ConfigBundle
+         * @description Конфигурация целиком. Разделы — в порядке зависимостей при импорте.
+         */
+        "ConfigBundle-Input": {
             /**
-             * Semester Id
-             * Format: uuid
+             * Version
+             * @default 1
+             * @constant
              */
-            semester_id: string;
-            /**
-             * Subject Id
-             * Format: uuid
-             */
-            subject_id: string;
-            /**
-             * Weekday
-             * @description ISO: 1 = Пн, 7 = Вс
-             */
-            weekday: number;
-            /** Pair Number */
-            pair_number?: number | null;
-            /**
-             * Start Time
-             * @description Своё время вместо звонков
-             */
-            start_time?: string | null;
-            /** End Time */
-            end_time?: string | null;
-            /** @default all */
-            parity: components["schemas"]["RuleParity"];
-            /** @default lecture */
-            class_type: components["schemas"]["ClassType"];
-            /** Location */
-            location?: string | null;
-            /** Teacher */
-            teacher?: string | null;
-            /** Valid From */
-            valid_from?: string | null;
-            /** Valid To */
-            valid_to?: string | null;
-        };
-        /** ClassRuleRead */
-        ClassRuleRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Semester Id
-             * Format: uuid
-             */
-            semester_id: string;
-            /**
-             * Subject Id
-             * Format: uuid
-             */
-            subject_id: string;
-            /** Weekday */
-            weekday: number;
-            /** Pair Number */
-            pair_number: number | null;
-            /** Start Time */
-            start_time: string | null;
-            /** End Time */
-            end_time: string | null;
-            parity: components["schemas"]["RuleParity"];
-            class_type: components["schemas"]["ClassType"];
-            /** Location */
-            location: string | null;
-            /** Teacher */
-            teacher: string | null;
-            /** Valid From */
-            valid_from: string | null;
-            /** Valid To */
-            valid_to: string | null;
-        };
-        /** ClassRuleUpdate */
-        ClassRuleUpdate: {
-            /** Subject Id */
-            subject_id?: string | null;
-            /** Weekday */
-            weekday?: number | null;
-            /** Pair Number */
-            pair_number?: number | null;
-            /** Start Time */
-            start_time?: string | null;
-            /** End Time */
-            end_time?: string | null;
-            parity?: components["schemas"]["RuleParity"] | null;
-            class_type?: components["schemas"]["ClassType"] | null;
-            /** Location */
-            location?: string | null;
-            /** Teacher */
-            teacher?: string | null;
-            /** Valid From */
-            valid_from?: string | null;
-            /** Valid To */
-            valid_to?: string | null;
+            version: 1;
+            /** Categories */
+            categories?: components["schemas"]["BundleCategory"][];
+            /** Action Types */
+            action_types?: components["schemas"]["BundleActionType-Input"][];
+            /** Task Types */
+            task_types?: components["schemas"]["BundleTaskType"][];
+            /** Area Types */
+            area_types?: components["schemas"]["BundleAreaType"][];
+            /** Periods */
+            periods?: components["schemas"]["BundlePeriod"][];
+            /** Days Off */
+            days_off?: components["schemas"]["BundleDayOff"][];
+            /** Slot Grids */
+            slot_grids?: components["schemas"]["BundleSlotGrid-Input"][];
+            /** Areas */
+            areas?: components["schemas"]["BundleArea"][];
+            /** Event Types */
+            event_types?: components["schemas"]["BundleEventType"][];
+            /** Budgets */
+            budgets?: components["schemas"]["BundleBudget"][];
+            /** Day Profiles */
+            day_profiles?: components["schemas"]["BundleDayProfile-Input"][];
+            /** Day Profile Rules */
+            day_profile_rules?: components["schemas"]["BundleDayProfileRule"][];
+            /** Schedule Rules */
+            schedule_rules?: components["schemas"]["BundleScheduleRule-Input"][];
+            /** Event Rules */
+            event_rules?: components["schemas"]["BundleEventRule"][];
+            settings?: components["schemas"]["BundleSettings"];
         };
         /**
-         * ClassType
-         * @enum {string}
+         * ConfigBundle
+         * @description Конфигурация целиком. Разделы — в порядке зависимостей при импорте.
          */
-        ClassType: "lecture" | "seminar" | "lab" | "other";
+        "ConfigBundle-Output": {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Categories */
+            categories?: components["schemas"]["BundleCategory"][];
+            /** Action Types */
+            action_types?: components["schemas"]["BundleActionType-Output"][];
+            /** Task Types */
+            task_types?: components["schemas"]["BundleTaskType"][];
+            /** Area Types */
+            area_types?: components["schemas"]["BundleAreaType"][];
+            /** Periods */
+            periods?: components["schemas"]["BundlePeriod"][];
+            /** Days Off */
+            days_off?: components["schemas"]["BundleDayOff"][];
+            /** Slot Grids */
+            slot_grids?: components["schemas"]["BundleSlotGrid-Output"][];
+            /** Areas */
+            areas?: components["schemas"]["BundleArea"][];
+            /** Event Types */
+            event_types?: components["schemas"]["BundleEventType"][];
+            /** Budgets */
+            budgets?: components["schemas"]["BundleBudget"][];
+            /** Day Profiles */
+            day_profiles?: components["schemas"]["BundleDayProfile-Output"][];
+            /** Day Profile Rules */
+            day_profile_rules?: components["schemas"]["BundleDayProfileRule"][];
+            /** Schedule Rules */
+            schedule_rules?: components["schemas"]["BundleScheduleRule-Output"][];
+            /** Event Rules */
+            event_rules?: components["schemas"]["BundleEventRule"][];
+            settings?: components["schemas"]["BundleSettings"];
+        };
         /**
-         * ControlForm
-         * @description Форма контроля по предмету.
-         * @enum {string}
+         * Contact
+         * @description Контакт проекта: научный руководитель, заказчик.
          */
-        ControlForm: "exam" | "credit" | "graded_credit" | "coursework" | "none";
+        Contact: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @default
+             */
+            role: string;
+            /**
+             * Contact
+             * @default
+             */
+            contact: string;
+        };
+        /** DayCyclePatternIn */
+        DayCyclePatternIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "day_cycle";
+            /**
+             * On
+             * @description Рабочих дней подряд
+             */
+            on: number;
+            /**
+             * Off
+             * @description Дней перерыва
+             */
+            off: number;
+            /**
+             * Anchor
+             * Format: date
+             * @description Первый рабочий день цикла
+             */
+            anchor: string;
+        };
         /** DayOffCreate */
         DayOffCreate: {
+            /**
+             * Period Id
+             * @description null — во всех периодах
+             */
+            period_id?: string | null;
             /**
              * Date From
              * Format: date
@@ -2493,6 +3649,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Period Id */
+            period_id: string | null;
             /**
              * Date From
              * Format: date
@@ -2508,6 +3666,8 @@ export interface components {
         };
         /** DayOffUpdate */
         DayOffUpdate: {
+            /** Period Id */
+            period_id?: string | null;
             /** Date From */
             date_from?: string | null;
             /** Date To */
@@ -2515,22 +3675,228 @@ export interface components {
             /** Title */
             title?: string | null;
         };
-        /**
-         * DayRange
-         * @description Интервал, который не переходит через полночь.
-         */
-        DayRange: {
-            /** Start */
-            start: string;
-            /** End */
-            end: string;
+        /** DayProfileCreate */
+        DayProfileCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Wake
+             * Format: time
+             * @description Подъём
+             * @default 07:30:00
+             */
+            wake: string;
+            /**
+             * Sleep
+             * Format: time
+             * @description Отбой; не позже подъёма — после полуночи
+             * @default 23:30:00
+             */
+            sleep: string;
+            /** @description Обед; null — без обеда */
+            lunch?: components["schemas"]["Lunch-Input"] | null;
+            /**
+             * Work Windows
+             * @description Когда вообще можно ставить дела
+             */
+            work_windows?: components["schemas"]["Span-Input"][];
+            /**
+             * Rest Evening Ok
+             * @description Может быть свободным вечером
+             * @default true
+             */
+            rest_evening_ok: boolean;
+            /**
+             * Rest Halfday Ok
+             * @description Может быть половиной выходного
+             * @default false
+             */
+            rest_halfday_ok: boolean;
+            /**
+             * Quiet Follows Sleep
+             * @description Тихие часы — сон режима (иначе — тихие часы из настроек)
+             * @default true
+             */
+            quiet_follows_sleep: boolean;
         };
-        /** DayRangePatch */
-        DayRangePatch: {
-            /** Start */
-            start?: string | null;
-            /** End */
-            end?: string | null;
+        /** DayProfileDay */
+        DayProfileDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Profile Id
+             * @description null — встроенный режим (своих нет)
+             */
+            profile_id: string | null;
+            /** Name */
+            name: string;
+            /** Pinned */
+            pinned: boolean;
+        };
+        /**
+         * DayProfileDayPut
+         * @description Режим одной даты в одно касание («сегодня — выходной»); null — по правилам.
+         */
+        DayProfileDayPut: {
+            /** Profile Id */
+            profile_id: string | null;
+        };
+        /** DayProfileRead */
+        DayProfileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Key
+             * @description Ключ сида/миграции; у своих режимов — null
+             */
+            key: string | null;
+            /** Name */
+            name: string;
+            /** Wake */
+            wake: string;
+            /** Sleep */
+            sleep: string;
+            lunch: components["schemas"]["SpanRead"] | null;
+            /** Work Windows */
+            work_windows: components["schemas"]["SpanRead"][];
+            /** Rest Evening Ok */
+            rest_evening_ok: boolean;
+            /** Rest Halfday Ok */
+            rest_halfday_ok: boolean;
+            /** Quiet Follows Sleep */
+            quiet_follows_sleep: boolean;
+            /** Position */
+            position: number;
+        };
+        /** DayProfileRuleCreate */
+        DayProfileRuleCreate: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /**
+             * Date From
+             * @description dates: с (включительно)
+             */
+            date_from?: string | null;
+            /**
+             * Date To
+             * @description dates: по (включительно)
+             */
+            date_to?: string | null;
+            /**
+             * Event Type Id
+             * @description event_day / day_after
+             */
+            event_type_id?: string | null;
+            /**
+             * Weekdays
+             * @description weekdays
+             */
+            weekdays?: number[];
+        };
+        /** DayProfileRuleRead */
+        DayProfileRuleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            kind: components["schemas"]["DayRuleKind"];
+            /** Date From */
+            date_from: string | null;
+            /** Date To */
+            date_to: string | null;
+            /** Event Type Id */
+            event_type_id: string | null;
+            /** Weekdays */
+            weekdays: number[];
+            /** Position */
+            position: number;
+        };
+        /** DayProfileRuleUpdate */
+        DayProfileRuleUpdate: {
+            /** Profile Id */
+            profile_id?: string | null;
+            kind?: components["schemas"]["DayRuleKind"] | null;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Event Type Id */
+            event_type_id?: string | null;
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Position */
+            position?: number | null;
+        };
+        /** DayProfileUpdate */
+        DayProfileUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Wake */
+            wake?: string | null;
+            /** Sleep */
+            sleep?: string | null;
+            /** @description null — без обеда */
+            lunch?: components["schemas"]["Lunch-Input"] | null;
+            /** Work Windows */
+            work_windows?: components["schemas"]["Span-Input"][] | null;
+            /** Rest Evening Ok */
+            rest_evening_ok?: boolean | null;
+            /** Rest Halfday Ok */
+            rest_halfday_ok?: boolean | null;
+            /** Quiet Follows Sleep */
+            quiet_follows_sleep?: boolean | null;
+            /** Position */
+            position?: number | null;
+        };
+        /**
+         * DayRuleKind
+         * @description Правило назначения режима дня (domain/dayprofile.py). Приоритет: dates >
+         *     event_day / day_after (по позиции) > weekdays > первый режим.
+         * @enum {string}
+         */
+        DayRuleKind: "dates" | "event_day" | "day_after" | "weekdays";
+        /**
+         * DeadlineDays
+         * @description Срок = дата выдачи (или сегодня) + N дней, 23:59.
+         */
+        DeadlineDays: {
+            /**
+             * Kind
+             * @default days
+             * @constant
+             */
+            kind: "days";
+            /** Days */
+            days: number;
+        };
+        /**
+         * DeadlineNextOccurrence
+         * @description Срок = начало ближайшего будущего вхождения правила расписания той же сферы
+         *     («к следующему уроку»); пересчитывается при изменении расписания.
+         */
+        DeadlineNextOccurrence: {
+            /**
+             * Kind
+             * @default next_occurrence
+             * @constant
+             */
+            kind: "next_occurrence";
         };
         /**
          * DeadlineRule
@@ -2590,15 +3956,23 @@ export interface components {
              * @description Сколько блоков дня уже отмечено «сделано»
              */
             done: number;
+            /**
+             * Proposals
+             * @description Предложения автозадач: «Взять» — status active, «Не надо» — cancelled
+             */
+            proposals: components["schemas"]["TaskRead"][];
         };
-        /** EventCreate */
+        /**
+         * EventCreate
+         * @description Разовое жёсткое событие. Вхождения правил — из ScheduleRule, гибкие блоки —
+         *     планировщиком.
+         */
         EventCreate: {
             /**
-             * Kind
-             * @default personal
-             * @enum {string}
+             * Event Type Id
+             * @description null — просто занято
              */
-            kind: "personal" | "rest";
+            event_type_id?: string | null;
             /** Title */
             title: string;
             /**
@@ -2620,14 +3994,22 @@ export interface components {
              * @default
              */
             note: string;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа занятости
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * EventKind
+         * @description Поведение события в планировщике (смысл задаёт тип занятости, Part 2 M17.1).
          * @enum {string}
          */
-        EventKind: "class" | "personal" | "rest" | "subtask" | "backlog" | "exam_prep" | "exam" | "project";
+        EventKind: "busy" | "subtask" | "backlog" | "prep" | "project";
         /** EventRead */
         EventRead: {
             /**
@@ -2664,28 +4046,308 @@ export interface components {
             source_type: string | null;
             /** Source Id */
             source_id: string | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Location */
             location: string | null;
             /** Color */
             color: string | null;
             /** Note */
             note: string;
-            class_type: components["schemas"]["ClassType"] | null;
-            /** Pair Number */
-            pair_number: number | null;
-            /** Teacher */
-            teacher: string | null;
+            /** Event Type Id */
+            event_type_id: string | null;
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
+            /** Slot */
+            slot: number | null;
         };
+        /** EventRuleCreate */
+        EventRuleCreate: {
+            /**
+             * Event Type Id
+             * @description Все события типа
+             */
+            event_type_id?: string | null;
+            /**
+             * Schedule Rule Id
+             * @description Вхождения одного правила расписания
+             */
+            schedule_rule_id?: string | null;
+            /** @default before */
+            when: components["schemas"]["EventRuleWhen"];
+            /**
+             * Title Template
+             * @description Подстановки: {area}, {event}, {field:<id или подпись поля>}
+             */
+            title_template: string;
+            /**
+             * Estimate Min
+             * @default 30
+             */
+            estimate_min: number;
+            /** Action Type Id */
+            action_type_id?: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /**
+             * Offset Min
+             * @description «До»: закончить за N минут
+             * @default 0
+             */
+            offset_min: number;
+            /**
+             * Within Days
+             * @description «После»: не позже конца + N дней
+             */
+            within_days?: number | null;
+            /**
+             * Until Next
+             * @description «После»: до следующего вхождения
+             * @default false
+             */
+            until_next: boolean;
+            /**
+             * Confirm
+             * @description Предлагать в вечернем разборе
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** EventRuleRead */
+        EventRuleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Type Id */
+            event_type_id: string | null;
+            /** Schedule Rule Id */
+            schedule_rule_id: string | null;
+            when: components["schemas"]["EventRuleWhen"];
+            /** Title Template */
+            title_template: string;
+            /** Estimate Min */
+            estimate_min: number;
+            /** Action Type Id */
+            action_type_id: string | null;
+            /** Task Type Id */
+            task_type_id: string | null;
+            /** Offset Min */
+            offset_min: number;
+            /** Within Days */
+            within_days: number | null;
+            /** Until Next */
+            until_next: boolean;
+            /** Confirm */
+            confirm: boolean;
+            /** Position */
+            position: number;
+        };
+        /** EventRuleUpdate */
+        EventRuleUpdate: {
+            when?: components["schemas"]["EventRuleWhen"] | null;
+            /** Title Template */
+            title_template?: string | null;
+            /** Estimate Min */
+            estimate_min?: number | null;
+            /** Action Type Id */
+            action_type_id?: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /** Offset Min */
+            offset_min?: number | null;
+            /** Within Days */
+            within_days?: number | null;
+            /** Until Next */
+            until_next?: boolean | null;
+            /** Confirm */
+            confirm?: boolean | null;
+            /** Position */
+            position?: number | null;
+        };
+        /**
+         * EventRuleWhen
+         * @description Автозадача (M19): до или после вхождения события.
+         * @enum {string}
+         */
+        EventRuleWhen: "before" | "after";
         /**
          * EventStatus
          * @enum {string}
          */
         EventStatus: "planned" | "done" | "cancelled" | "missed";
+        /** EventTypeCreate */
+        EventTypeCreate: {
+            /**
+             * Name
+             * @description В единственном числе: «Смена»
+             */
+            name: string;
+            /**
+             * Name Plural
+             * @description Во множественном — заголовок в сводке; null — как name
+             */
+            name_plural?: string | null;
+            /** @default calendar */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Color
+             * @default #64748b
+             */
+            color: string;
+            /**
+             * Buffer Before Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_before_min: number;
+            /**
+             * Buffer After Min
+             * @description Минут
+             * @default 0
+             */
+            buffer_after_min: number;
+            /**
+             * Merge Buffers
+             * @description Подряд в день с тем же местом — буфер до первого и после последнего
+             * @default false
+             */
+            merge_buffers: boolean;
+            /** Remind Before Min */
+            remind_before_min?: number | null;
+            /** Remind Channels */
+            remind_channels?: components["schemas"]["Channel"][];
+            /**
+             * Show Now Next
+             * @description Карточка «Сейчас / Дальше»
+             * @default false
+             */
+            show_now_next: boolean;
+            /**
+             * Is Rest
+             * @description Защищённый отдых
+             * @default false
+             */
+            is_rest: boolean;
+            /**
+             * Supports Prep
+             * @description Подготовка к событию
+             * @default false
+             */
+            supports_prep: boolean;
+            /**
+             * Location Label
+             * @description Подпись перед местом в текстах: «каб.» → «каб. 12»
+             * @default
+             */
+            location_label: string;
+            /** Default Area Type Id */
+            default_area_type_id?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["FieldDefIn"][];
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
+            synonyms?: string[];
+        };
+        /** EventTypeRead */
+        EventTypeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Key
+             * @description Ключ сида/миграции; у своих типов — null
+             */
+            key: string | null;
+            /** Name */
+            name: string;
+            /** Name Plural */
+            name_plural: string;
+            icon: components["schemas"]["CategoryIcon"];
+            /** Color */
+            color: string;
+            /** Buffer Before Min */
+            buffer_before_min: number;
+            /** Buffer After Min */
+            buffer_after_min: number;
+            /** Merge Buffers */
+            merge_buffers: boolean;
+            /** Remind Before Min */
+            remind_before_min: number | null;
+            /** Remind Channels */
+            remind_channels: components["schemas"]["Channel"][];
+            /** Show Now Next */
+            show_now_next: boolean;
+            /** Is Rest */
+            is_rest: boolean;
+            /** Supports Prep */
+            supports_prep: boolean;
+            /** Location Label */
+            location_label: string;
+            /** Default Area Type Id */
+            default_area_type_id: string | null;
+            /**
+             * Fields
+             * @description Живые поля (удалённые не показываются)
+             */
+            fields: components["schemas"]["FieldDefRead"][];
+            /** Synonyms */
+            synonyms: string[];
+            /** Position */
+            position: number;
+        };
+        /** EventTypeUpdate */
+        EventTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Name Plural */
+            name_plural?: string | null;
+            icon?: components["schemas"]["CategoryIcon"] | null;
+            /** Color */
+            color?: string | null;
+            /** Buffer Before Min */
+            buffer_before_min?: number | null;
+            /** Buffer After Min */
+            buffer_after_min?: number | null;
+            /** Merge Buffers */
+            merge_buffers?: boolean | null;
+            /**
+             * Remind Before Min
+             * @description null — не напоминать
+             */
+            remind_before_min?: number | null;
+            /** Remind Channels */
+            remind_channels?: components["schemas"]["Channel"][] | null;
+            /** Show Now Next */
+            show_now_next?: boolean | null;
+            /** Is Rest */
+            is_rest?: boolean | null;
+            /** Supports Prep */
+            supports_prep?: boolean | null;
+            /** Location Label */
+            location_label?: string | null;
+            /** Default Area Type Id */
+            default_area_type_id?: string | null;
+            /**
+             * Fields
+             * @description Полный список полей
+             */
+            fields?: components["schemas"]["FieldDefIn"][] | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /** Position */
+            position?: number | null;
+        };
         /**
          * EventUpdate
-         * @description Правка события. У вхождения шаблона ставит detached=true (кроме «сделано», pin, заметки).
+         * @description Правка события. У вхождения правила ставит detached=true (кроме «сделано», pin, заметки).
          */
         EventUpdate: {
             /** Title */
@@ -2703,275 +4365,14 @@ export interface components {
             status?: components["schemas"]["EventStatus"] | null;
             /** Is Pinned */
             is_pinned?: boolean | null;
-        };
-        /** ExamCreate */
-        ExamCreate: {
-            /**
-             * Subject Id
-             * Format: uuid
-             */
-            subject_id: string;
-            /**
-             * Title
-             * @description Пусто — «Экзамен: <предмет>»
-             * @default
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /**
-             * Duration Min
-             * @description Длительность экзамена, мин
-             * @default 180
-             */
-            duration_min: number;
-            /** Location */
-            location?: string | null;
-            /**
-             * Note
-             * @default
-             */
-            note: string;
-            /**
-             * Prep Days
-             * @description Начать подготовку за N дней
-             * @default 7
-             */
-            prep_days: number;
-            /**
-             * Learn Min
-             * @description Выучить вопрос, мин
-             * @default 45
-             */
-            learn_min: number;
-            /**
-             * Review Min
-             * @description Повторить вопрос, мин
-             * @default 15
-             */
-            review_min: number;
-            /**
-             * Run Min
-             * @description Общий прогон, мин на вопрос
-             * @default 5
-             */
-            run_min: number;
-        };
-        /** ExamDetail */
-        ExamDetail: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Subject Id
-             * Format: uuid
-             */
-            subject_id: string;
-            /**
-             * Title
-             * @description Готовое название (с предметом, если своё не задано)
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /** Duration Min */
-            duration_min: number;
-            /** Location */
-            location: string | null;
-            /** Note */
-            note: string;
-            /** Prep Days */
-            prep_days: number;
-            /** Learn Min */
-            learn_min: number;
-            /** Review Min */
-            review_min: number;
-            /** Run Min */
-            run_min: number;
-            /** Plan Enabled */
-            plan_enabled: boolean;
-            /**
-             * Questions Total
-             * @default 0
-             */
-            questions_total: number;
-            /**
-             * Questions Learned
-             * @default 0
-             */
-            questions_learned: number;
-            /** Questions */
-            questions: components["schemas"]["ExamQuestionRead"][];
-            /** Sessions */
-            sessions: components["schemas"]["ExamSessionRead"][];
-        };
-        /** ExamQuestionCreate */
-        ExamQuestionCreate: {
-            /** Text */
-            text: string;
-            /**
-             * Number
-             * @description Пусто — следующий
-             */
-            number?: number | null;
-        };
-        /** ExamQuestionRead */
-        ExamQuestionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Number */
-            number: number;
-            /** Text */
-            text: string;
-            status: components["schemas"]["ExamQuestionStatus"];
-            /** Learned On */
-            learned_on: string | null;
-            /** Reviews Done */
-            reviews_done: number;
-        };
-        /**
-         * ExamQuestionStatus
-         * @enum {string}
-         */
-        ExamQuestionStatus: "not_started" | "learned" | "review";
-        /**
-         * ExamQuestionUpdate
-         * @description status: learned — выучен (повторения от сегодня), review — «повторить»
-         *     (цикл повторений заново), not_started — сбросить.
-         */
-        ExamQuestionUpdate: {
-            /** Number */
-            number?: number | null;
-            /** Text */
-            text?: string | null;
-            status?: components["schemas"]["ExamQuestionStatus"] | null;
-        };
-        /** ExamQuestionsImport */
-        ExamQuestionsImport: {
-            /**
-             * Text
-             * @description Список вопросов: «1. …», «1) …» или по одному в строке
-             */
-            text: string;
-        };
-        /** ExamRead */
-        ExamRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Subject Id
-             * Format: uuid
-             */
-            subject_id: string;
-            /**
-             * Title
-             * @description Готовое название (с предметом, если своё не задано)
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /** Duration Min */
-            duration_min: number;
-            /** Location */
-            location: string | null;
-            /** Note */
-            note: string;
-            /** Prep Days */
-            prep_days: number;
-            /** Learn Min */
-            learn_min: number;
-            /** Review Min */
-            review_min: number;
-            /** Run Min */
-            run_min: number;
-            /** Plan Enabled */
-            plan_enabled: boolean;
-            /**
-             * Questions Total
-             * @default 0
-             */
-            questions_total: number;
-            /**
-             * Questions Learned
-             * @default 0
-             */
-            questions_learned: number;
-        };
-        /**
-         * ExamSessionKind
-         * @enum {string}
-         */
-        ExamSessionKind: "learn" | "review" | "run";
-        /**
-         * ExamSessionRead
-         * @description День плана подготовки и где он стоит в календаре (если уже стоит).
-         */
-        ExamSessionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            kind: components["schemas"]["ExamSessionKind"];
-            /** Title */
-            title: string;
-            /** Numbers */
-            numbers: number[];
-            /** Minutes */
-            minutes: number;
-            status: components["schemas"]["ExamSessionStatus"];
-            /** Start */
-            start: string | null;
-            /** End */
-            end: string | null;
-        };
-        /**
-         * ExamSessionStatus
-         * @enum {string}
-         */
-        ExamSessionStatus: "planned" | "done" | "missed";
-        /** ExamUpdate */
-        ExamUpdate: {
-            /** Title */
-            title?: string | null;
-            /** Starts At */
-            starts_at?: string | null;
-            /** Duration Min */
-            duration_min?: number | null;
-            /** Location */
-            location?: string | null;
-            /** Note */
-            note?: string | null;
-            /** Prep Days */
-            prep_days?: number | null;
-            /** Learn Min */
-            learn_min?: number | null;
-            /** Review Min */
-            review_min?: number | null;
-            /** Run Min */
-            run_min?: number | null;
+            /** Event Type Id */
+            event_type_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
+            /** Fields */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * Feel
@@ -2979,6 +4380,61 @@ export interface components {
          * @enum {string}
          */
         Feel: "faster" | "ok" | "slower";
+        /**
+         * FieldDefIn
+         * @description Поле типа. Без `id` (или с незнакомым) — новое поле; id выдаёт сервер.
+         *     Поле, которого нет в новом списке, считается удалённым: значения сфер остаются.
+         */
+        FieldDefIn: {
+            /** Id */
+            id?: string | null;
+            /** Label */
+            label: string;
+            type: components["schemas"]["FieldType"];
+            /**
+             * Options
+             * @description Для select / multiselect
+             */
+            options?: string[];
+            /**
+             * Multiple
+             * @description Много значений: text, contact, link, area_ref
+             * @default false
+             */
+            multiple: boolean;
+            /**
+             * Show In Reminder
+             * @default false
+             */
+            show_in_reminder: boolean;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** FieldDefRead */
+        FieldDefRead: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["FieldType"];
+            /** Options */
+            options: string[];
+            /** Multiple */
+            multiple: boolean;
+            /** Show In Reminder */
+            show_in_reminder: boolean;
+            /** Required */
+            required: boolean;
+        };
+        /**
+         * FieldType
+         * @description Тип пользовательского поля (domain/fields.py).
+         * @enum {string}
+         */
+        FieldType: "text" | "number" | "bool" | "select" | "multiselect" | "date" | "contact" | "link" | "area_ref";
         /** FreeStart */
         FreeStart: {
             /**
@@ -3046,7 +4502,7 @@ export interface components {
              */
             waiting?: string | null;
             /** Result */
-            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"] | components["schemas"]["MilestonesDraft"]) | null;
+            result?: (components["schemas"]["BreakdownDraft"] | components["schemas"]["ParseDraft"] | components["schemas"]["PhotoDraft"] | components["schemas"]["MilestonesDraft"] | components["schemas"]["SetupDraft"]) | null;
         };
         /** JobStarted */
         JobStarted: {
@@ -3066,12 +4522,101 @@ export interface components {
          * @enum {string}
          */
         KindHint: "task" | "backlog" | "event";
+        /** Link */
+        Link: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+        };
+        /** LoadBudgetCreate */
+        LoadBudgetCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Minutes Per Day
+             * @description Минут в день
+             */
+            minutes_per_day: number;
+            /**
+             * Action Type Ids
+             * @description Типы действий, которые идут в лимит
+             */
+            action_type_ids?: string[];
+            /**
+             * Event Type Ids
+             * @description Типы занятости, которые идут в лимит
+             */
+            event_type_ids?: string[];
+        };
+        /** LoadBudgetRead */
+        LoadBudgetRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Minutes Per Day */
+            minutes_per_day: number;
+            /** Position */
+            position: number;
+            /** Action Type Ids */
+            action_type_ids: string[];
+            /** Event Type Ids */
+            event_type_ids: string[];
+            /**
+             * Overrides
+             * @description Разовые лимиты на сегодня и дальше
+             */
+            overrides: components["schemas"]["BudgetOverrideRead"][];
+        };
+        /** LoadBudgetUpdate */
+        LoadBudgetUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Minutes Per Day */
+            minutes_per_day?: number | null;
+            /** Action Type Ids */
+            action_type_ids?: string[] | null;
+            /** Event Type Ids */
+            event_type_ids?: string[] | null;
+            /** Position */
+            position?: number | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
             email: string;
             /** Password */
             password: string;
+        };
+        /** Lunch */
+        "Lunch-Input": {
+            /**
+             * Start
+             * Format: time
+             */
+            start: string;
+            /**
+             * End
+             * Format: time
+             */
+            end: string;
+        };
+        /** Lunch */
+        "Lunch-Output": {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
         };
         /** MilestoneCreate */
         MilestoneCreate: {
@@ -3194,24 +4739,24 @@ export interface components {
         NoteCreate: {
             /**
              * Title
-             * @description null — «Пара · 6 окт» по паре или «Конспект 6 окт»
+             * @description null — «<сфера> · 6 окт» по событию или «Заметка 6 окт»
              */
             title?: string | null;
             /** @default text */
             kind: components["schemas"]["NoteKind"];
             /**
-             * Subject Id
-             * @description null — предмет пары
+             * Area Id
+             * @description null — сфера события
              */
-            subject_id?: string | null;
+            area_id?: string | null;
             /**
              * Event Id
-             * @description Пара, к которой конспект
+             * @description Событие, к которому заметка
              */
             event_id?: string | null;
             /**
              * Class Date
-             * @description null — дата пары или сегодня
+             * @description null — дата события или сегодня
              */
             class_date?: string | null;
             /**
@@ -3224,7 +4769,7 @@ export interface components {
         };
         /**
          * NoteEvent
-         * @description Пара конспекта — коротко, для подписи «2 пара, ауд. 1801».
+         * @description Событие заметки — коротко, для подписи «слот 2 · 12».
          */
         NoteEvent: {
             /**
@@ -3246,9 +4791,8 @@ export interface components {
             end: string;
             /** Location */
             location: string | null;
-            /** Pair Number */
-            pair_number: number | null;
-            class_type: components["schemas"]["ClassType"] | null;
+            /** Slot */
+            slot: number | null;
         };
         /** NoteHit */
         NoteHit: {
@@ -3260,8 +4804,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3317,8 +4861,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3362,8 +4906,8 @@ export interface components {
             /** Title */
             title: string;
             kind: components["schemas"]["NoteKind"];
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Event Id */
             event_id: string | null;
             /** Class Date */
@@ -3405,8 +4949,8 @@ export interface components {
             /** Title */
             title?: string | null;
             kind?: components["schemas"]["NoteKind"] | null;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Event Id */
             event_id?: string | null;
             /** Class Date */
@@ -3424,12 +4968,43 @@ export interface components {
             /** Channels */
             channels: components["schemas"]["ChannelState"][];
         };
+        /** OncePatternIn */
+        OncePatternIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "once";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+        };
         /**
-         * Parity
-         * @description Чётность недели: числитель = odd, знаменатель = even.
-         * @enum {string}
+         * OriginEvent
+         * @description Событие, от которого создана автозадача (для ссылки «к событию»).
          */
-        Parity: "odd" | "even";
+        OriginEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            status: components["schemas"]["EventStatus"];
+        };
         /**
          * ParseDraft
          * @description Разбор свободного текста ИИ — карточка «Создать и разбить / Изменить».
@@ -3445,9 +5020,10 @@ export interface components {
             title: string;
             /** Description */
             description: string;
-            task_type: components["schemas"]["TaskType"] | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Action Type Id */
@@ -3457,6 +5033,110 @@ export interface components {
              * @description Исходный текст
              */
             text: string;
+        };
+        /** Pause */
+        Pause: {
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** PauseRead */
+        PauseRead: {
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+            /** Title */
+            title: string;
+        };
+        /** PeriodCreate */
+        PeriodCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             * @description Последний день периода
+             */
+            end_date: string;
+            /**
+             * Cycle Weeks
+             * @description 1 — без цикла
+             * @default 1
+             */
+            cycle_weeks: number;
+            /**
+             * First Cycle Week
+             * @description Неделя цикла, куда попадает начало
+             * @default 1
+             */
+            first_cycle_week: number;
+            /** Pauses */
+            pauses?: components["schemas"]["Pause"][];
+        };
+        /** PeriodRead */
+        PeriodRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Cycle Weeks */
+            cycle_weeks: number;
+            /** First Cycle Week */
+            first_cycle_week: number;
+            /** Pauses */
+            pauses: components["schemas"]["PauseRead"][];
+        };
+        /** PeriodUpdate */
+        PeriodUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Cycle Weeks */
+            cycle_weeks?: number | null;
+            /** First Cycle Week */
+            first_cycle_week?: number | null;
+            /** Pauses */
+            pauses?: components["schemas"]["Pause"][] | null;
         };
         /**
          * PhotoDraft
@@ -3477,9 +5157,10 @@ export interface components {
             title: string;
             /** Text */
             text: string;
-            task_type: components["schemas"]["TaskType"] | null;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /**
@@ -3519,7 +5200,7 @@ export interface components {
          * @description Почему пересчитали план.
          * @enum {string}
          */
-        PlanReason: "manual" | "changes" | "missed" | "nightly" | "weekly" | "exam";
+        PlanReason: "manual" | "changes" | "missed" | "nightly" | "weekly" | "prep";
         /** PlanRevisionRead */
         PlanRevisionRead: {
             /**
@@ -3582,7 +5263,7 @@ export interface components {
              * Group Kind
              * @enum {string}
              */
-            group_kind: "task" | "backlog" | "exam" | "project";
+            group_kind: "task" | "backlog" | "prep" | "project";
             /**
              * Group Id
              * Format: uuid
@@ -3637,6 +5318,332 @@ export interface components {
             skipped: number;
         };
         /**
+         * PrepEventIn
+         * @description Событие, к которому готовимся, — создаётся вместе с планом.
+         */
+        PrepEventIn: {
+            /**
+             * Event Type Id
+             * @description Тип занятости; null — первый тип с подготовкой
+             */
+            event_type_id?: string | null;
+            /**
+             * Title
+             * @description Пусто — «<тип>: <сфера>»
+             * @default
+             */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Duration Min
+             * @description Длительность события, мин
+             * @default 180
+             */
+            duration_min: number;
+            /** Location */
+            location?: string | null;
+        };
+        /** PrepEventRead */
+        PrepEventRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Location */
+            location: string | null;
+            status: components["schemas"]["EventStatus"];
+            /** Event Type Id */
+            event_type_id: string | null;
+        };
+        /** PrepItemCreate */
+        PrepItemCreate: {
+            /** Text */
+            text: string;
+            /**
+             * Number
+             * @description Пусто — следующий
+             */
+            number?: number | null;
+        };
+        /** PrepItemRead */
+        PrepItemRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+            status: components["schemas"]["PrepItemStatus"];
+            /** Learned On */
+            learned_on: string | null;
+            /** Reviews Done */
+            reviews_done: number;
+        };
+        /**
+         * PrepItemStatus
+         * @enum {string}
+         */
+        PrepItemStatus: "not_started" | "learned" | "review";
+        /**
+         * PrepItemUpdate
+         * @description status: learned — пройден (повторения от сегодня), review — «повторить» (цикл
+         *     повторений заново), not_started — сбросить.
+         */
+        PrepItemUpdate: {
+            /** Number */
+            number?: number | null;
+            /** Text */
+            text?: string | null;
+            status?: components["schemas"]["PrepItemStatus"] | null;
+        };
+        /** PrepItemsImport */
+        PrepItemsImport: {
+            /**
+             * Text
+             * @description Список пунктов: «1. …», «1) …» или по одному в строке
+             */
+            text: string;
+        };
+        /** PrepPlanCreate */
+        PrepPlanCreate: {
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Event Id
+             * @description Готовиться к этому событию
+             */
+            event_id?: string | null;
+            /** @description …или создать событие */
+            event?: components["schemas"]["PrepEventIn"] | null;
+            /**
+             * Date
+             * @description …или к дате (без события)
+             */
+            date?: string | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** @default spaced */
+            strategy: components["schemas"]["PrepStrategy"];
+            /**
+             * Start Days Before
+             * @description Начать подготовку за N дней
+             * @default 7
+             */
+            start_days_before: number;
+            /**
+             * Learn Min
+             * @description Выучить / пройти пункт, мин
+             * @default 45
+             */
+            learn_min: number;
+            /**
+             * Review Min
+             * @description Повторить пункт, мин
+             * @default 15
+             */
+            review_min: number;
+            /**
+             * Run Min
+             * @description Прогон накануне, мин на пункт; 0 — без
+             * @default 5
+             */
+            run_min: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** PrepPlanDetail */
+        PrepPlanDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Id */
+            event_id: string | null;
+            /** Area Id */
+            area_id: string | null;
+            /** Date */
+            date: string | null;
+            /**
+             * Title
+             * @description Готовое название (своё → событие → сфера)
+             */
+            title: string;
+            strategy: components["schemas"]["PrepStrategy"];
+            /** Start Days Before */
+            start_days_before: number;
+            /** Learn Min */
+            learn_min: number;
+            /** Review Min */
+            review_min: number;
+            /** Run Min */
+            run_min: number;
+            /** Note */
+            note: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Target
+             * @description К какому моменту готовиться: начало события или дата
+             */
+            target: string | null;
+            event: components["schemas"]["PrepEventRead"] | null;
+            /**
+             * Items Total
+             * @default 0
+             */
+            items_total: number;
+            /**
+             * Items Learned
+             * @default 0
+             */
+            items_learned: number;
+            /** Items */
+            items: components["schemas"]["PrepItemRead"][];
+            /** Sessions */
+            sessions: components["schemas"]["PrepSessionRead"][];
+        };
+        /** PrepPlanRead */
+        PrepPlanRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Id */
+            event_id: string | null;
+            /** Area Id */
+            area_id: string | null;
+            /** Date */
+            date: string | null;
+            /**
+             * Title
+             * @description Готовое название (своё → событие → сфера)
+             */
+            title: string;
+            strategy: components["schemas"]["PrepStrategy"];
+            /** Start Days Before */
+            start_days_before: number;
+            /** Learn Min */
+            learn_min: number;
+            /** Review Min */
+            review_min: number;
+            /** Run Min */
+            run_min: number;
+            /** Note */
+            note: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Target
+             * @description К какому моменту готовиться: начало события или дата
+             */
+            target: string | null;
+            event: components["schemas"]["PrepEventRead"] | null;
+            /**
+             * Items Total
+             * @default 0
+             */
+            items_total: number;
+            /**
+             * Items Learned
+             * @default 0
+             */
+            items_learned: number;
+        };
+        /** PrepPlanUpdate */
+        PrepPlanUpdate: {
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Date
+             * @description Только у плана без события
+             */
+            date?: string | null;
+            /** Title */
+            title?: string | null;
+            strategy?: components["schemas"]["PrepStrategy"] | null;
+            /** Start Days Before */
+            start_days_before?: number | null;
+            /** Learn Min */
+            learn_min?: number | null;
+            /** Review Min */
+            review_min?: number | null;
+            /** Run Min */
+            run_min?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * PrepSessionKind
+         * @enum {string}
+         */
+        PrepSessionKind: "learn" | "review" | "run";
+        /**
+         * PrepSessionRead
+         * @description День плана и где он стоит в календаре (если уже стоит).
+         */
+        PrepSessionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            kind: components["schemas"]["PrepSessionKind"];
+            /** Title */
+            title: string;
+            /** Numbers */
+            numbers: number[];
+            /** Minutes */
+            minutes: number;
+            status: components["schemas"]["PrepSessionStatus"];
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+        };
+        /**
+         * PrepSessionStatus
+         * @enum {string}
+         */
+        PrepSessionStatus: "planned" | "done" | "missed";
+        /**
+         * PrepStrategy
+         * @enum {string}
+         */
+        PrepStrategy: "spaced" | "even";
+        /**
          * Priority
          * @enum {string}
          */
@@ -3650,6 +5657,11 @@ export interface components {
              * @description null — «Учёба»
              */
             category_id?: string | null;
+            /**
+             * Area Id
+             * @description Сфера проекта (необязательно)
+             */
+            area_id?: string | null;
             /** Deadline */
             deadline?: string | null;
             /**
@@ -3658,17 +5670,11 @@ export interface components {
              */
             description: string;
             /** Contacts */
-            contacts?: components["schemas"]["Teacher"][];
+            contacts?: components["schemas"]["Contact"][];
             /** Links */
-            links?: components["schemas"]["SubjectLink"][];
+            links?: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
-            /**
-             * Is Work Default
-             * @description Сюда по умолчанию попадают задания с работы
-             * @default false
-             */
-            is_work_default: boolean;
         };
         /** ProjectDetail */
         ProjectDetail: {
@@ -3681,19 +5687,19 @@ export interface components {
             title: string;
             /** Category Id */
             category_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Description */
             description: string;
             /** Contacts */
-            contacts: components["schemas"]["Teacher"][];
+            contacts: components["schemas"]["Contact"][];
             /** Links */
-            links: components["schemas"]["SubjectLink"][];
+            links: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
-            /** Is Work Default */
-            is_work_default: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3751,19 +5757,19 @@ export interface components {
             title: string;
             /** Category Id */
             category_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Deadline */
             deadline: string | null;
             /** Description */
             description: string;
             /** Contacts */
-            contacts: components["schemas"]["Teacher"][];
+            contacts: components["schemas"]["Contact"][];
             /** Links */
-            links: components["schemas"]["SubjectLink"][];
+            links: components["schemas"]["Link"][];
             /** Weekly Norm Min */
             weekly_norm_min: number | null;
             status: components["schemas"]["ProjectStatus"];
-            /** Is Work Default */
-            is_work_default: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3819,18 +5825,18 @@ export interface components {
             title?: string | null;
             /** Category Id */
             category_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Deadline */
             deadline?: string | null;
             /** Description */
             description?: string | null;
             /** Contacts */
-            contacts?: components["schemas"]["Teacher"][] | null;
+            contacts?: components["schemas"]["Contact"][] | null;
             /** Links */
-            links?: components["schemas"]["SubjectLink"][] | null;
+            links?: components["schemas"]["Link"][] | null;
             /** Weekly Norm Min */
             weekly_norm_min?: number | null;
-            /** Is Work Default */
-            is_work_default?: boolean | null;
             status?: components["schemas"]["ProjectStatus"] | null;
         };
         /**
@@ -3905,10 +5911,23 @@ export interface components {
             deadline: string | null;
             /** Is Deadline */
             is_deadline: boolean;
-            /** Subject Id */
-            subject_id: string | null;
-            task_type: components["schemas"]["TaskType"] | null;
-            action_type: components["schemas"]["ActionTypeKey"] | null;
+            /** Area Id */
+            area_id: string | null;
+            /**
+             * Task Type Id
+             * @description Тип задачи из справочника по словам
+             */
+            task_type_id: string | null;
+            /**
+             * Action Type Id
+             * @description Тип действия по словам; похоже на задачу — тип по умолчанию
+             */
+            action_type_id: string | null;
+            /**
+             * Event Type Id
+             * @description Тип занятости по словам — для события
+             */
+            event_type_id?: string | null;
             kind_hint: components["schemas"]["KindHint"];
             /**
              * Needs Ai
@@ -3921,9 +5940,19 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** RRulePatternIn */
+        RRulePatternIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "rrule";
+            /** Rrule */
+            rrule: string;
+        };
         /**
          * ReadingTaskCreate
-         * @description Задание «прочитать» из источника: тип «чтение», предмет источника.
+         * @description Задание «прочитать» из источника: сфера источника, тип — по словам названия.
          */
         ReadingTaskCreate: {
             /**
@@ -3936,102 +5965,11 @@ export interface components {
             deadline?: string | null;
             /** Estimate Min */
             estimate_min?: number | null;
-        };
-        /** RecurringEventCreate */
-        RecurringEventCreate: {
             /**
-             * Kind
-             * @default personal
-             * @enum {string}
+             * Task Type Id
+             * @description null — угадать по названию («прочитать» → тип с этим словом)
              */
-            kind: "personal" | "rest";
-            /** Title */
-            title: string;
-            /**
-             * Rrule
-             * @description RRULE без DTSTART, напр. «FREQ=WEEKLY;BYDAY=TU,TH»
-             */
-            rrule: string;
-            /**
-             * Start Date
-             * Format: date
-             */
-            start_date: string;
-            /** Until */
-            until?: string | null;
-            /**
-             * Start Time
-             * Format: time
-             */
-            start_time: string;
-            /**
-             * End Time
-             * Format: time
-             * @description <= start_time — заканчивается на следующий день
-             */
-            end_time: string;
-            /** Location */
-            location?: string | null;
-            /** Color */
-            color?: string | null;
-            /**
-             * Note
-             * @default
-             */
-            note: string;
-        };
-        /** RecurringEventRead */
-        RecurringEventRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            kind: components["schemas"]["EventKind"];
-            /** Title */
-            title: string;
-            /** Rrule */
-            rrule: string;
-            /**
-             * Start Date
-             * Format: date
-             */
-            start_date: string;
-            /** Until */
-            until: string | null;
-            /** Start Time */
-            start_time: string;
-            /** End Time */
-            end_time: string;
-            /** Location */
-            location: string | null;
-            /** Color */
-            color: string | null;
-            /** Note */
-            note: string;
-        };
-        /** RecurringEventUpdate */
-        RecurringEventUpdate: {
-            /** Kind */
-            kind?: ("personal" | "rest") | null;
-            /** Title */
-            title?: string | null;
-            /** Rrule */
-            rrule?: string | null;
-            /** Start Date */
-            start_date?: string | null;
-            /** Until */
-            until?: string | null;
-            /** Start Time */
-            start_time?: string | null;
-            /** End Time */
-            end_time?: string | null;
-            /** Location */
-            location?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Note */
-            note?: string | null;
+            task_type_id?: string | null;
         };
         /**
          * ReminderAction
@@ -4056,7 +5994,7 @@ export interface components {
          * ReminderKind
          * @enum {string}
          */
-        ReminderKind: "morning_digest" | "before_class" | "deadline" | "subtask_start" | "evening_review" | "weekly_review" | "test";
+        ReminderKind: "morning_digest" | "before_event" | "deadline" | "subtask_start" | "evening_review" | "weekly_review" | "test";
         /** ReminderRead */
         ReminderRead: {
             /**
@@ -4114,17 +6052,6 @@ export interface components {
              *         "push",
              *         "telegram"
              *       ],
-             *       "minutes_before": 15
-             *     }
-             */
-            before_class: components["schemas"]["BeforeClassRule"];
-            /**
-             * @default {
-             *       "enabled": true,
-             *       "channels": [
-             *         "push",
-             *         "telegram"
-             *       ],
              *       "days_before": [
              *         3,
              *         1,
@@ -4167,7 +6094,6 @@ export interface components {
         /** RemindersPatch */
         RemindersPatch: {
             morning_digest?: components["schemas"]["ReminderRulePatch"] | null;
-            before_class?: components["schemas"]["BeforeClassRulePatch"] | null;
             deadlines?: components["schemas"]["DeadlineRulePatch"] | null;
             evening_review?: components["schemas"]["ReminderRulePatch"] | null;
             weekly_review?: components["schemas"]["ReminderRulePatch"] | null;
@@ -4219,26 +6145,23 @@ export interface components {
          */
         RiskReason: "no_slots" | "no_time" | "dependency" | "late" | "overdue" | "rest" | "quota";
         /**
-         * RuleParity
-         * @description Когда идёт пара: каждую неделю, по числителям или по знаменателям.
-         * @enum {string}
-         */
-        RuleParity: "all" | "odd" | "even";
-        /**
          * Schedule
-         * @description Когда приходят сводка и разборы.
+         * @description Когда приходят сводка и разборы. Сводка и вечерний разбор — по режиму дня:
+         *     после ночной смены с подъёмом в 15:00 сводка придёт после 15:00.
          */
         Schedule: {
             /**
-             * Morning Digest
-             * @default 08:00
+             * Morning Digest After Wake Min
+             * @description Утренняя сводка — через N минут после подъёма
+             * @default 30
              */
-            morning_digest: string;
+            morning_digest_after_wake_min: number;
             /**
-             * Evening Review
-             * @default 21:30
+             * Evening Review Before Sleep Min
+             * @description Вечерний разбор — за N минут до отбоя
+             * @default 120
              */
-            evening_review: string;
+            evening_review_before_sleep_min: number;
             /**
              * Weekly Review Weekday
              * @description ISO: 1 = Пн, 7 = Вс
@@ -4253,10 +6176,16 @@ export interface components {
         };
         /** SchedulePatch */
         SchedulePatch: {
-            /** Morning Digest */
-            morning_digest?: string | null;
-            /** Evening Review */
-            evening_review?: string | null;
+            /**
+             * Morning Digest After Wake Min
+             * @description Утренняя сводка — через N минут после подъёма
+             */
+            morning_digest_after_wake_min?: number | null;
+            /**
+             * Evening Review Before Sleep Min
+             * @description Вечерний разбор — за N минут до отбоя
+             */
+            evening_review_before_sleep_min?: number | null;
             /**
              * Weekly Review Weekday
              * @description ISO: 1 = Пн, 7 = Вс
@@ -4265,6 +6194,149 @@ export interface components {
             /** Weekly Review */
             weekly_review?: string | null;
         };
+        /** ScheduleRuleCreate */
+        ScheduleRuleCreate: {
+            /**
+             * Event Type Id
+             * Format: uuid
+             */
+            event_type_id: string;
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Period Id
+             * @description null — без периода (90 дней)
+             */
+            period_id?: string | null;
+            /**
+             * Slot Grid Id
+             * @description Общая строка сетки
+             */
+            slot_grid_id?: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /**
+             * Start Time
+             * @description Своё время вместо слотов
+             */
+            start_time?: string | null;
+            /**
+             * End Time
+             * @description <= start_time — через полночь
+             */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /**
+             * Title
+             * @description null — название сферы или типа
+             */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Fields
+             * @description Значения полей типа: {field_id: value}
+             */
+            fields?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** ScheduleRuleRead */
+        ScheduleRuleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Event Type Id
+             * Format: uuid
+             */
+            event_type_id: string;
+            /** Area Id */
+            area_id: string | null;
+            /** Period Id */
+            period_id: string | null;
+            /** Slot Grid Id */
+            slot_grid_id: string | null;
+            /** Pattern */
+            pattern: components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"];
+            /** Start Time */
+            start_time: string | null;
+            /** End Time */
+            end_time: string | null;
+            /** Slot From */
+            slot_from: number | null;
+            /** Slot To */
+            slot_to: number | null;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /** Title */
+            title: string | null;
+            /** Location */
+            location: string | null;
+            /** Color */
+            color: string | null;
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
+            /** Note */
+            note: string;
+        };
+        /** ScheduleRuleUpdate */
+        ScheduleRuleUpdate: {
+            /** Event Type Id */
+            event_type_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
+            /** Period Id */
+            period_id?: string | null;
+            /** Slot Grid Id */
+            slot_grid_id?: string | null;
+            /** Pattern */
+            pattern?: (components["schemas"]["WeeklyPatternIn"] | components["schemas"]["DayCyclePatternIn"] | components["schemas"]["RRulePatternIn"] | components["schemas"]["OncePatternIn"]) | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot From */
+            slot_from?: number | null;
+            /** Slot To */
+            slot_to?: number | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Fields */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
+            /** Note */
+            note?: string | null;
+        };
         /** SearchResults */
         SearchResults: {
             /** Notes */
@@ -4272,74 +6344,143 @@ export interface components {
             /** Sources */
             sources: components["schemas"]["SourceRead"][];
         };
-        /** SemesterCreate */
-        SemesterCreate: {
+        /**
+         * SetupDraft
+         * @description Черновик ИИ-настройки (M21.4) — сборка; ничего не применено, пока не нажали
+         *     «Применить» (`POST /config/import`).
+         */
+        SetupDraft: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "setup";
+            /**
+             * Text
+             * @description Описание, по которому собран черновик
+             */
+            text: string;
+            /**
+             * About
+             * @description «О себе» от ИИ — предложить сохранить
+             */
+            about: string;
+            bundle: components["schemas"]["ConfigBundle-Output"];
+            /**
+             * Warnings
+             * @description Что уточнить и что пропущено при проверке
+             */
+            warnings: string[];
+            /** @description Что добавится и изменится при импорте */
+            preview: components["schemas"]["BundleImportResult"];
+        };
+        /** SetupRequest */
+        SetupRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Comment
+             * @description «Заново с комментарием»
+             */
+            comment?: string | null;
+            /**
+             * Previous
+             * @description Прошлый черновик кратко
+             */
+            previous?: string[];
+        };
+        /** SlotGridDay */
+        "SlotGridDay-Input": {
+            /**
+             * Weekday
+             * @description null — общие слоты
+             */
+            weekday?: number | null;
+            /** Slots */
+            slots: components["schemas"]["SlotIn-Input"][];
+        };
+        /** SlotGridDay */
+        "SlotGridDay-Output": {
+            /**
+             * Weekday
+             * @description null — общие слоты
+             */
+            weekday?: number | null;
+            /** Slots */
+            slots: components["schemas"]["SlotIn-Output"][];
+        };
+        /**
+         * SlotGridPut
+         * @description Сетка целиком: общие слоты + переопределения дней. `id` — общая строка
+         *     существующей сетки (переименовать, перенести в другой период); без него сетка
+         *     ищется по (period_id, name), нет такой — создаётся.
+         */
+        SlotGridPut: {
+            /** Id */
+            id?: string | null;
+            /** Period Id */
+            period_id?: string | null;
             /** Name */
             name: string;
-            /**
-             * Start Date
-             * Format: date
-             */
-            start_date: string;
-            /**
-             * Classes End
-             * Format: date
-             * @description Последний день занятий
-             */
-            classes_end: string;
-            /** Session Start */
-            session_start?: string | null;
-            /** Session End */
-            session_end?: string | null;
-            /** @default odd */
-            first_week_parity: components["schemas"]["Parity"];
+            /** Schedules */
+            schedules: components["schemas"]["SlotGridDay-Input"][];
         };
-        /** SemesterRead */
-        SemesterRead: {
+        /** SlotGridRead */
+        SlotGridRead: {
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Period Id */
+            period_id: string | null;
             /** Name */
             name: string;
-            /**
-             * Start Date
-             * Format: date
-             */
-            start_date: string;
-            /**
-             * Classes End
-             * Format: date
-             */
-            classes_end: string;
-            /** Session Start */
-            session_start: string | null;
-            /** Session End */
-            session_end: string | null;
-            first_week_parity: components["schemas"]["Parity"];
+            /** Weekday */
+            weekday: number | null;
+            /** Slots */
+            slots: components["schemas"]["SlotRead"][];
         };
-        /** SemesterUpdate */
-        SemesterUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Start Date */
-            start_date?: string | null;
-            /** Classes End */
-            classes_end?: string | null;
-            /** Session Start */
-            session_start?: string | null;
-            /** Session End */
-            session_end?: string | null;
-            first_week_parity?: components["schemas"]["Parity"] | null;
+        /** SlotIn */
+        "SlotIn-Input": {
+            /** Number */
+            number: number;
+            /**
+             * Start
+             * Format: time
+             */
+            start: string;
+            /**
+             * End
+             * Format: time
+             */
+            end: string;
+        };
+        /** SlotIn */
+        "SlotIn-Output": {
+            /** Number */
+            number: number;
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+        };
+        /** SlotRead */
+        SlotRead: {
+            /** Number */
+            number: number;
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
         };
         /** SourceCreate */
         SourceCreate: {
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /** Title */
             title: string;
             /**
@@ -4378,10 +6519,10 @@ export interface components {
              */
             id: string;
             /**
-             * Subject Id
+             * Area Id
              * Format: uuid
              */
-            subject_id: string;
+            area_id: string;
             /** Title */
             title: string;
             /** Author */
@@ -4412,8 +6553,8 @@ export interface components {
         SourceStatus: "to_read" | "reading" | "done";
         /** SourceUpdate */
         SourceUpdate: {
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Title */
             title?: string | null;
             /** Author */
@@ -4427,105 +6568,38 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** StudyDayLimitPut */
-        StudyDayLimitPut: {
-            /** Minutes */
-            minutes: number;
+        /**
+         * Span
+         * @description Интервал внутри суток; `end <= start` — до следующего дня (рабочее окно совы).
+         */
+        "Span-Input": {
+            /**
+             * Start
+             * Format: time
+             */
+            start: string;
+            /**
+             * End
+             * Format: time
+             */
+            end: string;
         };
-        /** StudyDayLimitRead */
-        StudyDayLimitRead: {
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            /** Minutes */
-            minutes: number;
+        /**
+         * Span
+         * @description Интервал внутри суток; `end <= start` — до следующего дня (рабочее окно совы).
+         */
+        "Span-Output": {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
         };
-        /** SubjectCreate */
-        SubjectCreate: {
-            /** Semester Id */
-            semester_id?: string | null;
-            /** Name */
-            name: string;
-            /** Short Name */
-            short_name?: string | null;
-            /**
-             * Color
-             * @default #3b82f6
-             */
-            color: string;
-            /** @default exam */
-            control_form: components["schemas"]["ControlForm"];
-            /** Teachers */
-            teachers?: components["schemas"]["Teacher"][];
-            /** Links */
-            links?: components["schemas"]["SubjectLink"][];
-            /** Synonyms */
-            synonyms?: string[];
-            /**
-             * Notes
-             * @default
-             */
-            notes: string;
-        };
-        /** SubjectLink */
-        SubjectLink: {
-            /**
-             * Title
-             * @default
-             */
-            title: string;
-            /**
-             * Url
-             * Format: uri
-             */
-            url: string;
-        };
-        /** SubjectRead */
-        SubjectRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Semester Id */
-            semester_id: string | null;
-            /** Name */
-            name: string;
-            /** Short Name */
-            short_name: string | null;
-            /** Color */
-            color: string;
-            control_form: components["schemas"]["ControlForm"];
-            /** Teachers */
-            teachers: components["schemas"]["Teacher"][];
-            /** Links */
-            links: components["schemas"]["SubjectLink"][];
-            /** Synonyms */
-            synonyms: string[];
-            /** Notes */
-            notes: string;
-        };
-        /** SubjectUpdate */
-        SubjectUpdate: {
-            /** Semester Id */
-            semester_id?: string | null;
-            /** Name */
-            name?: string | null;
-            /** Short Name */
-            short_name?: string | null;
-            /** Color */
-            color?: string | null;
-            control_form?: components["schemas"]["ControlForm"] | null;
-            /** Teachers */
-            teachers?: components["schemas"]["Teacher"][] | null;
-            /** Links */
-            links?: components["schemas"]["SubjectLink"][] | null;
-            /** Synonyms */
-            synonyms?: string[] | null;
-            /** Notes */
-            notes?: string | null;
+        /** SpanRead */
+        SpanRead: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
         };
         /** SubtaskCreate */
         SubtaskCreate: {
@@ -4660,27 +6734,33 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** TaskCreate */
+        /**
+         * TaskCreate
+         * @description Пустые поля заполняются умолчаниями типа задачи (если он задан).
+         */
         TaskCreate: {
             /** Title */
             title: string;
-            /** @default other */
-            task_type: components["schemas"]["TaskType"];
+            /**
+             * Task Type Id
+             * @description null — без типа
+             */
+            task_type_id?: string | null;
             /**
              * Description
              * @default
              */
             description: string;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /**
              * Category Id
-             * @description null — выводится: проект → тип действия → «Учёба»
+             * @description null — выводится: тип задачи → проект → тип действия
              */
             category_id?: string | null;
             /**
              * Action Type Id
-             * @description null — «Самостоятельная учёба»
+             * @description null — из типа задачи или тип по умолчанию (настройки)
              */
             action_type_id?: string | null;
             /** Time Window */
@@ -4722,11 +6802,12 @@ export interface components {
             id: string;
             /** Title */
             title: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Description */
             description: string;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Category Id */
             category_id: string | null;
             /** Action Type Id */
@@ -4756,6 +6837,26 @@ export interface components {
             recurrence: string | null;
             /** Recurrence Start */
             recurrence_start: string | null;
+            /**
+             * Earliest
+             * @description Не раньше (окно автозадачи)
+             */
+            earliest: string | null;
+            /**
+             * Deadline Auto
+             * @description Срок «к следующему вхождению» — следует за расписанием
+             */
+            deadline_auto: boolean;
+            /**
+             * Origin Event Id
+             * @description Автозадача: вхождение-источник
+             */
+            origin_event_id: string | null;
+            /**
+             * Origin Rule Id
+             * @description Автозадача: правило
+             */
+            origin_rule_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4779,6 +6880,7 @@ export interface components {
             progress: number;
             /** Subtasks */
             subtasks: components["schemas"]["SubtaskRead"][];
+            origin_event: components["schemas"]["OriginEvent"] | null;
         };
         /** TaskRead */
         TaskRead: {
@@ -4789,11 +6891,12 @@ export interface components {
             id: string;
             /** Title */
             title: string;
-            task_type: components["schemas"]["TaskType"];
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Description */
             description: string;
-            /** Subject Id */
-            subject_id: string | null;
+            /** Area Id */
+            area_id: string | null;
             /** Category Id */
             category_id: string | null;
             /** Action Type Id */
@@ -4823,6 +6926,26 @@ export interface components {
             recurrence: string | null;
             /** Recurrence Start */
             recurrence_start: string | null;
+            /**
+             * Earliest
+             * @description Не раньше (окно автозадачи)
+             */
+            earliest: string | null;
+            /**
+             * Deadline Auto
+             * @description Срок «к следующему вхождению» — следует за расписанием
+             */
+            deadline_auto: boolean;
+            /**
+             * Origin Event Id
+             * @description Автозадача: вхождение-источник
+             */
+            origin_event_id: string | null;
+            /**
+             * Origin Rule Id
+             * @description Автозадача: правило
+             */
+            origin_rule_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4849,21 +6972,93 @@ export interface components {
          * TaskStatus
          * @enum {string}
          */
-        TaskStatus: "active" | "done" | "cancelled";
-        /**
-         * TaskType
-         * @enum {string}
-         */
-        TaskType: "homework" | "report" | "essay" | "lab" | "coursework" | "reading" | "exam_prep" | "other";
+        TaskStatus: "active" | "done" | "cancelled" | "proposed";
+        /** TaskTypeCreate */
+        TaskTypeCreate: {
+            /** Name */
+            name: string;
+            /** @default tag */
+            icon: components["schemas"]["CategoryIcon"];
+            /**
+             * Synonyms
+             * @description Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание
+             */
+            synonyms?: string[];
+            /** Default Action Type Id */
+            default_action_type_id?: string | null;
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            /**
+             * Deadline Rule
+             * @description Как вывести срок; тип с правилом — «быстрый тип» в ＋
+             */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
+            /** Default Project Id */
+            default_project_id?: string | null;
+            /** Default Template Id */
+            default_template_id?: string | null;
+        };
+        /** TaskTypeRead */
+        TaskTypeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            icon: components["schemas"]["CategoryIcon"];
+            /** Synonyms */
+            synonyms: string[];
+            /** Default Action Type Id */
+            default_action_type_id: string | null;
+            /** Default Category Id */
+            default_category_id: string | null;
+            /** Default Estimate Min */
+            default_estimate_min: number | null;
+            /** Deadline Rule */
+            deadline_rule: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
+            /** Default Project Id */
+            default_project_id: string | null;
+            /** Default Template Id */
+            default_template_id: string | null;
+            /** Position */
+            position: number;
+        };
+        /** TaskTypeUpdate */
+        TaskTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            icon?: components["schemas"]["CategoryIcon"] | null;
+            /** Synonyms */
+            synonyms?: string[] | null;
+            /** Default Action Type Id */
+            default_action_type_id?: string | null;
+            /** Default Category Id */
+            default_category_id?: string | null;
+            /** Default Estimate Min */
+            default_estimate_min?: number | null;
+            /** Deadline Rule */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
+            /** Default Project Id */
+            default_project_id?: string | null;
+            /** Default Template Id */
+            default_template_id?: string | null;
+            /** Position */
+            position?: number | null;
+        };
         /** TaskUpdate */
         TaskUpdate: {
             /** Title */
             title?: string | null;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Description */
             description?: string | null;
-            /** Subject Id */
-            subject_id?: string | null;
+            /** Area Id */
+            area_id?: string | null;
             /** Category Id */
             category_id?: string | null;
             /** Action Type Id */
@@ -4889,21 +7084,6 @@ export interface components {
             /** Recurrence Start */
             recurrence_start?: string | null;
         };
-        /** Teacher */
-        Teacher: {
-            /** Name */
-            name: string;
-            /**
-             * Role
-             * @default
-             */
-            role: string;
-            /**
-             * Contact
-             * @default
-             */
-            contact: string;
-        };
         /** TelegramLinkCodeRead */
         TelegramLinkCodeRead: {
             /** Code */
@@ -4927,7 +7107,8 @@ export interface components {
         TemplateCreate: {
             /** Name */
             name: string;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
         };
@@ -4940,7 +7121,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            task_type: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id: string | null;
             /** Steps */
             steps: components["schemas"]["BreakdownStep"][];
             /** Total Estimate Min */
@@ -4956,12 +7138,13 @@ export interface components {
          * @description Откуда материализовано вхождение.
          * @enum {string}
          */
-        TemplateType: "class_rule" | "recurring";
+        TemplateType: "schedule_rule";
         /** TemplateUpdate */
         TemplateUpdate: {
             /** Name */
             name?: string | null;
-            task_type?: components["schemas"]["TaskType"] | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
         };
         /**
          * TimeRange
@@ -5010,6 +7193,12 @@ export interface components {
             /** End */
             end: string;
         };
+        /**
+         * TodayCard
+         * @description Карточки «Сегодня», которые можно выключить.
+         * @enum {string}
+         */
+        TodayCard: "now_next" | "progress" | "review" | "day" | "free" | "deadlines";
         /** UserRead */
         UserRead: {
             /**
@@ -5022,46 +7211,22 @@ export interface components {
             /** Timezone */
             timezone: string;
         };
-        /** UserSettings */
+        /**
+         * UserSettings
+         * @description Сон, обед и рабочие часы — в режимах дня (`day_profiles`, M18).
+         */
         UserSettings: {
             /**
-             * @default {
-             *       "weekdays": {
-             *         "end": "21:00",
-             *         "start": "09:00"
-             *       },
-             *       "weekends": {
-             *         "end": "19:00",
-             *         "start": "11:00"
-             *       }
-             *     }
+             * About
+             * @description О себе — для ИИ: чем занят, где учится или работает (до 1000 символов)
+             * @default
              */
-            work_hours: components["schemas"]["WorkHours"];
+            about: string;
             /**
-             * @default {
-             *       "start": "23:30",
-             *       "end": "07:30"
-             *     }
+             * Default Action Type Id
+             * @description Тип действия задач и дел без своего типа; null — без типа
              */
-            sleep: components["schemas"]["TimeRange"];
-            /**
-             * @default {
-             *       "start": "13:00",
-             *       "end": "14:00"
-             *     }
-             */
-            lunch: components["schemas"]["DayRange"];
-            /**
-             * Travel Buffer Min
-             * @description Дорога до университета и обратно, мин
-             * @default 60
-             */
-            travel_buffer_min: number;
-            /**
-             * Study Limit Min Per Day
-             * @default 360
-             */
-            study_limit_min_per_day: number;
+            default_action_type_id: string | null;
             /**
              * Deadline Buffer Days
              * @description Закончить за N дней до дедлайна
@@ -5069,6 +7234,7 @@ export interface components {
              */
             deadline_buffer_days: number;
             /**
+             * @description Для режимов дня без «тихие часы — сон режима»
              * @default {
              *       "start": "22:30",
              *       "end": "08:00"
@@ -5077,8 +7243,8 @@ export interface components {
             quiet_hours: components["schemas"]["TimeRange"];
             /**
              * @default {
-             *       "morning_digest": "08:00",
-             *       "evening_review": "21:30",
+             *       "morning_digest_after_wake_min": 30,
+             *       "evening_review_before_sleep_min": 120,
              *       "weekly_review_weekday": 7,
              *       "weekly_review": "19:00"
              *     }
@@ -5092,14 +7258,6 @@ export interface components {
              *           "telegram"
              *         ],
              *         "enabled": true
-             *       },
-             *       "before_class": {
-             *         "channels": [
-             *           "push",
-             *           "telegram"
-             *         ],
-             *         "enabled": true,
-             *         "minutes_before": 15
              *       },
              *       "deadlines": {
              *         "channels": [
@@ -5156,24 +7314,35 @@ export interface components {
              * @default false
              */
             onboarding_done: boolean;
+            /**
+             * Nav
+             * @description Вкладки после закреплённых «Сегодня», «Календарь», «＋»: areas, tasks, projects, notes, inbox, area:<id>, area_type:<id>
+             */
+            nav: string[];
+            /**
+             * Today Cards
+             * @description Включённые карточки «Сегодня»
+             */
+            today_cards: components["schemas"]["TodayCard"][];
         };
         /** UserSettingsPatch */
         UserSettingsPatch: {
-            work_hours?: components["schemas"]["WorkHoursPatch"] | null;
-            sleep?: components["schemas"]["TimeRangePatch"] | null;
-            lunch?: components["schemas"]["DayRangePatch"] | null;
             /**
-             * Travel Buffer Min
-             * @description Дорога до университета и обратно, мин
+             * About
+             * @description О себе — для ИИ: чем занят, где учится или работает (до 1000 символов)
              */
-            travel_buffer_min?: number | null;
-            /** Study Limit Min Per Day */
-            study_limit_min_per_day?: number | null;
+            about?: string | null;
+            /**
+             * Default Action Type Id
+             * @description Тип действия задач и дел без своего типа; null — без типа
+             */
+            default_action_type_id?: string | null;
             /**
              * Deadline Buffer Days
              * @description Закончить за N дней до дедлайна
              */
             deadline_buffer_days?: number | null;
+            /** @description Для режимов дня без «тихие часы — сон режима» */
             quiet_hours?: components["schemas"]["TimeRangePatch"] | null;
             schedule?: components["schemas"]["SchedulePatch"] | null;
             reminders?: components["schemas"]["RemindersPatch"] | null;
@@ -5188,6 +7357,21 @@ export interface components {
              * @description Первичная настройка пройдена или пропущена
              */
             onboarding_done?: boolean | null;
+            /**
+             * Nav
+             * @description Вкладки после закреплённых «Сегодня», «Календарь», «＋»: areas, tasks, projects, notes, inbox, area:<id>, area_type:<id>
+             */
+            nav?: string[] | null;
+            /**
+             * Today Cards
+             * @description Включённые карточки «Сегодня»
+             */
+            today_cards?: components["schemas"]["TodayCard"][] | null;
+        };
+        /** UserUpdate */
+        UserUpdate: {
+            /** Timezone */
+            timezone?: string | null;
         };
         /** WeekConfirm */
         WeekConfirm: {
@@ -5220,6 +7404,21 @@ export interface components {
             /** Backlog Done */
             backlog_done: number;
         };
+        /** WeeklyPatternIn */
+        WeeklyPatternIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "weekly";
+            /** Weekdays */
+            weekdays: number[];
+            /**
+             * Cycle Weeks
+             * @description Недели цикла; null — каждую
+             */
+            cycle_weeks?: number[] | null;
+        };
         /** WeeklyReview */
         WeeklyReview: {
             /**
@@ -5242,62 +7441,6 @@ export interface components {
             planned: components["schemas"]["BacklogRead"][];
             /** Suggestions */
             suggestions: components["schemas"]["BacklogRead"][];
-        };
-        /** WorkHours */
-        WorkHours: {
-            /**
-             * @default {
-             *       "start": "09:00",
-             *       "end": "21:00"
-             *     }
-             */
-            weekdays: components["schemas"]["DayRange"];
-            /**
-             * @default {
-             *       "start": "11:00",
-             *       "end": "19:00"
-             *     }
-             */
-            weekends: components["schemas"]["DayRange"];
-        };
-        /** WorkHoursPatch */
-        WorkHoursPatch: {
-            weekdays?: components["schemas"]["DayRangePatch"] | null;
-            weekends?: components["schemas"]["DayRangePatch"] | null;
-        };
-        /**
-         * WorkTaskCreate
-         * @description «Задание с работы»: категория «Работа», дедлайн = выдача + 14 дней, проект ВКР.
-         */
-        WorkTaskCreate: {
-            /** Title */
-            title: string;
-            /**
-             * Description
-             * @default
-             */
-            description: string;
-            /**
-             * Issued At
-             * @description null — сегодня
-             */
-            issued_at?: string | null;
-            /**
-             * Deadline
-             * @description null — выдача + 14 дней, 23:59
-             */
-            deadline?: string | null;
-            /**
-             * Project Id
-             * @description null — проект «по умолчанию для заданий с работы»
-             */
-            project_id?: string | null;
-            /**
-             * No Project
-             * @description Не привязывать к проекту
-             * @default false
-             */
-            no_project: boolean;
         };
     };
     responses: never;
@@ -5594,6 +7737,102 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6140,7 +8379,7 @@ export interface operations {
             };
         };
     };
-    list_semesters: {
+    list_event_types: {
         parameters: {
             query?: never;
             header?: never;
@@ -6155,7 +8394,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SemesterRead"][];
+                    "application/json": components["schemas"]["EventTypeRead"][];
                 };
             };
             /** @description Bad Request */
@@ -6232,7 +8471,7 @@ export interface operations {
             };
         };
     };
-    create_semester: {
+    create_event_type: {
         parameters: {
             query?: never;
             header?: never;
@@ -6241,7 +8480,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SemesterCreate"];
+                "application/json": components["schemas"]["EventTypeCreate"];
             };
         };
         responses: {
@@ -6251,7 +8490,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SemesterRead"];
+                    "application/json": components["schemas"]["EventTypeRead"];
                 };
             };
             /** @description Bad Request */
@@ -6328,12 +8567,12 @@ export interface operations {
             };
         };
     };
-    delete_semester: {
+    delete_event_type: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                semester_id: string;
+                type_id: string;
             };
             cookie?: never;
         };
@@ -6420,18 +8659,18 @@ export interface operations {
             };
         };
     };
-    update_semester: {
+    update_event_type: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                semester_id: string;
+                type_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SemesterUpdate"];
+                "application/json": components["schemas"]["EventTypeUpdate"];
             };
         };
         responses: {
@@ -6441,7 +8680,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SemesterRead"];
+                    "application/json": components["schemas"]["EventTypeRead"];
                 };
             };
             /** @description Bad Request */
@@ -6518,13 +8757,11 @@ export interface operations {
             };
         };
     };
-    list_bells: {
+    list_periods: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                semester_id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -6535,7 +8772,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BellScheduleRead"][];
+                    "application/json": components["schemas"]["PeriodRead"][];
                 };
             };
             /** @description Bad Request */
@@ -6612,18 +8849,206 @@ export interface operations {
             };
         };
     };
-    replace_bells: {
+    create_period: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeriodCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_period: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                semester_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_period: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BellsReplace"];
+                "application/json": components["schemas"]["PeriodUpdate"];
             };
         };
         responses: {
@@ -6633,8 +9058,290 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BellScheduleRead"][];
+                    "application/json": components["schemas"]["PeriodRead"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_slot_grids: {
+        parameters: {
+            query?: {
+                period_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotGridRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_slot_grid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlotGridPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotGridRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_slot_grid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grid_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {
@@ -7088,10 +9795,12 @@ export interface operations {
             };
         };
     };
-    list_subjects: {
+    list_schedule_rules: {
         parameters: {
             query?: {
-                semester_id?: string | null;
+                period_id?: string | null;
+                area_id?: string | null;
+                event_type_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -7105,7 +9814,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SubjectRead"][];
+                    "application/json": components["schemas"]["ScheduleRuleRead"][];
                 };
             };
             /** @description Bad Request */
@@ -7182,7 +9891,7 @@ export interface operations {
             };
         };
     };
-    create_subject: {
+    create_schedule_rule: {
         parameters: {
             query?: never;
             header?: never;
@@ -7191,7 +9900,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SubjectCreate"];
+                "application/json": components["schemas"]["ScheduleRuleCreate"];
             };
         };
         responses: {
@@ -7201,7 +9910,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SubjectRead"];
+                    "application/json": components["schemas"]["ScheduleRuleRead"];
                 };
             };
             /** @description Bad Request */
@@ -7278,481 +9987,7 @@ export interface operations {
             };
         };
     };
-    read_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    update_subject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                subject_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubjectUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    list_class_rules: {
-        parameters: {
-            query?: {
-                semester_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ClassRuleRead"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    create_class_rule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ClassRuleCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ClassRuleRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_class_rule: {
+    delete_schedule_rule: {
         parameters: {
             query?: never;
             header?: never;
@@ -7844,7 +10079,7 @@ export interface operations {
             };
         };
     };
-    update_class_rule: {
+    update_schedule_rule: {
         parameters: {
             query?: never;
             header?: never;
@@ -7855,7 +10090,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ClassRuleUpdate"];
+                "application/json": components["schemas"]["ScheduleRuleUpdate"];
             };
         };
         responses: {
@@ -7865,7 +10100,859 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClassRuleRead"];
+                    "application/json": components["schemas"]["ScheduleRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_area_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_area_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_areas: {
+        parameters: {
+            query?: {
+                period_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_area: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                area_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AreaRead"];
                 };
             };
             /** @description Bad Request */
@@ -8511,384 +11598,6 @@ export interface operations {
             };
         };
     };
-    list_recurring_events: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringEventRead"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    create_recurring_event: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecurringEventCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringEventRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_recurring_event: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                recurring_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    update_recurring_event: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                recurring_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecurringEventUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecurringEventRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     list_categories: {
         parameters: {
             query?: never;
@@ -9359,6 +12068,194 @@ export interface operations {
             };
         };
     };
+    create_action_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_action_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     update_action_type: {
         parameters: {
             query?: never;
@@ -9551,11 +12448,2289 @@ export interface operations {
             };
         };
     };
+    list_task_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_task_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_type_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_budgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoadBudgetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_budget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoadBudgetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadBudgetRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetOverridePut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetOverrideRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budget_id: string;
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_days: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileDay"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_day: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileDayPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileDay"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileRuleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayProfileRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayProfileRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_event_rules: {
+        parameters: {
+            query?: {
+                event_type_id?: string | null;
+                schedule_rule_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRuleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_tasks: {
         parameters: {
             query?: {
                 status?: components["schemas"]["TaskStatus"][];
-                subject_id?: string | null;
+                area_id?: string | null;
                 project_id?: string | null;
                 due_before?: string | null;
             };
@@ -9658,102 +14833,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskDetail"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    create_work_task: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkTaskCreate"];
             };
         };
         responses: {
@@ -11464,6 +16543,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["ProjectStatus"][];
+                area_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -12225,7 +17305,7 @@ export interface operations {
     list_notes: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
                 event_id?: string[];
                 limit?: number;
             };
@@ -12797,7 +17877,7 @@ export interface operations {
     list_sources: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13370,7 +18450,7 @@ export interface operations {
         parameters: {
             query: {
                 q: string;
-                subject_id?: string | null;
+                area_id?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -14488,288 +19568,6 @@ export interface operations {
             };
         };
     };
-    list_day_limits: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyDayLimitRead"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    put_day_limit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                day: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StudyDayLimitPut"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyDayLimitRead"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    delete_day_limit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                day: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     list_calibration: {
         parameters: {
             query?: never;
@@ -14954,10 +19752,11 @@ export interface operations {
             };
         };
     };
-    list_exams: {
+    list_plans: {
         parameters: {
             query?: {
-                subject_id?: string | null;
+                area_id?: string | null;
+                event_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -14971,7 +19770,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamRead"][];
+                    "application/json": components["schemas"]["PrepPlanRead"][];
                 };
             };
             /** @description Bad Request */
@@ -15048,7 +19847,7 @@ export interface operations {
             };
         };
     };
-    create_exam: {
+    create_plan: {
         parameters: {
             query?: never;
             header?: never;
@@ -15057,7 +19856,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamCreate"];
+                "application/json": components["schemas"]["PrepPlanCreate"];
             };
         };
         responses: {
@@ -15067,7 +19866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15144,12 +19943,12 @@ export interface operations {
             };
         };
     };
-    read_exam: {
+    read_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -15161,7 +19960,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15238,12 +20037,14 @@ export interface operations {
             };
         };
     };
-    delete_exam: {
+    delete_plan: {
         parameters: {
-            query?: never;
+            query?: {
+                with_event?: boolean;
+            };
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -15330,18 +20131,18 @@ export interface operations {
             };
         };
     };
-    update_exam: {
+    update_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamUpdate"];
+                "application/json": components["schemas"]["PrepPlanUpdate"];
             };
         };
         responses: {
@@ -15351,7 +20152,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15428,18 +20229,18 @@ export interface operations {
             };
         };
     };
-    import_questions: {
+    import_items: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionsImport"];
+                "application/json": components["schemas"]["PrepItemsImport"];
             };
         };
         responses: {
@@ -15449,7 +20250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15526,18 +20327,18 @@ export interface operations {
             };
         };
     };
-    add_question: {
+    add_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionCreate"];
+                "application/json": components["schemas"]["PrepItemCreate"];
             };
         };
         responses: {
@@ -15547,7 +20348,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15624,12 +20425,12 @@ export interface operations {
             };
         };
     };
-    enable_exam_plan: {
+    enable_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -15641,7 +20442,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15718,12 +20519,12 @@ export interface operations {
             };
         };
     };
-    disable_exam_plan: {
+    disable_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -15735,7 +20536,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -15812,12 +20613,12 @@ export interface operations {
             };
         };
     };
-    delete_question: {
+    delete_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: string;
+                item_id: string;
             };
             cookie?: never;
         };
@@ -15904,18 +20705,18 @@ export interface operations {
             };
         };
     };
-    update_question: {
+    update_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: string;
+                item_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionUpdate"];
+                "application/json": components["schemas"]["PrepItemUpdate"];
             };
         };
         responses: {
@@ -15925,7 +20726,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamQuestionRead"];
+                    "application/json": components["schemas"]["PrepItemRead"];
                 };
             };
             /** @description Bad Request */
@@ -18502,6 +23303,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigBundle-Output"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_config: {
+        parameters: {
+            query?: {
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigBundle-Input"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleImportResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start_ai_setup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStarted"];
                 };
             };
             /** @description Bad Request */

@@ -2,11 +2,11 @@ import { type QueryClient, queryOptions, useMutation, useQuery, useQueryClient }
 import { toast } from 'sonner'
 
 import type { components } from '@/api/schema'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
 import { wallDate } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 export type CalendarEvent = components['schemas']['EventRead']
 export type CalendarData = components['schemas']['CalendarRead']
@@ -14,9 +14,6 @@ export type EventCreate = components['schemas']['EventCreate']
 export type EventUpdate = components['schemas']['EventUpdate']
 export type EventKind = components['schemas']['EventKind']
 export type EventStatus = components['schemas']['EventStatus']
-export type RecurringEvent = components['schemas']['RecurringEventRead']
-export type RecurringEventCreate = components['schemas']['RecurringEventCreate']
-export type RecurringEventUpdate = components['schemas']['RecurringEventUpdate']
 
 export function calendarQueryOptions(from: string, to: string) {
   return queryOptions({
@@ -120,7 +117,7 @@ export function useUpdateEvent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
       // «Сделано» на блоке закрывает и источник: подзадачу, дело из ящика, день подготовки
       if (body.status) {
-        for (const queryKey of [queryKeys.tasks, queryKeys.backlogAll, queryKeys.examsAll, queryKeys.review]) {
+        for (const queryKey of [queryKeys.tasks, queryKeys.backlogAll, queryKeys.prepAll, queryKeys.review]) {
           queryClient.invalidateQueries({ queryKey })
         }
       }
@@ -156,70 +153,6 @@ export function useResetEvent() {
       invalidate()
       toast.success('Вернули как в расписании')
     },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-}
-
-// ---------- личные повторы ----------
-
-export function useRecurringEvents() {
-  return useQuery({
-    queryKey: queryKeys.recurring,
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/recurring-events')
-      if (error) throw error
-      return data
-    },
-  })
-}
-
-function useInvalidateRecurring() {
-  const queryClient = useQueryClient()
-  return () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.recurring })
-    queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
-  }
-}
-
-export function useCreateRecurring() {
-  const invalidate = useInvalidateRecurring()
-  return useMutation({
-    mutationFn: async (body: RecurringEventCreate) => {
-      const { data, error } = await api.POST('/api/v1/recurring-events', { body })
-      if (error) throw error
-      return data
-    },
-    onSuccess: invalidate,
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-}
-
-export function useUpdateRecurring() {
-  const invalidate = useInvalidateRecurring()
-  return useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: RecurringEventUpdate }) => {
-      const { data, error } = await api.PATCH('/api/v1/recurring-events/{recurring_id}', {
-        params: { path: { recurring_id: id } },
-        body,
-      })
-      if (error) throw error
-      return data
-    },
-    onSuccess: invalidate,
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-}
-
-export function useDeleteRecurring() {
-  const invalidate = useInvalidateRecurring()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await api.DELETE('/api/v1/recurring-events/{recurring_id}', {
-        params: { path: { recurring_id: id } },
-      })
-      if (error) throw error
-    },
-    onSuccess: invalidate,
     onError: (error) => toast.error(errorMessage(error)),
   })
 }

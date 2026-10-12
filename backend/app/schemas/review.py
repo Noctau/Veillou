@@ -10,12 +10,16 @@ from app.schemas.backlog import BacklogRead
 from app.schemas.common import InputModel, UTCMoment
 from app.schemas.event import EventRead
 from app.schemas.plan import PlanState
+from app.schemas.task import TaskRead
 
 
 class EveningReview(BaseModel):
     date: date
     items: list[EventRead] = Field(description="Начатые и прошедшие блоки дня без отметки")
     done: int = Field(description="Сколько блоков дня уже отмечено «сделано»")
+    proposals: list[TaskRead] = Field(
+        description="Предложения автозадач: «Взять» — status active, «Не надо» — cancelled",
+    )
 
 
 class RescheduleRequest(InputModel):

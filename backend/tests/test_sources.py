@@ -6,7 +6,8 @@ from httpx import AsyncClient
 from app.core.storage import LocalStorage, get_storage
 from app.main import app
 
-from .test_schedule_api import API, make_semester, make_subject, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
+from .test_tasks import seed_task_type
 
 
 @pytest.fixture(autouse=True)
@@ -16,8 +17,8 @@ def storage(tmp_path: Path):
     app.dependency_overrides.pop(get_storage, None)
 
 
-async def make_source(client: AsyncClient, subject_id: str, **over) -> dict:
-    body = {"subject_id": subject_id, "title": "Курс общей метеорологии", **over}
+async def make_source(client: AsyncClient, area_id: str, **over) -> dict:
+    body = {"area_id": area_id, "title": "Курс общей метеорологии", **over}
     resp = await client.post(f"{API}/sources", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -25,8 +26,8 @@ async def make_source(client: AsyncClient, subject_id: str, **over) -> dict:
 
 @pytest.fixture
 async def subject(auth_client: AsyncClient) -> dict:
-    sem = await make_semester(auth_client)
-    return await make_subject(auth_client, sem["id"])
+    sem = await make_period(auth_client)
+    return await make_area(auth_client, sem["id"])
 
 
 async def test_requires_auth(client: AsyncClient):
@@ -51,7 +52,7 @@ async def test_source_crud_and_order(auth_client: AsyncClient, subject):
     resp = await auth_client.patch(f"{API}/sources/{site['id']}", json={"title": None})
     assert resp.status_code == 400
 
-    listed = (await auth_client.get(f"{API}/sources", params={"subject_id": subject["id"]})).json()
+    listed = (await auth_client.get(f"{API}/sources", params={"area_id": subject["id"]})).json()
     # Обязательные первыми, «читаю» выше «прочитать»; дополнительные — в конце
     assert [s["id"] for s in listed] == [site["id"], book["id"], extra["id"]]
     assert listed[2]["url"] == "https://elibrary.ru/item.asp?id=1"
@@ -71,7 +72,9 @@ async def test_source_file(auth_client: AsyncClient, subject):
     assert (await auth_client.get(f"{API}/sources/{source['id']}")).json()["files_count"] == 1
 
 
-async def test_reading_task(auth_client: AsyncClient, subject):
+async def test_reading_task(auth_client: AsyncClient, subject, session, user):
+    reading_id = await seed_task_type(session, user.id, "reading", "Чтение")
+    await seed_task_type(session, user.id, "lab", "Лабораторная")
     source = await make_source(
         auth_client, subject["id"], author="Матвеев Л. Т.", url="https://example.com/book"
     )
@@ -82,14 +85,15 @@ async def test_reading_task(auth_client: AsyncClient, subject):
     assert resp.status_code == 201, resp.text
     task = resp.json()
     assert task["title"] == "Прочитать главы 3–5 — Курс общей метеорологии"
-    assert task["task_type"] == "reading"
-    assert task["subject_id"] == subject["id"]
+    # Тип — по глаголу «Прочитать», а не по словам из названия источника
+    assert task["task_type_id"] == str(reading_id)
+    assert task["area_id"] == subject["id"]
     assert (
         task["description"] == "Матвеев Л. Т. — Курс общей метеорологии\nhttps://example.com/book"
     )
     assert task["deadline"] == "2026-10-15T20:59:00Z"
 
-    tasks = (await auth_client.get(f"{API}/tasks", params={"subject_id": subject["id"]})).json()
+    tasks = (await auth_client.get(f"{API}/tasks", params={"area_id": subject["id"]})).json()
     assert [t["id"] for t in tasks] == [task["id"]]
 
     resp = await auth_client.post(f"{API}/sources/{source['id']}/reading-task", json={})
@@ -103,7 +107,5 @@ async def test_isolation(auth_client: AsyncClient, session, subject):
         assert (await other.get(f"{API}/sources/{source['id']}")).status_code == 404
         resp = await other.post(f"{API}/sources/{source['id']}/reading-task", json={})
         assert resp.status_code == 404
-        resp = await other.post(
-            f"{API}/sources", json={"subject_id": subject["id"], "title": "Чужой"}
-        )
+        resp = await other.post(f"{API}/sources", json={"area_id": subject["id"], "title": "Чужой"})
         assert resp.status_code == 404

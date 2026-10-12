@@ -1,21 +1,13 @@
 import uuid
-from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser, SessionDep
 from app.domain.enums import PlanReason
-from app.schemas.plan import (
-    CalibrationRead,
-    PlanState,
-    PlanUndoResult,
-    StudyDayLimitPut,
-    StudyDayLimitRead,
-)
+from app.schemas.plan import CalibrationRead, PlanState, PlanUndoResult
 from app.services import calibration
 from app.services.replan import ReplanService, plan_state, revision_read
-from app.services.study_limits import StudyLimitService
 
 
 def get_service(db: SessionDep, user: CurrentUser) -> ReplanService:
@@ -65,36 +57,12 @@ async def undo_plan(svc: Service) -> PlanUndoResult:
     return PlanUndoResult(revision=revision_read(rev), restored=restored, skipped=skipped)
 
 
-# ---------- разовый лимит учёбы ----------
-
-
-@router.get("/day-limits")
-async def list_day_limits(db: SessionDep, user: CurrentUser) -> list[StudyDayLimitRead]:
-    """Разовые лимиты учёбы на сегодня и дальше."""
-    items = await StudyLimitService(db, user).list()
-    return [StudyDayLimitRead.model_validate(i) for i in items]
-
-
-@router.put("/day-limits/{day}")
-async def put_day_limit(
-    day: date, data: StudyDayLimitPut, db: SessionDep, user: CurrentUser
-) -> StudyDayLimitRead:
-    """«Расширить часы в этот день»: лимит учёбы на дату вместо общего."""
-    item = await StudyLimitService(db, user).put(day, data.minutes)
-    return StudyDayLimitRead.model_validate(item)
-
-
-@router.delete("/day-limits/{day}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_day_limit(day: date, db: SessionDep, user: CurrentUser) -> None:
-    await StudyLimitService(db, user).delete(day)
-
-
 # ---------- калибровка ----------
 
 
 @calibration_router.get("")
 async def list_calibration(db: SessionDep, user: CurrentUser) -> list[CalibrationRead]:
-    """Коэффициенты оценок по (тип задания, тип действия) — только где есть отметки."""
+    """Коэффициенты оценок по (тип задачи, тип действия) — только где есть отметки."""
     rows = await calibration.list_calibrations(db, user.id)
     return [CalibrationRead.model_validate(r) for r in rows]
 

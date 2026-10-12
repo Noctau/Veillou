@@ -3,7 +3,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, Index, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,12 +34,14 @@ class AILog(UserOwnedMixin, Base):
 class BreakdownTemplate(UserOwnedMixin, Base):
     """Сохранённая разбивка — применяется без ИИ (M10.4).
 
-    `steps`: [{title, estimate_min, action_type (ключ), depends_on: [индексы], note}].
-    Тип действия хранится ключом, а не id: шаблон переживает пересоздание справочника.
+    `steps`: [{title, estimate_min, action_type_id, depends_on: [индексы], note}].
+    Удалённый тип действия в шаге — как «без типа» (тип по умолчанию).
     """
 
     __tablename__ = "breakdown_templates"
 
     name: Mapped[str] = mapped_column(String(200))
-    task_type: Mapped[str | None] = mapped_column(String(20))
+    task_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("task_types.id", ondelete="SET NULL")
+    )
     steps: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

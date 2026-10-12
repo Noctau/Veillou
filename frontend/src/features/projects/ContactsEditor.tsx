@@ -28,7 +28,7 @@ export function ContactsEditor({ project }: { project: ProjectDetail }) {
             </Button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="научный руководитель" aria-label="Роль" value={c.role ?? ''} onChange={(e) => patch(i, { role: e.target.value })} />
+            <Input placeholder="руководитель, заказчик" aria-label="Роль" value={c.role ?? ''} onChange={(e) => patch(i, { role: e.target.value })} />
             <Input placeholder="почта, телефон" aria-label="Контакт" value={c.contact ?? ''} onChange={(e) => patch(i, { contact: e.target.value })} />
           </div>
         </div>

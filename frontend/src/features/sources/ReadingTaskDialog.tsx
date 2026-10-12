@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { formatMinutes } from '@/features/tasks/labels'
 import { wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { type Source, useCreateReadingTask } from './useSources'
 

@@ -6,18 +6,23 @@ from fastapi.routing import APIRoute
 
 from app.api import (
     ai,
+    areas,
     attachments,
     auth,
     backlog,
+    budgets,
     catalog,
+    config,
+    day_profiles,
+    event_rules,
     events,
-    exams,
     free,
     health,
     me,
     notes,
     notify,
     plan,
+    prep,
     projects,
     quickadd,
     review,
@@ -63,10 +68,13 @@ def create_app() -> FastAPI:
     api.include_router(me.router)
     api.include_router(telegram.router)
     api.include_router(schedule.router)
+    api.include_router(areas.router)
     api.include_router(events.router)
     api.include_router(events.calendar_router)
-    api.include_router(events.recurring_router)
     api.include_router(catalog.router)
+    api.include_router(budgets.router)
+    api.include_router(day_profiles.router)
+    api.include_router(event_rules.router)
     api.include_router(tasks.router)
     api.include_router(quickadd.router)
     api.include_router(backlog.router)
@@ -78,13 +86,14 @@ def create_app() -> FastAPI:
     api.include_router(notify.actions_router)
     api.include_router(plan.router)
     api.include_router(plan.calibration_router)
-    api.include_router(exams.router)
-    api.include_router(exams.questions_router)
+    api.include_router(prep.router)
+    api.include_router(prep.items_router)
     api.include_router(review.router)
     api.include_router(free.router)
     api.include_router(attachments.router)
     api.include_router(attachments.files_router)
     api.include_router(ai.router)
+    api.include_router(config.router)
     app.include_router(api)
     return app
 

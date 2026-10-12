@@ -11,8 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DIGEST_TIMING_UI as D } from '@/lib/terms'
 
-import { TimeField, TimeRangeField } from '../fields'
+import { NumberField, TimeRangeField } from '../fields'
 import { SettingsSection } from '../SettingsSection'
 import { useUpdateSettings, type UserSettings } from '../useSettings'
 import { anyRange, intIn, wallTime } from '../zod'
@@ -21,8 +22,8 @@ const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Ч�
 
 const schema = z.object({
   schedule: z.object({
-    morning_digest: wallTime,
-    evening_review: wallTime,
+    morning_digest_after_wake_min: intIn(-720, 720),
+    evening_review_before_sleep_min: intIn(-720, 720),
     weekly_review_weekday: intIn(1, 7),
     weekly_review: wallTime,
   }),
@@ -45,17 +46,23 @@ export function ScheduleSection({ settings }: { settings: UserSettings }) {
       isDirty={isDirty}
       isSaving={update.isPending}
     >
-      <TimeField
-        id="morning_digest"
-        label="Утренняя сводка"
-        error={errors.schedule?.morning_digest?.message}
-        {...register('schedule.morning_digest')}
+      <NumberField
+        id="morning_digest_after_wake_min"
+        label={D.digest}
+        description={D.digestHint}
+        suffix={D.minutes}
+        step={5}
+        error={errors.schedule?.morning_digest_after_wake_min?.message}
+        {...register('schedule.morning_digest_after_wake_min', { valueAsNumber: true })}
       />
-      <TimeField
-        id="evening_review"
-        label="Вечерний разбор"
-        error={errors.schedule?.evening_review?.message}
-        {...register('schedule.evening_review')}
+      <NumberField
+        id="evening_review_before_sleep_min"
+        label={D.review}
+        description={D.reviewHint}
+        suffix={D.minutes}
+        step={5}
+        error={errors.schedule?.evening_review_before_sleep_min?.message}
+        {...register('schedule.evening_review_before_sleep_min', { valueAsNumber: true })}
       />
       <Field>
         <FieldLabel htmlFor="weekly_review_weekday">Недельный разбор</FieldLabel>
@@ -92,7 +99,7 @@ export function ScheduleSection({ settings }: { settings: UserSettings }) {
       </Field>
       <TimeRangeField
         label="Тихие часы"
-        description="Уведомления в это время откладываются до утра."
+        description="Для режимов дня, где тихие часы не совпадают со сном. Уведомления в это время откладываются."
         start={register('quiet_hours.start')}
         end={register('quiet_hours.end')}
         error={errors.quiet_hours?.end?.message ?? errors.quiet_hours?.start?.message}

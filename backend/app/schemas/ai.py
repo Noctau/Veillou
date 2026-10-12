@@ -6,9 +6,10 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app.domain.enums import JobStatus, TaskType
+from app.domain.enums import JobStatus
 from app.domain.quickparse import KindHint
 from app.domain.tasks import find_cycle
+from app.schemas.bundle import BundleImportResult, ConfigBundle
 from app.schemas.common import InputModel, ReadModel, UTCMoment
 from app.schemas.plan import PlanState
 from app.schemas.task import Description, SubtaskEstimate, TaskDetail, Title
@@ -50,7 +51,8 @@ class BreakdownDraft(BaseModel):
 
     type: Literal["breakdown"] = "breakdown"
     task_id: uuid.UUID
-    task_type: TaskType
+    # Результаты джоб Part 1 хранили ключ `task_type` — читаются без типа
+    task_type_id: uuid.UUID | None = None
     category_id: uuid.UUID | None
     steps: list[BreakdownStep]
     total_estimate_min: int
@@ -67,8 +69,8 @@ class ParseDraft(BaseModel):
     kind: KindHint
     title: str
     description: str
-    task_type: TaskType | None
-    subject_id: uuid.UUID | None
+    task_type_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None
     deadline: UTCMoment | None
     action_type_id: uuid.UUID | None
     text: str = Field(description="Исходный текст")
@@ -81,8 +83,8 @@ class PhotoDraft(BaseModel):
     task_id: uuid.UUID
     title: str
     text: str
-    task_type: TaskType | None
-    subject_id: uuid.UUID | None
+    task_type_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None
     deadline: UTCMoment | None
     updated: list[str] = Field(description="Какие поля задания заполнены с фото")
 
@@ -104,8 +106,21 @@ class MilestonesDraft(BaseModel):
     warning: str | None = Field(description="Что уточнить в описании проекта")
 
 
+class SetupDraft(BaseModel):
+    """Черновик ИИ-настройки (M21.4) — сборка; ничего не применено, пока не нажали
+    «Применить» (`POST /config/import`)."""
+
+    type: Literal["setup"] = "setup"
+    text: str = Field(description="Описание, по которому собран черновик")
+    about: str = Field(description="«О себе» от ИИ — предложить сохранить")
+    bundle: ConfigBundle
+    warnings: list[str] = Field(description="Что уточнить и что пропущено при проверке")
+    preview: BundleImportResult = Field(description="Что добавится и изменится при импорте")
+
+
 JobResult = Annotated[
-    BreakdownDraft | ParseDraft | PhotoDraft | MilestonesDraft, Field(discriminator="type")
+    BreakdownDraft | ParseDraft | PhotoDraft | MilestonesDraft | SetupDraft,
+    Field(discriminator="type"),
 ]
 
 
@@ -138,7 +153,7 @@ class BreakdownApply(InputModel):
     """«Запланировать»: несделанные шаги задания заменяются этими, считается превью плана."""
 
     steps: list[BreakdownStep] = Field(min_length=1, max_length=MAX_STEPS)
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
     plan: bool = Field(default=True, description="Сразу посчитать превью плана")
     job_id: uuid.UUID | None = Field(
@@ -161,7 +176,7 @@ class BreakdownApplied(BaseModel):
 
 class TemplateCreate(InputModel):
     name: Name
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
     steps: list[BreakdownStep] = Field(min_length=1, max_length=MAX_STEPS)
 
     @model_validator(mode="after")
@@ -172,19 +187,27 @@ class TemplateCreate(InputModel):
 
 class TemplateUpdate(InputModel):
     name: Name | None = None
-    task_type: TaskType | None = None
+    task_type_id: uuid.UUID | None = None
 
 
 class TemplateRead(ReadModel):
     id: uuid.UUID
     name: str
-    task_type: TaskType | None
+    task_type_id: uuid.UUID | None
     steps: list[BreakdownStep]
     total_estimate_min: int
     created_at: UTCMoment
 
 
 # ---------- разбор текста ----------
+
+
+class SetupRequest(InputModel):
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    comment: Comment | None = Field(default=None, description="«Заново с комментарием»")
+    previous: list[Annotated[str, StringConstraints(max_length=300)]] = Field(
+        default_factory=list, max_length=60, description="Прошлый черновик кратко"
+    )
 
 
 class AIParseRequest(InputModel):

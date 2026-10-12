@@ -1,9 +1,16 @@
-"""Категории, типы действий и окна времени (ТЗ §4.8)."""
+"""Категории, типы действий, типы задач и окна времени (ТЗ §4.8, M15)."""
 
 import uuid
-from typing import Annotated, Self
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    Discriminator,
+    Field,
+    StringConstraints,
+    Tag,
+    field_validator,
+    model_validator,
+)
 
 from app.domain.enums import ActionTypeKey, CategoryIcon, CategoryKey
 from app.schemas.common import HexColor, InputModel, ReadModel, WallTime, Weekday
@@ -59,21 +66,129 @@ class CategoryRead(ReadModel):
     position: int
 
 
+# ---------- слова быстрого ввода ----------
+
+Synonym = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+SYNONYMS_HELP = "Слова быстрого ввода и ИИ: «реферат», «созвон»; «слово*» — любое окончание"
+
+
+def _unique_words(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    seen: dict[str, str] = {}
+    for word in value:
+        seen.setdefault(word.lower(), word)
+    return list(seen.values())
+
+
 # ---------- типы действий ----------
+
+TypeWindows = Annotated[list[TimeWindow], Field(min_length=1, max_length=14)]
+
+
+class ActionTypeCreate(InputModel):
+    name: CatalogName
+    windows: TypeWindows
+    default_category_id: uuid.UUID | None = None
+    prefer_morning: bool = False
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30, description=SYNONYMS_HELP)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class ActionTypeUpdate(InputModel):
-    """Набор типов фиксирован; правятся название, окна и категория по умолчанию."""
-
     name: CatalogName | None = None
-    windows: Annotated[list[TimeWindow], Field(min_length=1, max_length=14)] | None = None
+    windows: TypeWindows | None = None
     default_category_id: uuid.UUID | None = None
+    prefer_morning: bool | None = None
+    synonyms: list[Synonym] | None = Field(default=None, max_length=30)
+    position: int | None = Field(default=None, ge=0, le=1000)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
 
 
 class ActionTypeRead(ReadModel):
     id: uuid.UUID
-    key: ActionTypeKey
+    key: ActionTypeKey | None = Field(description="Ключ сида; у своих типов — null")
     name: str
     default_category_id: uuid.UUID | None
     windows: list[TimeWindow]
+    prefer_morning: bool = Field(description="Лёгкое предпочтение утра в плане")
+    synonyms: list[str]
+    position: int
+
+
+# ---------- типы задач ----------
+
+
+class DeadlineDays(InputModel):
+    """Срок = дата выдачи (или сегодня) + N дней, 23:59."""
+
+    kind: Literal["days"] = "days"
+    days: int = Field(ge=1, le=365)
+
+
+class DeadlineNextOccurrence(InputModel):
+    """Срок = начало ближайшего будущего вхождения правила расписания той же сферы
+    («к следующему уроку»); пересчитывается при изменении расписания."""
+
+    kind: Literal["next_occurrence"] = "next_occurrence"
+
+
+def _deadline_kind(value: Any) -> str | None:
+    """Без `kind` — «+N дней» (так правило записывалось до M19)."""
+    if isinstance(value, dict):
+        return str(value.get("kind", "days"))
+    return getattr(value, "kind", None)
+
+
+DeadlineRule = Annotated[
+    Annotated[DeadlineDays, Tag("days")]
+    | Annotated[DeadlineNextOccurrence, Tag("next_occurrence")],
+    Discriminator(_deadline_kind),
+]
+
+
+class TaskTypeCreate(InputModel):
+    name: CatalogName
+    icon: CategoryIcon = CategoryIcon.tag
+    synonyms: list[Synonym] = Field(default_factory=list, max_length=30, description=SYNONYMS_HELP)
+    default_action_type_id: uuid.UUID | None = None
+    default_category_id: uuid.UUID | None = None
+    default_estimate_min: int | None = Field(default=None, ge=5, le=10_000)
+    deadline_rule: DeadlineRule | None = Field(
+        default=None, description="Как вывести срок; тип с правилом — «быстрый тип» в ＋"
+    )
+    default_project_id: uuid.UUID | None = None
+    default_template_id: uuid.UUID | None = None
+
+    _synonyms = field_validator("synonyms")(_unique_words)
+
+
+class TaskTypeUpdate(InputModel):
+    name: CatalogName | None = None
+    icon: CategoryIcon | None = None
+    synonyms: list[Synonym] | None = Field(default=None, max_length=30)
+    default_action_type_id: uuid.UUID | None = None
+    default_category_id: uuid.UUID | None = None
+    default_estimate_min: int | None = Field(default=None, ge=5, le=10_000)
+    deadline_rule: DeadlineRule | None = None
+    default_project_id: uuid.UUID | None = None
+    default_template_id: uuid.UUID | None = None
+    position: int | None = Field(default=None, ge=0, le=1000)
+
+    _synonyms = field_validator("synonyms")(_unique_words)
+
+
+class TaskTypeRead(ReadModel):
+    id: uuid.UUID
+    name: str
+    icon: CategoryIcon
+    synonyms: list[str]
+    default_action_type_id: uuid.UUID | None
+    default_category_id: uuid.UUID | None
+    default_estimate_min: int | None
+    deadline_rule: DeadlineRule | None
+    default_project_id: uuid.UUID | None
+    default_template_id: uuid.UUID | None
     position: int

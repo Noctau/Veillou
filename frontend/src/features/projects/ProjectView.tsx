@@ -1,4 +1,4 @@
-import { ArchiveIcon, ArrowLeftIcon, BriefcaseIcon, CheckIcon, MoreVerticalIcon, PlusIcon, RepeatIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
+import { ArchiveIcon, ArrowLeftIcon, CheckIcon, MoreVerticalIcon, PlusIcon, RepeatIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -41,7 +40,7 @@ import { ProjectTimeline } from './ProjectTimeline'
 import { RecurringTaskDialog } from './RecurringTaskDialog'
 import { type ProjectDetail, useDeleteProject, useProject, useUpdateProject } from './useProjects'
 import { WeeklyNorm } from './WeeklyNorm'
-import { WorkTaskDialog } from './WorkTaskDialog'
+import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
 
 function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -96,7 +95,7 @@ function AddProjectTask({ projectId }: { projectId: string }) {
       onSubmit={(e) => {
         e.preventDefault()
         if (!title.trim()) return
-        create.mutate({ title: title.trim(), task_type: 'other', description: '', priority: 'normal', project_id: projectId, subtasks: [] })
+        create.mutate({ title: title.trim(), description: '', priority: 'normal', project_id: projectId, subtasks: [] })
         setTitle('')
       }}
     >
@@ -112,7 +111,7 @@ function RecurringList({ projectId }: { projectId: string }) {
   const { data: tasks } = useTasks({ status: ['active'], project_id: projectId })
   const recurring = tasks?.filter((t) => t.recurrence) ?? []
   if (!recurring.length) {
-    return <p className="text-sm text-muted-foreground">Например, встреча или письмо научруку раз в неделю.</p>
+    return <p className="text-sm text-muted-foreground">Например, созвон с руководителем или отчёт раз в неделю.</p>
   }
   return (
     <ul className="flex flex-col gap-1">
@@ -162,11 +161,6 @@ function Header({ project }: { project: ProjectDetail }) {
               onChange={(e) => patch({ deadline: e.target.value || null })}
               className="h-8 w-40"
             />
-            {project.is_work_default && (
-              <Badge variant="secondary">
-                <BriefcaseIcon /> задания с работы
-              </Badge>
-            )}
             {project.status !== 'active' && <Badge variant="outline">{done ? 'Завершён' : 'В архиве'}</Badge>}
           </div>
         </div>
@@ -177,13 +171,6 @@ function Header({ project }: { project: ProjectDetail }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuCheckboxItem
-              checked={project.is_work_default}
-              onCheckedChange={(checked) => patch({ is_work_default: checked })}
-            >
-              Сюда идут задания с работы
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
             {project.status === 'active' ? (
               <>
                 <DropdownMenuItem onSelect={() => patch({ status: 'done' })}>
@@ -223,7 +210,7 @@ function Header({ project }: { project: ProjectDetail }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/study?tab=projects', { replace: true }) })}
+              onClick={() => remove.mutate(project.id, { onSuccess: () => navigate('/projects', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>
@@ -237,7 +224,6 @@ function Header({ project }: { project: ProjectDetail }) {
 export function ProjectView({ projectId }: { projectId: string }) {
   const { data: project, isPending, isError, error } = useProject(projectId)
   const update = useUpdateProject()
-  const [workTask, setWorkTask] = useState(false)
   const [recurring, setRecurring] = useState(false)
 
   if (isPending) {
@@ -269,11 +255,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
         <div className="flex flex-col gap-3">
           <TaskList
             projectId={project.id}
-            actions={
-              <Button size="sm" variant="ghost" onClick={() => setWorkTask(true)}>
-                <BriefcaseIcon /> С работы
-              </Button>
-            }
+            actions={<QuickTypeButtons projectId={project.id} variant="ghost" />}
           />
           <AddProjectTask projectId={project.id} />
         </div>
@@ -309,7 +291,6 @@ export function ProjectView({ projectId }: { projectId: string }) {
         <AttachmentList ownerType="project" ownerId={project.id} />
       </Section>
 
-      <WorkTaskDialog open={workTask} onOpenChange={setWorkTask} projectId={project.id} />
       <RecurringTaskDialog open={recurring} onOpenChange={setRecurring} projectId={project.id} />
     </div>
   )

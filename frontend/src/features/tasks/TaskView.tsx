@@ -44,20 +44,21 @@ import { useAttachments } from '@/features/attachments/useAttachments'
 import { TemplatesDialog } from '@/features/breakdown/TemplatesDialog'
 import { useLatestBreakdown } from '@/features/breakdown/useBreakdown'
 import { describeRrule } from '@/features/calendar/rrule'
-import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
+import { ActionTypeSelect, CategorySelect, TaskTypeSelect } from '@/features/catalog/CatalogSelect'
+import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useProject, useProjects } from '@/features/projects/useProjects'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { AreaSelect } from '@/features/areas/AreaSelect'
+import { AREAS_UI, ORIGIN_UI } from '@/lib/terms'
 import { errorMessage } from '@/lib/errors'
-import { wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
-import { describeDeadline, formatMinutes, TASK_TYPE_LABEL } from './labels'
+import { describeDeadline, formatMinutes } from './labels'
 import { SubtaskList } from './SubtaskList'
-import { type TaskDetail, type TaskType, type TaskUpdate, useDeleteTask, useTask, useUpdateTask } from './useTasks'
+import { type TaskDetail, type TaskUpdate, useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
 const NONE = 'none'
-const TASK_TYPES = Object.keys(TASK_TYPE_LABEL) as TaskType[]
 
 function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -171,7 +172,6 @@ function ProjectFields({ task, patch }: { task: TaskDetail; patch: (body: TaskUp
 }
 
 function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => void }) {
-  const { data: subjects } = useSubjects()
   return (
     <Card>
       <CardContent className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
@@ -180,35 +180,12 @@ function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => 
           <DeadlineEditor task={task} onSave={(deadline) => patch({ deadline })} />
         </Field>
         <Field>
-          <FieldLabel htmlFor="task-subject">Предмет</FieldLabel>
-          <Select value={task.subject_id ?? NONE} onValueChange={(v) => patch({ subject_id: v === NONE ? null : v })}>
-            <SelectTrigger id="task-subject" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Без предмета</SelectItem>
-              {subjects?.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FieldLabel htmlFor="task-area">{AREAS_UI.area}</FieldLabel>
+          <AreaSelect id="task-area" value={task.area_id} onChange={(area_id) => patch({ area_id })} />
         </Field>
         <Field>
           <FieldLabel htmlFor="task-type">Тип</FieldLabel>
-          <Select value={task.task_type} onValueChange={(v) => patch({ task_type: v as TaskType })}>
-            <SelectTrigger id="task-type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TASK_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TASK_TYPE_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TaskTypeSelect id="task-type" value={task.task_type_id} onChange={(task_type_id) => patch({ task_type_id })} />
         </Field>
         <Field>
           <FieldLabel htmlFor="task-category">Категория</FieldLabel>
@@ -286,6 +263,7 @@ export function TaskView({ taskId }: { taskId: string }) {
   const remove = useDeleteTask()
   const { data: attachments } = useAttachments('task', taskId)
   const { data: draftJob } = useLatestBreakdown(taskId)
+  const taskTypes = byId(useTaskTypes().data)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [saveTemplate, setSaveTemplate] = useState(false)
 
@@ -303,6 +281,7 @@ export function TaskView({ taskId }: { taskId: string }) {
   const patch = (body: TaskUpdate) => update.mutate({ id: task.id, body })
   const done = task.status === 'done'
   const due = task.deadline ? describeDeadline(task.deadline, tz) : null
+  const taskType = task.task_type_id ? taskTypes.get(task.task_type_id) : undefined
   const estimate = task.subtasks.reduce((sum, s) => sum + (s.status === 'done' ? 0 : s.estimate_min), 0)
   const hasPhoto = !!attachments?.some((a) => a.mime.startsWith('image/'))
   const canBreak = !task.recurrence && !done
@@ -324,9 +303,16 @@ export function TaskView({ taskId }: { taskId: string }) {
         <div className="min-w-0 flex-1">
           <TitleEditor key={task.title} task={task} onSave={(title) => patch({ title })} />
           <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-            <span>{TASK_TYPE_LABEL[task.task_type]}</span>
+            {taskType && <span>{taskType.name}</span>}
             {due && <span className={cn(due.tone === 'overdue' && !done && 'text-destructive')}>{due.text}</span>}
             {estimate > 0 && !task.recurrence && <span>осталось ~{formatMinutes(estimate)}</span>}
+            {task.origin_event && (
+              <Link to="/calendar" className="underline-offset-4 hover:underline">
+                {ORIGIN_UI.from}: {task.origin_event.title}, {formatDay(wallDate(task.origin_event.start, tz))}{' '}
+                {wallTime(task.origin_event.start, tz)}
+                {task.origin_event.status === 'cancelled' && ` (${ORIGIN_UI.cancelled})`}
+              </Link>
+            )}
             {task.recurrence && (
               <span className="flex items-center gap-1">
                 <RepeatIcon className="size-3.5" /> {describeRrule(task.recurrence)}
@@ -416,7 +402,7 @@ export function TaskView({ taskId }: { taskId: string }) {
         open={saveTemplate}
         onOpenChange={setSaveTemplate}
         steps={templateSteps}
-        taskType={task.task_type}
+        taskTypeId={task.task_type_id}
         defaultName={task.title}
         onApply={(t) => navigate(`/tasks/${task.id}/breakdown?template=${t.id}`)}
       />
@@ -430,7 +416,7 @@ export function TaskView({ taskId }: { taskId: string }) {
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/study?tab=tasks', { replace: true }) })}
+              onClick={() => remove.mutate(task.id, { onSuccess: () => navigate('/tasks', { replace: true }) })}
             >
               Удалить
             </AlertDialogAction>

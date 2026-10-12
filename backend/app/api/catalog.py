@@ -5,11 +5,15 @@ from fastapi import APIRouter, Depends, status
 
 from app.api.deps import CurrentUser, SessionDep
 from app.schemas.catalog import (
+    ActionTypeCreate,
     ActionTypeRead,
     ActionTypeUpdate,
     CategoryCreate,
     CategoryRead,
     CategoryUpdate,
+    TaskTypeCreate,
+    TaskTypeRead,
+    TaskTypeUpdate,
 )
 from app.services.catalog import CatalogService
 
@@ -57,6 +61,11 @@ async def list_action_types(svc: Service) -> list[ActionTypeRead]:
     return [ActionTypeRead.model_validate(a) for a in await svc.list_action_types()]
 
 
+@router.post("/action-types", status_code=status.HTTP_201_CREATED)
+async def create_action_type(data: ActionTypeCreate, svc: Service) -> ActionTypeRead:
+    return ActionTypeRead.model_validate(await svc.create_action_type(data))
+
+
 @router.patch("/action-types/{action_type_id}")
 async def update_action_type(
     action_type_id: uuid.UUID, patch: ActionTypeUpdate, svc: Service
@@ -64,7 +73,39 @@ async def update_action_type(
     return ActionTypeRead.model_validate(await svc.update_action_type(action_type_id, patch))
 
 
+@router.delete("/action-types/{action_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_action_type(action_type_id: uuid.UUID, svc: Service) -> None:
+    """Дела с этим типом получают тип по умолчанию (настройки), из лимитов тип выходит."""
+    await svc.delete_action_type(action_type_id)
+
+
 @router.post("/action-types/{action_type_id}/reset")
 async def reset_action_type(action_type_id: uuid.UUID, svc: Service) -> ActionTypeRead:
-    """Вернуть окна, название и категорию по умолчанию (ТЗ §4.8)."""
+    """Вернуть окна, название и категорию по умолчанию (ТЗ §4.8). Только у засеянных."""
     return ActionTypeRead.model_validate(await svc.reset_action_type(action_type_id))
+
+
+# ---------- типы задач ----------
+
+
+@router.get("/task-types")
+async def list_task_types(svc: Service) -> list[TaskTypeRead]:
+    return [TaskTypeRead.model_validate(t) for t in await svc.list_task_types()]
+
+
+@router.post("/task-types", status_code=status.HTTP_201_CREATED)
+async def create_task_type(data: TaskTypeCreate, svc: Service) -> TaskTypeRead:
+    return TaskTypeRead.model_validate(await svc.create_task_type(data))
+
+
+@router.patch("/task-types/{task_type_id}")
+async def update_task_type(
+    task_type_id: uuid.UUID, patch: TaskTypeUpdate, svc: Service
+) -> TaskTypeRead:
+    return TaskTypeRead.model_validate(await svc.update_task_type(task_type_id, patch))
+
+
+@router.delete("/task-types/{task_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task_type(task_type_id: uuid.UUID, svc: Service) -> None:
+    """Задачи этого типа остаются — без типа."""
+    await svc.delete_task_type(task_type_id)

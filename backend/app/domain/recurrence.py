@@ -1,16 +1,20 @@
-"""Шаблоны → вхождения. Чистые функции, без БД.
+"""Правила расписания → вхождения (Part 2, M17.3). Чистые функции, без БД.
 
-- `expand_class_rules` — пары из сетки недели с учётом чётности, звонков,
-  срока действия правила, праздников и границ семестра (сессия — без пар).
-- `expand_rrule` — личные блоки с RRULE («по Вт, Чт»).
-- `rrule_dates` — только даты RRULE (регулярные подзадачи: «встреча с научруком по чт»).
+- `expand_rule` — вхождения одного правила: паттерн (по дням недели с маской
+  недель цикла, смены «N через M», RRULE, разово), время настенное или из слотов
+  сетки, границы периода и срока действия правила, паузы периода, исключения.
+- `rrule_dates` — только даты RRULE (регулярные задачи: «встреча по чт»).
 
-Вхождение идентифицируется (ключ шаблона, локальная дата) — на этом держится
-материализация: перенесённое вручную вхождение не создаётся заново.
+Вхождение идентифицируется (ключ правила, локальная дата начала) — на этом
+держится материализация: перенесённое вручную вхождение не создаётся заново.
 
-Чётность: неделя (Пн–Вс), в которую попадает начало семестра, получает
-`first_week_parity`, дальше чередуется каждую неделю — в т. ч. через Новый год,
-независимо от номеров ISO-недель.
+Неделя цикла: неделя (Пн–Вс), в которую попадает начало периода, получает
+`first_cycle_week`, дальше номера идут по кругу 1…`cycle_weeks` каждую неделю —
+в т. ч. через Новый год, независимо от номеров ISO-недель. Цикл 2 — бывшие
+числитель (1) и знаменатель (2).
+
+Защита от «невозможных» правил: генерация идёт только в ограниченном окне
+(не длиннее `MAX_SPAN_DAYS`) и обрывается на `MAX_OCCURRENCES` вхождениях.
 """
 
 from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
@@ -21,7 +25,15 @@ from zoneinfo import ZoneInfo
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, rrulestr
 
 from app.core.time import wall_to_utc
-from app.domain.enums import Parity, RuleParity
+
+# Окно генерации и число вхождений одного правила — с запасом на годовой период
+MAX_SPAN_DAYS = 800
+MAX_OCCURRENCES = 1500
+# Смена «N через M»: цикл не длиннее года
+MAX_DAY_CYCLE = 366
+MAX_CYCLE_WEEKS = 8
+# Якорь RRULE без даты начала: от него считаются INTERVAL и т. п. (понедельник)
+DEFAULT_ANCHOR = date(2000, 1, 3)
 
 
 @dataclass(frozen=True)
@@ -46,35 +58,37 @@ class DateRange:
 
 
 @dataclass(frozen=True)
-class SemesterSpec:
+class PeriodSpec:
     start: date
-    classes_end: date  # последний день занятий включительно
-    first_week_parity: Parity = Parity.odd
+    end: date  # последний день включительно
+    cycle_weeks: int = 1
+    first_cycle_week: int = 1
+    pauses: tuple[DateRange, ...] = ()
 
 
 @dataclass(frozen=True)
-class BellSlot:
+class Slot:
     number: int
     start: time
     end: time
 
 
 @dataclass(frozen=True)
-class Bells:
-    """Звонки: общие + переопределения по дням недели (ISO 1–7).
+class SlotGridSpec:
+    """Сетка слотов: общие + переопределения по дням недели (ISO 1–7).
 
-    Переопределение заменяет общие звонки для этого дня целиком.
+    Переопределение заменяет общие слоты для этого дня целиком.
     """
 
-    default: Mapping[int, BellSlot] = field(default_factory=dict)
-    by_weekday: Mapping[int, Mapping[int, BellSlot]] = field(default_factory=dict)
+    default: Mapping[int, Slot] = field(default_factory=dict)
+    by_weekday: Mapping[int, Mapping[int, Slot]] = field(default_factory=dict)
 
     @classmethod
     def from_slots(
         cls,
-        default: Iterable[BellSlot],
-        by_weekday: Mapping[int, Iterable[BellSlot]] | None = None,
-    ) -> "Bells":
+        default: Iterable[Slot],
+        by_weekday: Mapping[int, Iterable[Slot]] | None = None,
+    ) -> "SlotGridSpec":
         return cls(
             default={s.number: s for s in default},
             by_weekday={
@@ -82,40 +96,96 @@ class Bells:
             },
         )
 
-    def slot(self, weekday: int, number: int) -> BellSlot | None:
+    def slot(self, weekday: int, number: int) -> Slot | None:
         return self.by_weekday.get(weekday, self.default).get(number)
 
 
+# ---------- паттерны ----------
+
+
 @dataclass(frozen=True)
-class ClassRuleSpec:
+class WeeklyPattern:
+    """По дням недели (ISO 1–7). `cycle_weeks` — маска недель цикла периода
+    (`{1}` при цикле 2 — бывший числитель); None — каждую неделю."""
+
+    weekdays: frozenset[int]
+    cycle_weeks: frozenset[int] | None = None
+
+
+@dataclass(frozen=True)
+class DayCyclePattern:
+    """Смены: `on` дней подряд, затем `off` дней перерыва; `anchor` — первый день `on`."""
+
+    on: int
+    off: int
+    anchor: date
+
+
+@dataclass(frozen=True)
+class RRulePattern:
+    rrule: str  # без DTSTART и времени: «FREQ=MONTHLY;BYDAY=2TU»
+
+
+@dataclass(frozen=True)
+class OncePattern:
+    date: date
+
+
+Pattern = WeeklyPattern | DayCyclePattern | RRulePattern | OncePattern
+
+
+@dataclass(frozen=True)
+class RuleSpec:
     key: Hashable  # id правила
-    weekday: int  # ISO: 1 = Пн
-    parity: RuleParity = RuleParity.all
-    pair_number: int | None = None
-    start_time: time | None = None  # своё время вместо звонков
+    pattern: Pattern
+    # Время: настенное (end <= start — через полночь) или слоты сетки
+    start_time: time | None = None
     end_time: time | None = None
+    slot_from: int | None = None
+    slot_to: int | None = None  # None — как slot_from
     valid_from: date | None = None
     valid_to: date | None = None
 
 
 @dataclass(frozen=True)
 class Occurrence:
-    key: Hashable  # ключ шаблона
-    date: date  # локальная дата вхождения по шаблону
+    key: Hashable  # ключ правила
+    date: date  # локальная дата начала вхождения по правилу
     start: datetime  # UTC
     end: datetime  # UTC
-    pair_number: int | None = None
+    slot: int | None = None
 
 
 def week_monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
-def week_parity(d: date, semester_start: date, first_week_parity: Parity) -> Parity:
-    weeks = (week_monday(d) - week_monday(semester_start)).days // 7
-    if weeks % 2 == 0:
-        return first_week_parity
-    return Parity.even if first_week_parity == Parity.odd else Parity.odd
+def cycle_week(d: date, period: PeriodSpec) -> int:
+    """Номер недели цикла (1…cycle_weeks) для даты `d`."""
+    if period.cycle_weeks <= 1:
+        return 1
+    weeks = (week_monday(d) - week_monday(period.start)).days // 7
+    return (period.first_cycle_week - 1 + weeks) % period.cycle_weeks + 1
+
+
+def validate_pattern(pattern: Pattern) -> None:
+    """Бросает ValueError на заведомо невозможный паттерн."""
+    match pattern:
+        case WeeklyPattern(weekdays=days, cycle_weeks=mask):
+            if not days or not days <= set(range(1, 8)):
+                raise ValueError("Укажите дни недели")
+            if mask is not None and (not mask or not mask <= set(range(1, MAX_CYCLE_WEEKS + 1))):
+                raise ValueError("Некорректные недели цикла")
+        case DayCyclePattern(on=on, off=off):
+            if on < 1 or off < 0 or on + off > MAX_DAY_CYCLE:
+                raise ValueError("Смены: от 1 рабочего дня, цикл не длиннее года")
+        case RRulePattern(rrule=value):
+            parse_rrule(value)
+        case OncePattern():
+            pass
+
+
+# ---------- генерация ----------
 
 
 def _wall_interval(d: date, start: time, end: time, tz: ZoneInfo) -> tuple[datetime, datetime]:
@@ -124,76 +194,85 @@ def _wall_interval(d: date, start: time, end: time, tz: ZoneInfo) -> tuple[datet
     return wall_to_utc(d, start, tz), wall_to_utc(end_day, end, tz)
 
 
-def _rule_times(rule: ClassRuleSpec, bells: Bells) -> tuple[time, time] | None:
+def _times(rule: RuleSpec, weekday: int, grid: SlotGridSpec | None) -> tuple[time, time] | None:
     if rule.start_time is not None and rule.end_time is not None:
         return rule.start_time, rule.end_time
-    if rule.pair_number is None:
+    if rule.slot_from is None or grid is None:
         return None
-    slot = bells.slot(rule.weekday, rule.pair_number)
-    return (slot.start, slot.end) if slot else None
+    first = grid.slot(weekday, rule.slot_from)
+    last = grid.slot(weekday, rule.slot_to or rule.slot_from)
+    if first is None or last is None or last.end <= first.start:
+        return None
+    return first.start, last.end
 
 
-def _is_day_off(d: date, days_off: Sequence[DateRange]) -> bool:
-    return any(d in r for r in days_off)
+def _span(rule: RuleSpec, window: DateRange, period: PeriodSpec | None) -> DateRange | None:
+    span: DateRange | None = window
+    if period is not None:
+        span = DateRange(period.start, period.end).intersect(window)
+    if span is not None and (rule.valid_from or rule.valid_to):
+        span = span.intersect(DateRange(rule.valid_from or date.min, rule.valid_to or date.max))
+    if span is not None and (span.end - span.start).days > MAX_SPAN_DAYS:
+        span = DateRange(span.start, span.start + timedelta(days=MAX_SPAN_DAYS))
+    return span
 
 
-def expand_class_rule(
-    rule: ClassRuleSpec,
-    semester: SemesterSpec,
-    bells: Bells,
-    tz: ZoneInfo,
+def _dates(rule: RuleSpec, span: DateRange, period: PeriodSpec | None) -> Iterator[date]:
+    """Даты паттерна в `span` по порядку (без пауз и исключений)."""
+    match rule.pattern:
+        case WeeklyPattern(weekdays=days, cycle_weeks=mask):
+            cycle = period or PeriodSpec(span.start, span.end)
+            for d in span.days():
+                if d.isoweekday() in days and (mask is None or cycle_week(d, cycle) in mask):
+                    yield d
+        case DayCyclePattern(on=on, off=off, anchor=anchor):
+            length = on + off
+            for d in span.days():
+                if (d - anchor).days % length < on:
+                    yield d
+        case RRulePattern(rrule=value):
+            dtstart = rule.valid_from or (period.start if period else DEFAULT_ANCHOR)
+            parsed = parse_rrule(value).replace(dtstart=datetime.combine(dtstart, time(0)))
+            # Наивная полночь — только носитель даты для dateutil
+            for dt in parsed.xafter(datetime.combine(span.start, time(0)), inc=True):
+                if dt.date() > span.end:
+                    return
+                yield dt.date()
+        case OncePattern(date=d):
+            if d in span:
+                yield d
+
+
+def expand_rule(
+    rule: RuleSpec,
     *,
+    tz: ZoneInfo,
+    window: DateRange,
+    period: PeriodSpec | None = None,
+    grid: SlotGridSpec | None = None,
     days_off: Sequence[DateRange] = (),
-    window: DateRange | None = None,
 ) -> list[Occurrence]:
-    """Все вхождения правила пары в семестре (или в пересечении с `window`).
+    """Вхождения правила в `window` ∩ период ∩ срок действия правила.
 
-    Пара без времени (номер пары, которого нет в звонках этого дня) не даёт вхождений.
+    Паузы периода и `days_off` вхождений не дают. День, на который у слота нет
+    времени (номера нет в сетке этого дня), пропускается.
     """
-    times = _rule_times(rule, bells)
-    if times is None:
-        return []
-
-    span: DateRange | None = DateRange(semester.start, semester.classes_end)
-    if rule.valid_from or rule.valid_to:
-        valid = DateRange(rule.valid_from or date.min, rule.valid_to or date.max)
-        span = DateRange(semester.start, semester.classes_end).intersect(valid)
-    if span is not None and window is not None:
-        span = span.intersect(window)
+    span = _span(rule, window, period)
     if span is None:
         return []
-
-    # Первый нужный день недели внутри диапазона
-    d = span.start + timedelta(days=(rule.weekday - span.start.isoweekday()) % 7)
+    skip = (*(period.pauses if period else ()), *days_off)
     result: list[Occurrence] = []
-    while d <= span.end:
-        # Parity и RuleParity — разные перечисления с общими значениями odd / even
-        parity_ok = rule.parity == RuleParity.all or (
-            week_parity(d, semester.start, semester.first_week_parity).value == rule.parity.value
-        )
-        if parity_ok and not _is_day_off(d, days_off):
-            start, end = _wall_interval(d, times[0], times[1], tz)
-            result.append(Occurrence(rule.key, d, start, end, rule.pair_number))
-        d += timedelta(days=7)
+    for d in _dates(rule, span, period):
+        if any(d in r for r in skip):
+            continue
+        times = _times(rule, d.isoweekday(), grid)
+        if times is None:
+            continue
+        start, end = _wall_interval(d, times[0], times[1], tz)
+        result.append(Occurrence(rule.key, d, start, end, rule.slot_from))
+        if len(result) >= MAX_OCCURRENCES:
+            break
     return result
-
-
-def expand_class_rules(
-    rules: Iterable[ClassRuleSpec],
-    semester: SemesterSpec,
-    bells: Bells,
-    tz: ZoneInfo,
-    *,
-    days_off: Sequence[DateRange] = (),
-    window: DateRange | None = None,
-) -> list[Occurrence]:
-    """Вхождения всех правил, по времени начала."""
-    result = [
-        occ
-        for rule in rules
-        for occ in expand_class_rule(rule, semester, bells, tz, days_off=days_off, window=window)
-    ]
-    return sorted(result, key=lambda o: (o.start, str(o.key)))
 
 
 # ---------- RRULE ----------
@@ -241,34 +320,3 @@ def rrule_dates(
         datetime.combine(span.start, time(0)), datetime.combine(span.end, time(0)), inc=True
     )
     return [d.date() for d in days]
-
-
-def expand_rrule(
-    value: str,
-    *,
-    dtstart: date,
-    start_time: time,
-    end_time: time,
-    tz: ZoneInfo,
-    window: DateRange,
-    until: date | None = None,
-    key: Hashable = None,
-) -> list[Occurrence]:
-    """Вхождения RRULE в окне `window`. Время — настенное в `tz` (DST учитывается).
-
-    `end_time <= start_time` — блок заканчивается на следующий день.
-    """
-    text = value.strip().removeprefix("RRULE:")
-    # Наивная полночь здесь — только носитель даты для dateutil
-    rule = parse_rrule(text).replace(dtstart=datetime.combine(dtstart, time(0)))
-    span = DateRange(dtstart, until or date.max).intersect(window)
-    if span is None:
-        return []
-    days = rule.between(
-        datetime.combine(span.start, time(0)), datetime.combine(span.end, time(0)), inc=True
-    )
-    result = []
-    for dt in days:
-        start, end = _wall_interval(dt.date(), start_time, end_time, tz)
-        result.append(Occurrence(key, dt.date(), start, end))
-    return result

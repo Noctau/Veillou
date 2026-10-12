@@ -5,8 +5,8 @@
 ставится джоба `plan.preview` (с дедупликацией и паузой — серия правок даёт
 один пересчёт). Воркер считает превью; применяет его только пользователь.
 
-Дела из ящика (взятые на неделю), дни подготовки к экзаменам и недельная
-норма проекта — тоже.
+Дела из ящика (взятые на неделю), дни подготовки к событиям, недельная
+норма проекта, лимиты нагрузки, буферы типов занятости и режимы дня — тоже.
 
 Не триггерят: «сделано» (план остаётся верным, освободившееся время подберёт
 следующий пересчёт), заметки, отметки калибровки и правки самого планировщика
@@ -23,11 +23,16 @@ from app.domain.enums import EventStatus, PlanReason, SubtaskStatus, TaskStatus
 from app.models import (
     ActionType,
     BacklogItem,
+    BudgetDayOverride,
+    DayProfile,
+    DayProfileRule,
     Event,
-    Exam,
-    ExamSession,
+    EventType,
+    LoadBudget,
+    LoadBudgetMember,
+    PrepPlan,
+    PrepSession,
     Project,
-    StudyDayLimit,
     Subtask,
     Task,
     User,
@@ -41,9 +46,10 @@ TASK_FIELDS = {
     "estimate_min",
     "time_window",
     "action_type_id",
-    "task_type",
+    "task_type_id",
     "deadline_buffer_days",
     "project_id",
+    "earliest",
     "deleted_at",
 }
 SUBTASK_FIELDS = {"estimate_min", "depends_on", "time_window", "action_type_id", "deleted_at"}
@@ -54,12 +60,15 @@ BACKLOG_FIELDS = {
     "status",
     "estimate_min",
     "conditions",
+    "hours_action_type_id",
+    "days_event_type_id",
     "time_window",
     "action_type_id",
     "deleted_at",
 }
-EXAM_FIELDS = {"starts_at", "duration_min", "plan_enabled", "deleted_at"}
-SESSION_FIELDS = {"question_ids", "minutes", "date", "deleted_at"}
+PREP_FIELDS = {"event_id", "date", "enabled", "deleted_at"}
+SESSION_FIELDS = {"item_ids", "minutes", "date", "deleted_at"}
+EVENT_TYPE_FIELDS = {"buffer_before_min", "buffer_after_min", "merge_buffers", "deleted_at"}
 PROJECT_FIELDS = {"weekly_norm_min", "status", "deadline", "title", "deleted_at"}
 # Статусы события, переход в которые (или из которых) меняет занятость
 EVENT_STATUSES = {EventStatus.missed, EventStatus.cancelled}
@@ -100,20 +109,24 @@ def _relevant(obj: Any, is_new: bool) -> bool:
     if isinstance(obj, User):
         return not is_new and bool(_changed(obj, USER_FIELDS))
     if isinstance(obj, ActionType):
-        return is_new or bool(_changed(obj, {"windows", "deleted_at"}))
+        return is_new or bool(_changed(obj, {"windows", "prefer_morning", "deleted_at"}))
     if isinstance(obj, BacklogItem):
         if is_new:
             return obj.planned_week is not None
         return bool(_changed(obj, BACKLOG_FIELDS))
-    if isinstance(obj, Exam):
-        return not is_new and bool(_changed(obj, EXAM_FIELDS))
-    if isinstance(obj, ExamSession):
+    if isinstance(obj, PrepPlan):
+        return not is_new and bool(_changed(obj, PREP_FIELDS))
+    if isinstance(obj, PrepSession):
         return is_new or bool(_changed(obj, SESSION_FIELDS))
     if isinstance(obj, Project):
         if is_new:
             return bool(obj.weekly_norm_min)
         return bool(_changed(obj, PROJECT_FIELDS))
-    return isinstance(obj, StudyDayLimit)
+    if isinstance(obj, EventType):
+        return not is_new and bool(_changed(obj, EVENT_TYPE_FIELDS))
+    if isinstance(obj, LoadBudget):
+        return is_new or bool(_changed(obj, {"minutes_per_day", "deleted_at"}))
+    return isinstance(obj, LoadBudgetMember | BudgetDayOverride | DayProfile | DayProfileRule)
 
 
 def _reason(objs: list[Any]) -> PlanReason:

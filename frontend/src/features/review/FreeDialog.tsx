@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { formatMinutes } from '@/features/tasks/labels'
 import { errorMessage } from '@/lib/errors'
 import { wallTime } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { useFree, useStartFree } from './useReview'
 
 const CHOICES = [15, 30, 45, 60, 90, 120]
 
-/** «У меня есть N минут»: лучшее подходящее дело и пара альтернатив; «Начать» — блок на сейчас. */
+/** «У меня есть N минут»: лучшее подходящее дело и две-три альтернативы; «Начать» — блок на сейчас. */
 export function FreeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const tz = useTimeZone()
   const [minutes, setMinutes] = useState<number | null>(null)

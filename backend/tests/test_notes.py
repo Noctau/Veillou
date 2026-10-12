@@ -8,7 +8,7 @@ from app.core.storage import LocalStorage, get_storage
 from app.main import app
 
 from .test_attachments import PNG
-from .test_schedule_api import API, BELLS, make_semester, make_subject, other_client
+from .test_schedule_api import API, make_area, make_class_rule, make_period, other_client
 
 # Вторник 06.10.2026 15:00 МСК
 NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
@@ -35,29 +35,14 @@ async def make_note(client: AsyncClient, **over) -> dict:
 
 
 async def class_event(client: AsyncClient, day: str = "2026-10-06") -> tuple[dict, dict]:
-    """Предмет и вхождение его пары (1 пара по вторникам) на `day`."""
-    sem = await make_semester(client)
-    subject = await make_subject(client, sem["id"])
-    resp = await client.put(
-        f"{API}/semesters/{sem['id']}/bells",
-        json={"schedules": [{"weekday": None, "slots": BELLS}]},
-    )
-    assert resp.status_code == 200, resp.text
-    resp = await client.post(
-        f"{API}/class-rules",
-        json={
-            "semester_id": sem["id"],
-            "subject_id": subject["id"],
-            "weekday": 2,
-            "pair_number": 1,
-            "location": "1801",
-        },
-    )
-    assert resp.status_code == 201, resp.text
+    """Предмет и вхождение его «Пары» (1-й слот по вторникам) на `day`."""
+    sem = await make_period(client)
+    subject = await make_area(client, sem["id"])
+    await make_class_rule(client, sem, subject, weekday=2, slot=1, location="1801")
     cal = await client.get(
         f"{API}/calendar", params={"from": f"{day}T00:00:00+03:00", "to": f"{day}T23:59:00+03:00"}
     )
-    (event,) = [e for e in cal.json()["events"] if e["kind"] == "class"]
+    (event,) = [e for e in cal.json()["events"] if e["kind"] == "busy"]
     return subject, event
 
 
@@ -66,11 +51,11 @@ async def test_requires_auth(client: AsyncClient):
 
 
 async def test_text_note_crud(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
-    subject = await make_subject(auth_client, sem["id"])
+    sem = await make_period(auth_client)
+    subject = await make_area(auth_client, sem["id"])
     note = await make_note(
         auth_client,
-        subject_id=subject["id"],
+        area_id=subject["id"],
         body_md="# Лекция 3\n\nУравнение $p = \\rho R T$",
     )
     # Название и дата по умолчанию
@@ -90,7 +75,7 @@ async def test_text_note_crud(auth_client: AsyncClient):
     resp = await auth_client.patch(f"{API}/notes/{note['id']}", json={"title": None})
     assert resp.status_code == 400
 
-    listed = (await auth_client.get(f"{API}/notes", params={"subject_id": subject["id"]})).json()
+    listed = (await auth_client.get(f"{API}/notes", params={"area_id": subject["id"]})).json()
     assert [n["id"] for n in listed] == [note["id"]]
     assert "body_md" not in listed[0]
 
@@ -103,7 +88,7 @@ async def test_note_without_subject(auth_client: AsyncClient):
     note = await make_note(
         auth_client, title="Мысли", kind="link", url="https://disk.yandex.ru/d/x"
     )
-    assert note["subject_id"] is None
+    assert note["area_id"] is None
     assert note["url"] == "https://disk.yandex.ru/d/x"
     resp = await auth_client.patch(f"{API}/notes/{note['id']}", json={"url": None})
     assert resp.json()["url"] is None
@@ -114,11 +99,11 @@ async def test_note_without_subject(auth_client: AsyncClient):
 async def test_note_to_class_event(auth_client: AsyncClient):
     subject, event = await class_event(auth_client)
     note = await make_note(auth_client, event_id=event["id"])
-    assert note["subject_id"] == subject["id"]
+    assert note["area_id"] == subject["id"]
     assert note["class_date"] == "2026-10-06"
     assert note["title"] == "Климатология · 6 окт"
     assert note["event"]["location"] == "1801"
-    assert note["event"]["pair_number"] == 1
+    assert note["event"]["slot"] == 1
 
     listed = (await auth_client.get(f"{API}/notes", params={"event_id": event["id"]})).json()
     assert [n["id"] for n in listed] == [note["id"]]
@@ -135,7 +120,7 @@ async def test_relink_to_other_event(auth_client: AsyncClient):
     (next_week,) = cal.json()["events"]
     resp = await auth_client.patch(f"{API}/notes/{note['id']}", json={"event_id": next_week["id"]})
     assert resp.status_code == 200, resp.text
-    assert resp.json()["subject_id"] == subject["id"]
+    assert resp.json()["area_id"] == subject["id"]
     assert resp.json()["class_date"] == "2026-10-13"
 
 
@@ -179,7 +164,7 @@ async def test_note_for_event_get_or_create(auth_client: AsyncClient):
     resp = await auth_client.post(url, params={"kind": "photo"})
     assert resp.status_code == 201, resp.text
     note = resp.json()
-    assert (note["event_id"], note["subject_id"], note["kind"]) == (
+    assert (note["event_id"], note["area_id"], note["kind"]) == (
         event["id"],
         subject["id"],
         "photo",

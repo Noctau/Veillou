@@ -37,7 +37,7 @@ from app.services.tasks import TaskService
 
 HELP = (
     "Пишите мне что угодно — я разберу и сохраню:\n"
-    "• «реферат климатология до 15 окт» — задание с дедлайном\n"
+    "• «отчёт к пятнице» — задача со сроком\n"
     "• «записаться к стоматологу» — дело в долгий ящик\n"
     "• «кино в пт в 19» — событие в календаре\n"
     "• текст задания целиком или фото доски — разберу с ИИ и предложу разбить на шаги\n\n"
@@ -112,7 +112,8 @@ async def free_text(message: Message, db: AsyncSession, user: User) -> None:
     if not text or not text.strip():
         await message.answer(HELP)
         return
-    if needs_ai(text, await quickadd.parse_text(db, user, text[:500])):
+    parsed = await quickadd.parse_text(db, user, text[:500])
+    if needs_ai(text, parsed.result, has_areas=parsed.has_areas):
         await ai.start_text(message, db, user, text)
         return
     await _create(message, db, user, text)
@@ -135,7 +136,7 @@ async def photo(message: Message, db: AsyncSession, user: User, bot: Bot) -> Non
     else:  # фильтр пропускает только фото и картинки-документы
         return
     caption = (message.caption or "").strip()
-    parsed = await quickadd.parse_text(db, user, caption[:500]) if caption else None
+    parsed = (await quickadd.parse_text(db, user, caption[:500])).result if caption else None
     data = await download(bot, file_id)
     task = await TaskService(db, user).create(
         TaskCreate(

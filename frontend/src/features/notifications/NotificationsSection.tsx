@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { formatDay, todayIn, wallDate, wallTime, addDaysIso } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import {
   pushUnsupportedReason,

@@ -5,23 +5,32 @@ import type { components } from '@/api/schema'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
+import { SCHEDULE_UI as T } from '@/lib/terms'
 
-export type Semester = components['schemas']['SemesterRead']
-export type SemesterCreate = components['schemas']['SemesterCreate']
-export type SemesterUpdate = components['schemas']['SemesterUpdate']
-export type BellSchedule = components['schemas']['BellScheduleRead']
-export type BellScheduleIn = components['schemas']['BellScheduleIn']
-export type BellSlot = components['schemas']['BellSlot-Output']
-export type DayOff = components['schemas']['DayOffRead']
-export type DayOffCreate = components['schemas']['DayOffCreate']
-export type ClassRule = components['schemas']['ClassRuleRead']
-export type ClassRuleCreate = components['schemas']['ClassRuleCreate']
-export type ClassRuleUpdate = components['schemas']['ClassRuleUpdate']
-export type Parity = components['schemas']['Parity']
-export type RuleParity = components['schemas']['RuleParity']
-export type ClassType = components['schemas']['ClassType']
+type Schemas = components['schemas']
 
-/** Изменения шаблонов пересобирают вхождения -> календарь устарел. */
+export type EventType = Schemas['EventTypeRead']
+export type EventTypeCreate = Schemas['EventTypeCreate']
+export type EventTypeUpdate = Schemas['EventTypeUpdate']
+export type Period = Schemas['PeriodRead']
+export type PeriodCreate = Schemas['PeriodCreate']
+export type PeriodUpdate = Schemas['PeriodUpdate']
+export type Pause = Schemas['Pause']
+export type SlotGridRow = Schemas['SlotGridRead']
+export type SlotGridPut = Schemas['SlotGridPut']
+export type SlotGridDay = Schemas['SlotGridDay-Input']
+export type Slot = Schemas['SlotRead']
+export type DayOff = Schemas['DayOffRead']
+export type DayOffCreate = Schemas['DayOffCreate']
+export type ScheduleRule = Schemas['ScheduleRuleRead']
+export type ScheduleRuleCreate = Schemas['ScheduleRuleCreate']
+export type ScheduleRuleUpdate = Schemas['ScheduleRuleUpdate']
+export type Pattern = ScheduleRule['pattern']
+export type Channel = Schemas['Channel']
+
+const STALE = 5 * 60_000
+
+/** Изменения расписания пересобирают вхождения -> календарь устарел. */
 function useInvalidateSchedule() {
   const queryClient = useQueryClient()
   return (...keys: (readonly unknown[])[]) => {
@@ -30,107 +39,208 @@ function useInvalidateSchedule() {
   }
 }
 
-// ---------- семестры ----------
+function onError(error: unknown) {
+  toast.error(errorMessage(error))
+}
 
-export function useSemesters() {
+// ---------- типы занятости ----------
+
+export function useEventTypes() {
   return useQuery({
-    queryKey: queryKeys.semesters,
+    queryKey: queryKeys.eventTypes,
+    staleTime: STALE,
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/semesters')
+      const { data, error } = await api.GET('/api/v1/event-types')
       if (error) throw error
       return data
     },
   })
 }
 
-/** Текущий семестр: идущий сейчас, иначе ближайший будущий, иначе последний. */
-export function pickCurrentSemester(semesters: Semester[], today: string): Semester | undefined {
-  const end = (s: Semester) => s.session_end ?? s.classes_end
+export function useCreateEventType() {
+  const invalidate = useInvalidateSchedule()
+  return useMutation({
+    mutationFn: async (body: EventTypeCreate) => {
+      const { data, error } = await api.POST('/api/v1/event-types', { body })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => invalidate(queryKeys.eventTypes),
+    onError,
+  })
+}
+
+export function useUpdateEventType() {
+  const invalidate = useInvalidateSchedule()
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: EventTypeUpdate }) => {
+      const { data, error } = await api.PATCH('/api/v1/event-types/{type_id}', {
+        params: { path: { type_id: id } },
+        body,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => invalidate(queryKeys.eventTypes, queryKeys.budgets),
+    onError,
+  })
+}
+
+export function useDeleteEventType() {
+  const invalidate = useInvalidateSchedule()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/event-types/{type_id}', {
+        params: { path: { type_id: id } },
+      })
+      if (error) throw error
+    },
+    onSuccess: () => invalidate(queryKeys.eventTypes, queryKeys.scheduleRulesAll, queryKeys.budgets, queryKeys.backlogAll),
+    onError,
+  })
+}
+
+// ---------- периоды ----------
+
+export function usePeriods() {
+  return useQuery({
+    queryKey: queryKeys.periods,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/periods')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Текущий период: идущий сейчас, иначе ближайший будущий, иначе последний. */
+export function pickCurrentPeriod(periods: Period[], today: string): Period | undefined {
   return (
-    semesters.find((s) => s.start_date <= today && today <= end(s)) ??
-    [...semesters].filter((s) => s.start_date > today).sort((a, b) => a.start_date.localeCompare(b.start_date))[0] ??
-    semesters[0]
+    periods.find((p) => p.start_date <= today && today <= p.end_date) ??
+    [...periods].filter((p) => p.start_date > today).sort((a, b) => a.start_date.localeCompare(b.start_date))[0] ??
+    periods[0]
   )
 }
 
-export function useCreateSemester() {
+export function useCreatePeriod() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
-    mutationFn: async ({ semester, bells }: { semester: SemesterCreate; bells: BellScheduleIn[] }) => {
-      const { data, error } = await api.POST('/api/v1/semesters', { body: semester })
+    mutationFn: async ({ period, slots }: { period: PeriodCreate; slots?: SlotGridDay[] }) => {
+      const { data, error } = await api.POST('/api/v1/periods', { body: period })
       if (error) throw error
-      const res = await api.PUT('/api/v1/semesters/{semester_id}/bells', {
-        params: { path: { semester_id: data.id } },
-        body: { schedules: bells },
-      })
-      if (res.error) throw res.error
+      if (slots) {
+        const res = await api.PUT('/api/v1/slot-grids', {
+          body: { period_id: data.id, name: T.defaultGrid, schedules: slots },
+        })
+        if (res.error) throw res.error
+      }
       return data
     },
     onSuccess: () => {
-      invalidate(queryKeys.semesters)
-      toast.success('Семестр создан')
+      invalidate(queryKeys.periods, queryKeys.slotGrids)
+      toast.success(T.periodCreated)
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError,
   })
 }
 
-export function useUpdateSemester() {
+export function useUpdatePeriod() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: SemesterUpdate }) => {
-      const { data, error } = await api.PATCH('/api/v1/semesters/{semester_id}', {
-        params: { path: { semester_id: id } },
+    mutationFn: async ({ id, body }: { id: string; body: PeriodUpdate }) => {
+      const { data, error } = await api.PATCH('/api/v1/periods/{period_id}', {
+        params: { path: { period_id: id } },
         body,
       })
       if (error) throw error
       return data
     },
     onSuccess: () => {
-      invalidate(queryKeys.semesters)
-      toast.success('Сохранено')
+      invalidate(queryKeys.periods)
+      toast.success(T.saved)
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError,
   })
 }
 
-// ---------- звонки ----------
-
-export function useBells(semesterId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.bells(semesterId ?? ''),
-    enabled: !!semesterId,
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/semesters/{semester_id}/bells', {
-        params: { path: { semester_id: semesterId! } },
-      })
-      if (error) throw error
-      return data
-    },
-  })
-}
-
-export function useReplaceBells(semesterId: string) {
-  const queryClient = useQueryClient()
+export function useDeletePeriod() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
-    mutationFn: async (schedules: BellScheduleIn[]) => {
-      const { data, error } = await api.PUT('/api/v1/semesters/{semester_id}/bells', {
-        params: { path: { semester_id: semesterId } },
-        body: { schedules },
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/periods/{period_id}', {
+        params: { path: { period_id: id } },
       })
       if (error) throw error
-      return data
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.bells(semesterId), data)
-      invalidate()
-      toast.success('Звонки сохранены')
-    },
-    onError: (error) => toast.error(errorMessage(error)),
+    onSuccess: () =>
+      invalidate(queryKeys.periods, queryKeys.slotGrids, queryKeys.scheduleRulesAll, queryKeys.daysOff, queryKeys.areas),
+    onError,
   })
 }
 
-// ---------- выходные ----------
+// ---------- сетки слотов ----------
+
+export function useSlotGrids() {
+  return useQuery({
+    queryKey: queryKeys.slotGrids,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/slot-grids')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Сетка — строки с одним (period_id, name); общая строка (weekday = null) — её id. */
+export type SlotGrid = { id: string; period_id: string | null; name: string; rows: SlotGridRow[] }
+
+export function groupGrids(rows: SlotGridRow[]): SlotGrid[] {
+  const heads = rows.filter((r) => r.weekday === null)
+  return heads.map((h) => ({
+    id: h.id,
+    period_id: h.period_id,
+    name: h.name,
+    rows: rows.filter((r) => r.period_id === h.period_id && r.name === h.name),
+  }))
+}
+
+/** Слоты сетки на день недели: переопределение дня или общие. */
+export function slotsFor(grid: SlotGrid | undefined, weekday: number): Slot[] {
+  if (!grid) return []
+  return (grid.rows.find((r) => r.weekday === weekday) ?? grid.rows.find((r) => r.weekday === null))?.slots ?? []
+}
+
+export function usePutSlotGrid() {
+  const invalidate = useInvalidateSchedule()
+  return useMutation({
+    mutationFn: async (body: SlotGridPut) => {
+      const { data, error } = await api.PUT('/api/v1/slot-grids', { body })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      invalidate(queryKeys.slotGrids)
+      toast.success(T.gridSaved)
+    },
+    onError,
+  })
+}
+
+export function useDeleteSlotGrid() {
+  const invalidate = useInvalidateSchedule()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/slot-grids/{grid_id}', {
+        params: { path: { grid_id: id } },
+      })
+      if (error) throw error
+    },
+    onSuccess: () => invalidate(queryKeys.slotGrids),
+    onError,
+  })
+}
+
+// ---------- исключения ----------
 
 export function useDaysOff() {
   return useQuery({
@@ -152,7 +262,7 @@ export function useCreateDayOff() {
       return data
     },
     onSuccess: () => invalidate(queryKeys.daysOff),
-    onError: (error) => toast.error(errorMessage(error)),
+    onError,
   })
 }
 
@@ -166,65 +276,71 @@ export function useDeleteDayOff() {
       if (error) throw error
     },
     onSuccess: () => invalidate(queryKeys.daysOff),
-    onError: (error) => toast.error(errorMessage(error)),
+    onError,
   })
 }
 
-// ---------- правила пар ----------
+// ---------- правила расписания ----------
 
-export function useClassRules(semesterId: string | undefined) {
+export type RuleFilter = { period_id?: string; area_id?: string; event_type_id?: string }
+
+export function useScheduleRules(filter: RuleFilter = {}, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.classRules(semesterId ?? ''),
-    enabled: !!semesterId,
+    queryKey: queryKeys.scheduleRules(filter),
+    enabled,
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/class-rules', {
-        params: { query: { semester_id: semesterId } },
-      })
+      const { data, error } = await api.GET('/api/v1/schedule-rules', { params: { query: filter } })
       if (error) throw error
       return data
     },
   })
 }
 
-export function useCreateClassRule() {
+export function useCreateScheduleRule() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
-    mutationFn: async (body: ClassRuleCreate) => {
-      const { data, error } = await api.POST('/api/v1/class-rules', { body })
+    mutationFn: async (body: ScheduleRuleCreate) => {
+      const { data, error } = await api.POST('/api/v1/schedule-rules', { body })
       if (error) throw error
       return data
     },
-    onSuccess: () => invalidate(queryKeys.classRulesAll),
-    onError: (error) => toast.error(errorMessage(error)),
+    onSuccess: () => invalidate(queryKeys.scheduleRulesAll),
+    onError,
   })
 }
 
-export function useUpdateClassRule() {
+export function useUpdateScheduleRule() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: ClassRuleUpdate }) => {
-      const { data, error } = await api.PATCH('/api/v1/class-rules/{rule_id}', {
+    mutationFn: async ({ id, body }: { id: string; body: ScheduleRuleUpdate }) => {
+      const { data, error } = await api.PATCH('/api/v1/schedule-rules/{rule_id}', {
         params: { path: { rule_id: id } },
         body,
       })
       if (error) throw error
       return data
     },
-    onSuccess: () => invalidate(queryKeys.classRulesAll),
-    onError: (error) => toast.error(errorMessage(error)),
+    onSuccess: () => invalidate(queryKeys.scheduleRulesAll),
+    onError,
   })
 }
 
-export function useDeleteClassRule() {
+export function useDeleteScheduleRule() {
   const invalidate = useInvalidateSchedule()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await api.DELETE('/api/v1/class-rules/{rule_id}', {
+      const { error } = await api.DELETE('/api/v1/schedule-rules/{rule_id}', {
         params: { path: { rule_id: id } },
       })
       if (error) throw error
     },
-    onSuccess: () => invalidate(queryKeys.classRulesAll),
-    onError: (error) => toast.error(errorMessage(error)),
+    onSuccess: () => invalidate(queryKeys.scheduleRulesAll),
+    onError,
   })
+}
+
+/** Тело создания из прочитанного правила (копирование). */
+export function ruleToCreate(rule: ScheduleRule): ScheduleRuleCreate {
+  const { id: _, ...rest } = rule
+  return rest
 }

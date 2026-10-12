@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from app.domain.search import HIT_END, HIT_START
 
 from .test_notes import make_note
-from .test_schedule_api import API, make_semester, make_subject, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
 from .test_sources import make_source
 
 
@@ -18,13 +18,13 @@ async def test_requires_auth(client: AsyncClient):
 
 
 async def test_search_notes_by_title_and_text(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
-    clim = await make_subject(auth_client, sem["id"])
-    phys = await make_subject(auth_client, sem["id"], name="Физика атмосферы", short_name="фа")
-    by_title = await make_note(auth_client, subject_id=phys["id"], title="Уравнения состояния")
+    sem = await make_period(auth_client)
+    clim = await make_area(auth_client, sem["id"])
+    phys = await make_area(auth_client, sem["id"], name="Физика атмосферы", short_name="фа")
+    by_title = await make_note(auth_client, area_id=phys["id"], title="Уравнения состояния")
     by_text = await make_note(
         auth_client,
-        subject_id=clim["id"],
+        area_id=clim["id"],
         title="Лекция 3",
         body_md="# Циркуляция\n\nУравнение состояния для **сухого** воздуха: $p = \\rho R T$.",
     )
@@ -43,7 +43,7 @@ async def test_search_notes_by_title_and_text(auth_client: AsyncClient):
     assert [n["id"] for n in (await search(auth_client, "сухОго"))["notes"]] == [by_text["id"]]
 
     # Фильтр по предмету
-    found = await search(auth_client, "состояния", subject_id=clim["id"])
+    found = await search(auth_client, "состояния", area_id=clim["id"])
     assert [n["id"] for n in found["notes"]] == [by_text["id"]]
 
     # Пустой / мусорный запрос — пусто, без ошибки
@@ -61,8 +61,8 @@ async def test_search_reflects_edits_and_deletes(auth_client: AsyncClient):
 
 
 async def test_search_sources(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
-    subject = await make_subject(auth_client, sem["id"])
+    sem = await make_period(auth_client)
+    subject = await make_area(auth_client, sem["id"])
     book = await make_source(auth_client, subject["id"], author="Матвеев Л. Т.")
     found = await search(auth_client, "матвеев")
     assert [s["id"] for s in found["sources"]] == [book["id"]]

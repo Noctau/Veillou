@@ -22,6 +22,7 @@ from app.services.replan import ReplanService
 
 from .test_ai import breakdown_answer, parsed_answer, photo_answer, run_jobs
 from .test_bot import buttons, linked, press, tg, tg_message
+from .test_tasks import seed_task_type
 from .test_telegram import TG_ID, BotHarness
 
 __all__ = ["linked", "tg"]
@@ -71,7 +72,7 @@ async def tasks(session: AsyncSession) -> list[Task]:
 def parse_answer(**over) -> str:
     data = {
         "title": "Реферат о муссонах",
-        "task_type": "essay",
+        "task_type": "Реферат",
         "deadline_date": "2030-03-01",
         "description": "10–12 страниц, 5 источников, ГОСТ",
     }
@@ -85,6 +86,7 @@ async def test_short_clear_text_skips_ai(tg, linked, session, fake):
 
 
 async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, session, fake):
+    essay_id = await seed_task_type(session, linked.id, "essay", "Реферат")
     await tg.dp.feed_update(tg.bot, Update(update_id=next(_ids), message=tg_message(LONG)))
     assert sent(tg, SendMessage)[-1].text == "🤖 Разбираю…"
     assert await tasks(session) == []  # пока только черновик
@@ -102,7 +104,7 @@ async def test_long_text_goes_to_ai_and_create_and_break_down(tg, linked, sessio
     [task] = await tasks(session)
     task_id = task.id
     assert task.title == "Реферат о муссонах"
-    assert task.task_type == "essay"
+    assert task.task_type_id == essay_id
     assert "ГОСТ" in task.description
     assert task.deadline is not None
     assert "Разбиваю на шаги" in sent(tg, EditMessageText)[-1].text
@@ -187,6 +189,8 @@ async def test_ai_error_reported_in_chat(tg, linked, fake):
 
 
 async def test_photo_creates_task_and_recognizes(tg, linked, session, fake, monkeypatch):
+    homework_id = await seed_task_type(session, linked.id, "homework", "ДЗ")
+
     async def download(bot, file_id: str) -> bytes:
         return b"\xff\xd8jpeg"
 
@@ -209,7 +213,7 @@ async def test_photo_creates_task_and_recognizes(tg, linked, session, fake, monk
     assert att.mime == "image/jpeg"
     assert sent(tg, SendMessage)[-1].text == "📷 Распознаю фото…"
 
-    fake.push(photo_answer(title="Задачи 1–5", text="Решить задачи 1–5", task_type="homework"))
+    fake.push(photo_answer(title="Задачи 1–5", text="Решить задачи 1–5", task_type="ДЗ"))
     await run_jobs(tg.bot)
     card = sent(tg, EditMessageText)[-1]
     assert "Задачи 1–5" in card.text
@@ -218,5 +222,5 @@ async def test_photo_creates_task_and_recognizes(tg, linked, session, fake, monk
     async with session_factory() as db:
         fresh = await db.get(Task, task.id)
         assert fresh is not None
-        assert fresh.task_type == "homework"
+        assert fresh.task_type_id == homework_id
         assert (await db.get(User, fresh.user_id)) is not None

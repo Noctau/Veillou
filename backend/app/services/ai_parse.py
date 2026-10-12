@@ -1,12 +1,12 @@
 """ИИ-разбор свободного текста (M10.5) и фото задания (M10.6).
 
 Текст: quickparse не уверен (`needs_ai`) → джоба `ai.parse` → черновик
-карточки (что это, название, предмет, тип, дедлайн). Явные даты и предмет,
+карточки (что это, название, сфера, тип, дедлайн). Явные даты и сфера,
 которые нашёл quickparse, важнее догадок ИИ. Ничего не создаётся — карточку
 подтверждают «Создать и разбить» / «Изменить».
 
 Фото: картинки-вложения задания → vision-модель → текст задания в описание,
-дедлайн, предмет и тип, если их ещё нет. Это правка самого задания (не плана),
+дедлайн, сфера и тип, если их ещё нет. Это правка самого задания (не плана),
 поэтому применяется сразу, а `PhotoDraft.updated` говорит, что поменялось.
 """
 
@@ -21,21 +21,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import Image
 from app.ai.prompts import ParseContext, parse_messages, photo_messages
-from app.ai.schemas import AIParsed, AIPhoto, with_subjects
+from app.ai.schemas import AIParsed, AIPhoto
 from app.core.exceptions import InvalidDataError
 from app.core.storage import Storage, get_storage
 from app.core.time import get_tz, now_utc, wall_to_utc
-from app.domain.enums import AIOrigin, AIPurpose, AttachmentOwner, JobKind, TaskType
-from app.domain.quickparse import AI_TEXT_LEN, END_OF_DAY, KindHint, SubjectRef, has_date_cue
-from app.models import Attachment, Job, Subject, Task, User
+from app.domain.enums import AIOrigin, AIPurpose, AttachmentOwner, JobKind
+from app.domain.quickparse import AI_TEXT_LEN, END_OF_DAY, KindHint, has_date_cue
+from app.models import Area, Attachment, Job, Task, User
 from app.schemas.ai import ParseDraft, PhotoDraft
 from app.schemas.backlog import BacklogCreate
 from app.schemas.task import TaskCreate
 from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
+from app.services.ai_profile import load_ai_context
 from app.services.backlog import BacklogService
-from app.services.breakdown import load_catalog
-from app.services.quickadd import Created, create_from_text, parse_text, subject_refs
+from app.services.quickadd import Created, create_from_text, parse_text
 from app.services.tasks import TaskRepo, TaskService
 
 # Название задания, созданного из фото без подписи: распознавание его заменит
@@ -43,19 +43,6 @@ PHOTO_TITLE = "Задание с фото"
 MAX_IMAGES = 4
 # Больше в vision-модель не шлём: файл целиком в памяти и ещё раз в base64
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
-
-
-def _subject_names(refs: list[SubjectRef]) -> dict[str, uuid.UUID]:
-    """Название предмета → id (первое имя в SubjectRef — полное название)."""
-    result: dict[str, uuid.UUID] = {}
-    for ref in refs:
-        if ref.names and isinstance(ref.id, uuid.UUID):
-            result.setdefault(ref.names[0], ref.id)
-    return result
-
-
-def _task_type(value: TaskType) -> TaskType | None:
-    return None if value == TaskType.other else value
 
 
 def _said(at: time | None, text: str) -> time | None:
@@ -102,18 +89,17 @@ class AIParseService:
 
     async def parse(self, text: str, job_id: uuid.UUID | None = None) -> ParseDraft:
         now = now_utc().astimezone(self.tz)
-        refs = await subject_refs(self.db, self.user, now.date())
-        names = _subject_names(refs)
-        quick = await parse_text(self.db, self.user, text)
+        ai = await load_ai_context(self.db, self.user, now.date())
+        parsed = await parse_text(self.db, self.user, text)
+        quick = parsed.result
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.parse,
-            parse_messages(ParseContext(text, now.replace(tzinfo=None), list(names))),
-            with_subjects(AIParsed, list(names)),
+            parse_messages(ParseContext(text, now.replace(tzinfo=None), ai.profile)),
+            ai.schema(AIParsed),
             job_id=job_id,
         )
-        catalog = await load_catalog(self.db, self.user_id)
 
         deadline = None
         if quick.date is not None and quick.deadline is not None:
@@ -121,22 +107,25 @@ class AIParseService:
         elif (wall := answer.deadline_wall()) and has_date_cue(text):
             day, at = wall
             deadline = wall_to_utc(day, _said(at, text) or END_OF_DAY, self.tz)
-        subject_id = quick.subject_id if isinstance(quick.subject_id, uuid.UUID) else None
-        subject_id = subject_id or (names.get(answer.subject) if answer.subject else None)
+        area_id = quick.area_id if isinstance(quick.area_id, uuid.UUID) else None
+        area_id = area_id or ai.area_id(answer.area)
         kind = KindHint(answer.kind)
         if kind == KindHint.event and (quick.date is None or quick.time is None):
             # Событию нужно точное время — без него это задание или дело
             kind = KindHint.task if deadline or answer.task_type else KindHint.backlog
         # Правила quickparse по ключевым словам надёжнее догадки ИИ
-        action = quick.action_type or answer.action_type
+        if quick.action_type is not None or parsed.action_type_id is not None:
+            action_type_id = parsed.action_type_id
+        else:
+            action_type_id = ai.action_id(answer.action_type)
         return ParseDraft(
             kind=kind,
             title=answer.title[:300],
             description=_description(answer.description, text),
-            task_type=_task_type(answer.task_type) or quick.task_type,
-            subject_id=subject_id,
+            task_type_id=ai.task_types.id_of(answer.task_type) or parsed.task_type_id,
+            area_id=area_id,
             deadline=deadline,
-            action_type_id=catalog.action_id(action),
+            action_type_id=action_type_id,
             text=text,
         )
 
@@ -198,14 +187,14 @@ class AIParseService:
         if not images:
             raise jobs.JobFailedError("У задания нет фото")
         now = now_utc().astimezone(self.tz)
-        names = _subject_names(await subject_refs(self.db, self.user, now.date()))
+        ai = await load_ai_context(self.db, self.user, now.date())
         caption = "" if task.title == PHOTO_TITLE else task.title
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.photo,
-            photo_messages(ParseContext(caption, now.replace(tzinfo=None), list(names))),
-            with_subjects(AIPhoto, list(names)),
+            photo_messages(ParseContext(caption, now.replace(tzinfo=None), ai.profile)),
+            ai.schema(AIPhoto),
             images=images,
             job_id=job_id,
         )
@@ -213,7 +202,7 @@ class AIParseService:
         if wall := answer.deadline_wall():
             day, at = wall
             deadline = wall_to_utc(day, at or END_OF_DAY, self.tz)
-        subject_id = names.get(answer.subject) if answer.subject else None
+        area_id = ai.area_id(answer.area)
 
         updated: list[str] = []
         text = answer.text.strip()
@@ -226,18 +215,19 @@ class AIParseService:
         if task.deadline is None and deadline is not None:
             task.deadline = deadline
             updated.append("deadline")
-        if task.subject_id is None and subject_id is not None:
-            task.subject_id = subject_id
-            updated.append("subject_id")
-        if task.task_type == TaskType.other and _task_type(answer.task_type):
-            task.task_type = answer.task_type
-            updated.append("task_type")
+        if task.area_id is None and area_id is not None:
+            task.area_id = area_id
+            updated.append("area_id")
+        task_type_id = ai.task_types.id_of(answer.task_type)
+        if task.task_type_id is None and task_type_id is not None:
+            task.task_type_id = task_type_id
+            updated.append("task_type_id")
         return PhotoDraft(
             task_id=task.id,
             title=task.title,
             text=text,
-            task_type=_task_type(answer.task_type),
-            subject_id=subject_id,
+            task_type_id=task_type_id,
+            area_id=area_id,
             deadline=deadline,
             updated=updated,
         )
@@ -259,7 +249,7 @@ async def create_from_draft(
     kind = kind or draft.kind
     if kind == KindHint.event:
         return await create_from_text(db, user, draft.text, kind=KindHint.event)
-    subject = await db.get(Subject, draft.subject_id) if draft.subject_id else None
+    area = await db.get(Area, draft.area_id) if draft.area_id else None
     if kind == KindHint.backlog:
         tz = get_tz(user.timezone)
         desired = draft.deadline.astimezone(tz).date() if draft.deadline else None
@@ -276,9 +266,9 @@ async def create_from_draft(
     task = await TaskService(db, user).create(
         TaskCreate(
             title=draft.title,
-            task_type=draft.task_type or TaskType.other,
+            task_type_id=draft.task_type_id,
             description=draft.description,
-            subject_id=draft.subject_id,
+            area_id=draft.area_id,
             action_type_id=draft.action_type_id,
             deadline=draft.deadline,
         )
@@ -288,5 +278,5 @@ async def create_from_draft(
         task.id,
         draft.title,
         deadline=draft.deadline,
-        subject=subject.name if subject else None,
+        area=area.name if area else None,
     )

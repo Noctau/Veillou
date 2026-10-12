@@ -1,6 +1,6 @@
 import { formatDay, wallDate, wallTime } from '@/lib/time'
 
-import type { PlanReason, PlanRevision, RiskReason } from './usePlan'
+import type { PlanRevision } from './usePlan'
 
 /** 1 блок, 2 блока, 5 блоков. */
 export function plural(n: number, one: string, few: string, many: string): string {
@@ -9,25 +9,6 @@ export function plural(n: number, one: string, few: string, many: string): strin
   if (mod10 === 1 && mod100 !== 11) return one
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few
   return many
-}
-
-export const RISK_LABEL: Record<RiskReason, string> = {
-  no_slots: 'нет подходящего времени до дедлайна',
-  no_time: 'не хватает времени до дедлайна',
-  dependency: 'не поставлен предыдущий шаг',
-  late: 'позже, чем хотелось (впритык к дедлайну)',
-  overdue: 'дедлайн уже прошёл',
-  rest: 'влезет, только если отдать минимум отдыха',
-  quota: 'не набирается недельная норма',
-}
-
-export const REASON_LABEL: Record<PlanReason, string> = {
-  manual: 'Перепланировали',
-  changes: 'План устарел после правок',
-  missed: 'Переносим невыполненное',
-  nightly: 'Пересчитали план за ночь',
-  weekly: 'Дела из ящика на неделю',
-  exam: 'План подготовки к экзамену',
 }
 
 /** «3 блока перенесены · 1 задание под угрозой» */

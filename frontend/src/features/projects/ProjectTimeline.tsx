@@ -1,8 +1,8 @@
 import { AlertTriangleIcon } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { formatDay, todayIn } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
 import { buildTimeline, shortTitle, type TimelinePoint } from './timeline'

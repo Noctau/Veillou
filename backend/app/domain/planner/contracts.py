@@ -33,21 +33,39 @@ class TimeRange:
     end: time
 
 
+Interval = tuple[datetime, datetime]
+
+
+@dataclass(frozen=True)
+class DaySpec:
+    """Сутки по режиму дня (domain/dayprofile.py): день планировщика — от подъёма
+    `wake` до подъёма следующего дня; сон — от отбоя `sleep` до него же.
+
+    Ночь «после ночной смены» — это хвост предыдущего дня (до позднего подъёма).
+    """
+
+    date: date
+    wake: datetime
+    sleep: datetime  # отбой (может быть после полуночи)
+    lunch: Interval | None = None
+    # Общие окна для дел; блок без своих окон ставится только сюда
+    work: tuple[Interval, ...] = ()
+    # Может ли этот день дать свободный вечер / половину выходного (минимум отдыха)
+    rest_evening_ok: bool = True
+    rest_halfday_ok: bool = False
+
+
 @dataclass(frozen=True)
 class PlanSettings:
-    """Срез настроек пользователя, нужный планировщику (schemas/settings.py)."""
+    """Срез настроек пользователя, нужный планировщику (schemas/settings.py).
 
-    work_weekdays: TimeRange = TimeRange(time(9, 0), time(21, 0))
-    work_weekends: TimeRange = TimeRange(time(11, 0), time(19, 0))
-    sleep: TimeRange = TimeRange(time(23, 30), time(7, 30))
-    lunch: TimeRange | None = TimeRange(time(13, 0), time(14, 0))
-    # Вычитается целиком до первой и после последней пары дня
-    travel_buffer_min: int = 60
-    study_limit_min_per_day: int = 360
+    Сон, обед и рабочие окна — по дням (`PlanInput.days`, режимы дня)."""
+
     deadline_buffer_days: int = 1
     max_subtasks_per_task_per_day: int = 2
-    # Минимум отдыха в неделю: свободные вечера (evening_start → сон, любой день)
-    # и половины выходных (подъём → half_day_split, half_day_split → сон в Сб/Вс)
+    # Минимум отдыха в неделю: свободные вечера (evening_start → отбой, в дни с
+    # `rest_evening_ok`) и половины выходных (подъём → half_day_split,
+    # half_day_split → отбой, в дни с `rest_halfday_ok`)
     free_evenings_per_week: int = 2
     weekend_half_days: int = 1
     evening_start: time = time(18, 0)
@@ -60,13 +78,33 @@ class PlanSettings:
 
 
 @dataclass(frozen=True)
+class Budget:
+    """Лимит нагрузки: блоков с этим лимитом — не больше `minutes_per_day` в день.
+
+    `overrides` — разовый лимит на день (дата дня планировщика → минут). Блок
+    в двух лимитах учитывается в обоих; id, которого нет в `PlanInput.budgets`,
+    ничего не ограничивает.
+    """
+
+    id: BlockId
+    minutes_per_day: int
+    overrides: tuple[tuple[date, int], ...] = ()
+
+
+@dataclass(frozen=True)
 class Busy:
-    """Жёсткий интервал (пара, личное, отдых): планировщик туда ничего не ставит."""
+    """Жёсткий интервал (событие типа занятости): планировщик туда ничего не ставит."""
 
     start: datetime
     end: datetime
-    # Пара: в её день вычитается буфер дороги до первой и после последней пары
-    is_class: bool = False
+    # Дорога, мин: вычитается до начала и после конца
+    buffer_before: int = 0
+    buffer_after: int = 0
+    # Склейка: интервалы одного дня с одним ключом получают буфер только до первого
+    # и после последнего (тип занятости + место). None — буфер у каждого свой
+    merge_key: str | None = None
+    # Лимиты, в которые засчитывается (по типу занятости, M17)
+    budgets: frozenset[BlockId] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -80,7 +118,7 @@ class FixedBlock:
     start: datetime
     end: datetime
     group_id: BlockId | None = None  # задание
-    counts_as_study: bool = True
+    budgets: frozenset[BlockId] = frozenset()
     # Метка нормы (проект): засчитывается в `Quota` с этой меткой
     quota: BlockId | None = None
 
@@ -95,13 +133,16 @@ class Block:
     deadline: datetime | None = None
     # Вес: и в «раньше закончить», и в штрафе за непостановку. normal = 1, high = 3
     priority: int = 1
-    # Окна типа действия или свои окна задачи; пусто — общие рабочие часы
+    # Окна типа действия или свои окна задачи; пусто — общие рабочие окна дня
     windows: tuple[Window, ...] = ()
+    # Окна — только в пределах рабочих окон дня (чипы дела из ящика без своих окон)
+    within_work: bool = False
     # id блоков (или FixedBlock), которые должны закончиться раньше начала этого
     depends_on: tuple[BlockId, ...] = ()
     splittable: bool = False
-    counts_as_study: bool = True
-    # Лёгкое предпочтение утра («связь с людьми»)
+    # Лимиты нагрузки, в которые засчитывается время блока (по типу действия)
+    budgets: frozenset[BlockId] = frozenset()
+    # Лёгкое предпочтение утра (флаг типа действия)
     prefer_morning: bool = False
     # Не раньше этого момента
     earliest: datetime | None = None
@@ -156,8 +197,9 @@ class PlanInput:
     fixed: tuple[FixedBlock, ...] = ()
     previous: tuple[Placement, ...] = ()
     settings: PlanSettings = PlanSettings()
-    # Разовый лимит учёбы на день (дата дня планировщика → минут) вместо общего
-    study_limits: tuple[tuple[date, int], ...] = ()
+    # Сутки по режимам дня; даты без своего DaySpec — по умолчанию (dayprofile.FALLBACK)
+    days: tuple[DaySpec, ...] = ()
+    budgets: tuple[Budget, ...] = ()
     quotas: tuple[Quota, ...] = ()
     # Горизонт: от now до самого дальнего дедлайна, но не меньше min и не больше max
     max_horizon_days: int = 60

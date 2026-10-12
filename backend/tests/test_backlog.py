@@ -34,16 +34,24 @@ async def test_create_guesses_action_type_and_category(auth_client):
 
 
 async def test_fields_and_validation(auth_client):
+    types = await action_types(auth_client)
     item = await make_item(
         auth_client,
         estimate_min=60,
         desired_by="2026-10-31",
-        conditions=["weekday_daytime", "institution_hours", "weekday_daytime"],
+        conditions=["weekday_daytime", "needs_laptop", "weekday_daytime"],
+        hours_action_type_id=types["institutions"]["id"],
         time_window=[{"weekdays": [1, 2, 3, 4, 5], "start": "08:00", "end": "20:00"}],
     )
-    assert item["conditions"] == ["weekday_daytime", "institution_hours"]
+    assert item["conditions"] == ["weekday_daytime", "needs_laptop"]
+    assert item["hours_action_type_id"] == types["institutions"]["id"]
     assert item["desired_by"] == "2026-10-31"
-    for bad in ({"conditions": ["in_city"]}, {"estimate_min": 0}, {"title": " "}):
+    for bad in (
+        {"conditions": ["in_city"]},
+        {"conditions": ["institution_hours"]},  # теперь — hours_action_type_id
+        {"estimate_min": 0},
+        {"title": " "},
+    ):
         resp = await auth_client.post(f"{API}/backlog", json={"title": "x", **bad})
         assert resp.status_code == 422, bad
     resp = await auth_client.patch(f"{API}/backlog/{item['id']}", json={"conditions": None})

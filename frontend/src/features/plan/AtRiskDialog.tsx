@@ -6,18 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBacklog, useTakeForWeek } from '@/features/backlog/useBacklog'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
+import { useBudgets, usePutBudgetOverride } from '@/features/catalog/useCatalog'
 import { useSettings } from '@/features/settings/useSettings'
 import { formatMinutes } from '@/features/tasks/labels'
 import { useUpdateSubtask } from '@/features/tasks/useSubtasks'
 import { type TaskDetail, useTask, useUpdateTask } from '@/features/tasks/useTasks'
+import { RISK_LABEL } from '@/lib/terms'
 import { addDaysIso, todayIn, wallDate } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
-import { RISK_LABEL } from './labels'
-import { type PlanRisk, usePreviewPlan, usePutDayLimit } from './usePlan'
+import { type PlanRisk, usePreviewPlan } from './usePlan'
 
 type Props = {
   risk: PlanRisk | null
@@ -25,8 +27,9 @@ type Props = {
 }
 
 /**
- * Варианты, когда что-то под угрозой (ТЗ §6, шаг 4): урезать оценки, больше учёбы
- * в конкретный день, убрать дела из ящика с недели, сдвинуть внутренний срок.
+ * Варианты, когда что-то под угрозой (ТЗ §6, шаг 4): урезать оценки, расширить
+ * лимит нагрузки в конкретный день, убрать дела из ящика с недели, сдвинуть
+ * внутренний срок.
  * Решает пользователь; после выбора — новое превью. Дело из ящика, которое не
  * влезло, можно снять с недели. Норма проекта не набирается — уменьшить её
  * или дать больше часов в конкретный день.
@@ -52,7 +55,7 @@ export function AtRiskDialog({ risk, onOpenChange }: Props) {
           <BacklogOptions risk={risk} onDone={close} />
         ) : risk?.group_kind === 'project' ? (
           <ProjectOptions risk={risk} onDone={close} />
-        ) : risk?.group_kind === 'exam' ? (
+        ) : risk?.group_kind === 'prep' ? (
           <div className="flex flex-col gap-4">
             {risk.reason === 'rest' && <RestNote />}
             <DayLimitSection deadline={risk.deadline} onDone={close} />
@@ -179,7 +182,7 @@ function TaskOptions({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk;
       </section>
 
       <Separator />
-      <DayLimitSection deadline={risk.deadline} onDone={onDone} />
+      <DayLimitSection deadline={risk.deadline} actionTypeId={task.action_type_id} onDone={onDone} />
       <DropBacklogSection onDone={onDone} />
 
       {buffer > 0 && task.deadline && (
@@ -208,25 +211,58 @@ function TaskOptions({ task, risk, onDone }: { task: TaskDetail; risk: PlanRisk;
   )
 }
 
-/** «Больше учёбы в один день»: разовый лимит на дату. */
-function DayLimitSection({ deadline, onDone }: { deadline: string | null; onDone: () => void }) {
+/** «Расширить часы в этот день»: разовый лимит выбранного лимита нагрузки на дату. */
+function DayLimitSection({
+  deadline,
+  actionTypeId,
+  onDone,
+}: {
+  deadline: string | null
+  actionTypeId?: string | null
+  onDone: () => void
+}) {
   const tz = useTimeZone()
-  const { data: settings } = useSettings()
-  const putLimit = usePutDayLimit()
+  const { data: budgets } = useBudgets()
+  const putLimit = usePutBudgetOverride()
   const { replan, pending } = useReplan(onDone)
   const today = todayIn(tz)
   const lastDay = deadline ? wallDate(deadline, tz) : addDaysIso(today, 13)
   const [day, setDay] = useState(today)
-  const limitHours = (settings?.study_limit_min_per_day ?? 360) / 60
-  const [hours, setHours] = useState(limitHours + 2)
+  // По умолчанию — лимит, куда идёт тип действия задачи
+  const fallback = budgets?.find((b) => actionTypeId && b.action_type_ids.includes(actionTypeId)) ?? budgets?.[0]
+  const [chosen, setChosen] = useState<string | null>(null)
+  const budget = budgets?.find((b) => b.id === chosen) ?? fallback
+  const [hours, setHours] = useState<number | null>(null)
+  if (!budget) return null
+  const limitHours = budget.minutes_per_day / 60
+  const value = hours ?? limitHours + 2
 
   return (
     <section className="flex flex-col gap-2">
       <h3 className="flex items-center gap-2 text-sm font-medium">
-        <TimerIcon className="size-4" /> Больше учёбы в один день
+        <TimerIcon className="size-4" /> Больше часов в один день
       </h3>
-      <p className="text-xs text-muted-foreground">Обычно — до {limitHours} ч в день. Разово можно больше.</p>
+      <p className="text-xs text-muted-foreground">
+        Лимит «{budget.name}» — до {limitHours} ч в день. Разово можно больше.
+      </p>
       <div className="flex flex-wrap items-end gap-2">
+        {budgets && budgets.length > 1 && (
+          <div className="flex min-w-36 flex-1 flex-col gap-1">
+            <Label htmlFor="risk-budget">Лимит</Label>
+            <Select value={budget.id} onValueChange={(id) => (setChosen(id), setHours(null))}>
+              <SelectTrigger id="risk-budget" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {budgets.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="flex min-w-36 flex-1 flex-col gap-1">
           <Label htmlFor="risk-day">День</Label>
           <Input id="risk-day" type="date" min={today} max={lastDay} value={day} onChange={(e) => setDay(e.target.value)} />
@@ -238,17 +274,19 @@ function DayLimitSection({ deadline, onDone }: { deadline: string | null; onDone
             type="number"
             inputMode="decimal"
             min={0.5}
-            max={16}
+            max={24}
             step={0.5}
-            value={hours}
+            value={value}
             onChange={(e) => setHours(Number(e.target.value))}
           />
         </div>
         <Button
           size="sm"
           variant="outline"
-          disabled={pending || putLimit.isPending || !day || !(hours > 0 && hours <= 16)}
-          onClick={() => putLimit.mutate({ day, minutes: Math.round(hours * 60) }, { onSuccess: replan })}
+          disabled={pending || putLimit.isPending || !day || !(value > 0 && value <= 24)}
+          onClick={() =>
+            putLimit.mutate({ budgetId: budget.id, day, minutes: Math.round(value * 60) }, { onSuccess: replan })
+          }
         >
           Пересчитать
         </Button>
@@ -257,7 +295,7 @@ function DayLimitSection({ deadline, onDone }: { deadline: string | null; onDone
   )
 }
 
-/** «Убрать дела из ящика»: снять взятые на неделю — их время отдать учёбе. */
+/** «Убрать дела из ящика»: снять взятые на неделю — их время отдать задачам. */
 function DropBacklogSection({ onDone }: { onDone: () => void }) {
   const { data: items } = useBacklog('active')
   const take = useTakeForWeek()
@@ -299,7 +337,7 @@ function BacklogOptions({ risk, onDone }: { risk: PlanRisk; onDone: () => void }
     <div className="flex flex-col gap-3 text-sm">
       {risk.reason === 'rest' && <RestNote />}
       <p className="text-muted-foreground">
-        Сначала план ставит учёбу, дела из ящика — в оставшиеся окна, подходящие под их условия. Можно снять дело с недели:
+        Сначала план ставит задачи, дела из ящика — в оставшиеся окна, подходящие под их условия. Можно снять дело с недели:
         оно вернётся в следующий разбор.
       </p>
       <div className="flex justify-end gap-2">

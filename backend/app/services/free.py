@@ -20,8 +20,6 @@ from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain import backlog as box
 from app.domain.calibration import calibrated
 from app.domain.enums import (
-    ActionTypeKey,
-    BacklogCondition,
     BacklogStatus,
     EventKind,
     EventStatus,
@@ -35,9 +33,9 @@ from app.models import ActionType, BacklogItem, Event, Subtask, Task, User
 from app.models.base import UserOwnedMixin
 from app.schemas.review import FreeSuggestion
 from app.schemas.task import SubtaskSchedule
-from app.services.calibration import DEFAULT_ACTION, coefficients
+from app.services.calibration import coefficients
+from app.services.day_profiles import load_days
 from app.services.replan import windows_from_json
-from app.services.settings import effective_settings
 from app.services.tasks import TaskService
 
 SOURCE_MODEL: dict[str, type[Task] | type[Subtask] | type[BacklogItem]] = {
@@ -76,7 +74,6 @@ class FreeService:
 
     async def candidates(self) -> tuple[list[FreeCandidate], dict[tuple[Kind, uuid.UUID], Meta]]:
         action_types = {a.id: a for a in await self._all(ActionType)}
-        by_key = {a.key: a for a in action_types.values() if a.key}
         coefs = await coefficients(self.db, self.user_id)
         tasks = {t.id: t for t in await self._all(Task, Task.status == TaskStatus.active)}
         subtasks = await self._all(Subtask, Subtask.task_id.in_(tasks))
@@ -116,14 +113,15 @@ class FreeService:
             elif task.estimate_min:
                 items.append(("task", task.id, None, task.estimate_min))
             for kind, id, sub, estimate in items:
-                at = type_of((sub.action_type_id if sub else None) or task.action_type_id)
+                action_id = (sub.action_type_id if sub else None) or task.action_type_id
+                at = type_of(action_id)
                 if sub is not None and sub.time_window:
                     windows = windows_from_json(sub.time_window)
                 elif task.time_window:
                     windows = windows_from_json(task.time_window)
                 else:
                     windows = windows_from_json(at.windows) if at else ()
-                key = (task.task_type, at.key if at and at.key else DEFAULT_ACTION)
+                key = (task.task_type_id, action_id)
                 planned = next_block.get(id)
                 rank = (
                     planned is None,
@@ -142,16 +140,11 @@ class FreeService:
                 )
                 meta[(kind, id)] = (task.title if sub else None, task.id, task.deadline)
 
-        s = effective_settings(self.user)
-        work = (
-            Window(
-                frozenset({1, 2, 3, 4, 5}), s.work_hours.weekdays.start, s.work_hours.weekdays.end
-            ),
-            Window(frozenset({6, 7}), s.work_hours.weekends.start, s.work_hours.weekends.end),
-        )
-        institution = by_key.get(ActionTypeKey.institutions)
-        inst_windows = windows_from_json(institution.windows) if institution else ()
-        classes_today = await self._classes_today()
+        # Дело без своих окон — в рабочие окна сегодняшнего режима дня
+        profile = (await load_days(self.db, self.user, self.today, self.today)).profile(self.today)
+        weekday = frozenset({self.today.isoweekday()})
+        work = tuple(Window(weekday, start, end) for start, end in profile.work)
+        types_today = await self._event_types_today()
         week = box.week_start(self.today)
         for item in await self._all(BacklogItem, BacklogItem.status == BacklogStatus.active):
             at = type_of(item.action_type_id)
@@ -160,9 +153,11 @@ class FreeService:
                 if item.time_window
                 else (windows_from_json(at.windows) if at else ()) or work
             )
+            hours = type_of(item.hours_action_type_id)
             days = None
-            if BacklogCondition.on_class_days in item.conditions:
-                days = frozenset({self.today}) if classes_today else frozenset()
+            if item.days_event_type_id is not None:
+                today = item.days_event_type_id in types_today
+                days = frozenset({self.today}) if today else frozenset()
             created = local_date(item.created_at, self.tz)
             result.append(
                 FreeCandidate(
@@ -170,7 +165,9 @@ class FreeService:
                     item.id,
                     item.title,
                     item.estimate_min or box.DEFAULT_ESTIMATE_MIN,
-                    box.condition_windows(base, item.conditions, inst_windows),
+                    box.condition_windows(
+                        base, item.conditions, windows_from_json(hours.windows) if hours else ()
+                    ),
                     days,
                     rank=(
                         item.planned_week is None or item.planned_week < week,
@@ -182,16 +179,17 @@ class FreeService:
             meta[("backlog", item.id)] = ("Из ящика", None, None)
         return result, meta
 
-    async def _classes_today(self) -> bool:
+    async def _event_types_today(self) -> set[uuid.UUID]:
+        """Типы занятости, события которых есть сегодня (условие «в дни событий типа»)."""
         start = wall_to_utc(self.today, time(0), self.tz)
         rows = await self._all(
             Event,
-            Event.kind == EventKind.class_,
+            Event.kind == EventKind.busy,
             Event.status != EventStatus.cancelled,
             Event.start >= start,
             Event.start < start + timedelta(days=1),
         )
-        return bool(rows)
+        return {e.event_type_id for e in rows if e.event_type_id is not None}
 
     async def suggest(self, minutes: int) -> list[FreeSuggestion]:
         candidates, meta = await self.candidates()
@@ -264,7 +262,7 @@ class FreeService:
                 user_id=self.user_id,
                 kind=EventKind.subtask,
                 title=source.title,
-                subject_id=source.subject_id,
+                area_id=source.area_id,
                 source_type=SourceType.task,
                 source_id=id,
             )

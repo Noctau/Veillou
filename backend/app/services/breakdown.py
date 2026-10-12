@@ -21,10 +21,9 @@ from app.ai.prompts import BreakdownContext, PrevStep, breakdown_messages
 from app.ai.schemas import AIBreakdown
 from app.core.config import settings
 from app.core.exceptions import InvalidDataError
-from app.core.time import get_tz, now_utc
+from app.core.time import get_tz, local_date, now_utc
 from app.domain.breakdown import RawStep, normalize_steps, time_warning
 from app.domain.enums import (
-    ActionTypeKey,
     AIOrigin,
     AIPurpose,
     EventStatus,
@@ -33,17 +32,17 @@ from app.domain.enums import (
     PlanReason,
     SourceType,
     SubtaskStatus,
-    TaskType,
 )
 from app.domain.planner import free_minutes
 from app.models import (
     ActionType,
+    Area,
+    AreaType,
     BreakdownTemplate,
     Category,
     Event,
     Job,
     Project,
-    Subject,
     Subtask,
     Task,
     User,
@@ -59,48 +58,29 @@ from app.schemas.ai import (
 )
 from app.services import jobs
 from app.services.ai import call_llm, enqueue_ai
+from app.services.ai_profile import AIContext, load_ai_context
 from app.services.base import UserScopedRepository
-from app.services.calibration import DEFAULT_ACTION, coefficients
-from app.services.catalog import ensure_defaults
+from app.services.budgets import budget_index
+from app.services.calibration import coefficients
+from app.services.catalog import ensure_defaults, load_task_types
 from app.services.replan import ReplanService, windows_from_json
 from app.services.tasks import TaskRepo
 
 
 @dataclass
 class Catalog:
-    """Справочники пользователя: ключ ↔ id."""
+    """Типы действий пользователя: проверка ссылок шагов и шаблонов."""
 
-    action_by_key: dict[str, ActionType]
-    action_key_by_id: dict[uuid.UUID, str]
-    category_by_key: dict[str, Category]
-
-    def action_id(self, key: str | None) -> uuid.UUID | None:
-        at = self.action_by_key.get(key) if key else None
-        return at.id if at else None
+    actions: dict[uuid.UUID, ActionType]
 
 
 async def load_catalog(db: AsyncSession, user_id: uuid.UUID) -> Catalog:
     if await ensure_defaults(db, user_id):
         await db.flush()
-    actions = list(
-        await db.scalars(
-            select(ActionType).where(ActionType.user_id == user_id, ActionType.deleted_at.is_(None))
-        )
+    actions = await db.scalars(
+        select(ActionType).where(ActionType.user_id == user_id, ActionType.deleted_at.is_(None))
     )
-    categories = list(
-        await db.scalars(
-            select(Category).where(
-                Category.user_id == user_id,
-                Category.deleted_at.is_(None),
-                Category.key.is_not(None),
-            )
-        )
-    )
-    return Catalog(
-        {a.key: a for a in actions},
-        {a.id: a.key for a in actions},
-        {c.key: c for c in categories if c.key},
-    )
+    return Catalog({a.id: a for a in actions})
 
 
 class _TemplateRepo(UserScopedRepository[BreakdownTemplate]):
@@ -144,31 +124,32 @@ class BreakdownService:
         await self.db.commit()
         return job_id
 
-    async def _free_minutes(self, task: Task, catalog: Catalog, act: str) -> int | None:
+    async def _free_minutes(self, task: Task, catalog: Catalog) -> int | None:
         if task.deadline is None:
             return None
         snap = await ReplanService(self.db, self.user).snapshot()
-        at = catalog.action_by_key.get(act)
+        at = catalog.actions.get(task.action_type_id) if task.action_type_id else None
         windows = windows_from_json(task.time_window or (at.windows if at else None))
+        budgets = await budget_index(self.db, self.user_id, local_date(snap.inp.now, self.tz))
         return free_minutes(
             snap.inp,
             deadline=task.deadline,
             windows=windows,
-            counts_as_study=act == ActionTypeKey.study,
+            budgets=budgets.of(at.id if at else None),
             exclude_group=str(task.id),
         )
 
     async def context(
-        self, task: Task, request: BreakdownRequest
+        self, task: Task, request: BreakdownRequest, ai: AIContext
     ) -> tuple[BreakdownContext, int | None, float]:
-        """Контекст промпта, свободные минуты (в «её» темпе) и коэффициент калибровки."""
+        """Контекст промпта, свободные минуты (в темпе пользователя) и коэффициент калибровки."""
         catalog = await load_catalog(self.db, self.user_id)
-        act = catalog.action_key_by_id.get(task.action_type_id) if task.action_type_id else None
-        act = act or DEFAULT_ACTION
-        coef = (await coefficients(self.db, self.user_id)).get((task.task_type, act), 1.0)
-        free = await self._free_minutes(task, catalog, act)
+        coefs = await coefficients(self.db, self.user_id)
+        coef = coefs.get((task.task_type_id, task.action_type_id), 1.0)
+        free = await self._free_minutes(task, catalog)
 
-        subject = await self.db.get(Subject, task.subject_id) if task.subject_id else None
+        area = await self.db.get(Area, task.area_id) if task.area_id else None
+        area_type = await self.db.get(AreaType, area.area_type_id) if area else None
         project = await self.db.get(Project, task.project_id) if task.project_id else None
         done = await self.db.scalars(
             select(Subtask.title)
@@ -184,16 +165,17 @@ class BreakdownService:
         ctx = BreakdownContext(
             title=task.title,
             today=now.date(),
-            task_type=task.task_type if task.task_type != TaskType.other else None,
+            task_type=ai.task_types.name_of(task.task_type_id),
             description=task.description,
-            subject=subject.name if subject else None,
+            area=(f"{area.name} ({area_type.name})" if area_type else area.name) if area else None,
             project=project.title if project else None,
             deadline=task.deadline.astimezone(self.tz) if task.deadline else None,
-            # ИИ оценивает «чистое» время; в её темпе свободного как бы меньше
+            # ИИ оценивает «чистое» время; в темпе пользователя свободного как бы меньше
             free_minutes=round(free / coef) if free is not None else None,
             done_steps=list(done),
             previous=[PrevStep(s.title, s.estimate_min) for s in request.previous],
             comment=request.comment,
+            profile=ai.profile,
         )
         return ctx, free, coef
 
@@ -207,23 +189,28 @@ class BreakdownService:
             comment=payload.get("comment"),
             previous=[BreakdownStep.model_validate(s) for s in payload.get("previous") or []],
         )
-        ctx, free, coef = await self.context(task, request)
+        ai = await load_ai_context(self.db, self.user, local_date(now_utc(), self.tz))
+        ctx, free, coef = await self.context(task, request, ai)
         answer = await call_llm(
             self.db,
             self.user_id,
             AIPurpose.breakdown,
             breakdown_messages(ctx),
-            AIBreakdown,
+            ai.schema(AIBreakdown),
             job_id=job.id,
         )
-        draft = await self.to_draft(task, answer, free, coef)
+        draft = await self.to_draft(task, answer, free, coef, ai)
         job.result = draft.model_dump(mode="json")
         return draft
 
     async def to_draft(
-        self, task: Task, answer: AIBreakdown, free: int | None, coef: float
+        self,
+        task: Task,
+        answer: AIBreakdown,
+        free: int | None,
+        coef: float,
+        ai: AIContext | None = None,
     ) -> BreakdownDraft:
-        catalog = await load_catalog(self.db, self.user_id)
         normalized = normalize_steps(
             [
                 RawStep(
@@ -232,20 +219,19 @@ class BreakdownService:
                 for s in answer.subtasks
             ]
         )
-        # Тип задания ИИ уточняет, только если его не задали руками
-        task_type = (
-            answer.task_type if task.task_type == TaskType.other else TaskType(task.task_type)
-        )
-        category = catalog.category_by_key.get(answer.category)
+        # Тип задачи ИИ уточняет, только если его не задали руками
+        if ai is None:
+            ai = await load_ai_context(self.db, self.user, local_date(now_utc(), self.tz))
+        task_type_id = task.task_type_id or ai.task_types.id_of(answer.task_type)
         return BreakdownDraft(
             task_id=task.id,
-            task_type=task_type,
-            category_id=task.category_id or (category.id if category else None),
+            task_type_id=task_type_id,
+            category_id=task.category_id or ai.category_id(answer.category),
             steps=[
                 BreakdownStep(
                     title=s.title[:300],
                     estimate_min=s.estimate_min,
-                    action_type_id=catalog.action_id(s.action_type),
+                    action_type_id=ai.action_id(s.action_type),
                     depends_on=list(s.depends_on),
                     note=s.note,
                 )
@@ -270,8 +256,10 @@ class BreakdownService:
             raise InvalidDataError("Регулярное задание не разбивается на шаги")
         catalog = await load_catalog(self.db, self.user_id)
         for s in data.steps:
-            if s.action_type_id and s.action_type_id not in catalog.action_key_by_id:
+            if s.action_type_id and s.action_type_id not in catalog.actions:
                 raise InvalidDataError("Тип действия не найден")
+        if data.task_type_id is not None:
+            await self._check_task_type(data.task_type_id)
         if data.category_id is not None:
             category = await self.db.get(Category, data.category_id)
             if category is None or category.user_id != self.user_id or category.deleted_at:
@@ -336,8 +324,8 @@ class BreakdownService:
                     note=step.note,
                 )
             )
-        if data.task_type is not None:
-            task.task_type = data.task_type
+        if data.task_type_id is not None:
+            task.task_type_id = data.task_type_id
         if data.category_id is not None:
             task.category_id = data.category_id
         if data.job_id is not None:
@@ -382,21 +370,29 @@ class BreakdownService:
 
     # ---------- шаблоны ----------
 
+    async def _check_task_type(self, task_type_id: uuid.UUID) -> None:
+        if (await load_task_types(self.db, self.user_id)).name_of(task_type_id) is None:
+            raise InvalidDataError("Тип задачи не найден")
+
     def _template_read(self, t: BreakdownTemplate, catalog: Catalog) -> TemplateRead:
-        steps = [
-            BreakdownStep(
-                title=s["title"],
-                estimate_min=s["estimate_min"],
-                action_type_id=catalog.action_id(s.get("action_type")),
-                depends_on=s.get("depends_on", []),
-                note=s.get("note", ""),
+        steps = []
+        for s in t.steps:
+            raw = s.get("action_type_id")
+            type_id = uuid.UUID(raw) if raw else None
+            steps.append(
+                BreakdownStep(
+                    title=s["title"],
+                    estimate_min=s["estimate_min"],
+                    # Удалённый тип действия — как «без типа»
+                    action_type_id=type_id if type_id in catalog.actions else None,
+                    depends_on=s.get("depends_on", []),
+                    note=s.get("note", ""),
+                )
             )
-            for s in t.steps
-        ]
         return TemplateRead(
             id=t.id,
             name=t.name,
-            task_type=TaskType(t.task_type) if t.task_type else None,
+            task_type_id=t.task_type_id,
             steps=steps,
             total_estimate_min=sum(s.estimate_min for s in steps),
             created_at=t.created_at,
@@ -411,22 +407,23 @@ class BreakdownService:
 
     async def create_template(self, data: TemplateCreate) -> TemplateRead:
         catalog = await load_catalog(self.db, self.user_id)
+        if data.task_type_id is not None:
+            await self._check_task_type(data.task_type_id)
         steps = []
         for s in data.steps:
-            key = catalog.action_key_by_id.get(s.action_type_id) if s.action_type_id else None
-            if s.action_type_id and key is None:
+            if s.action_type_id and s.action_type_id not in catalog.actions:
                 raise InvalidDataError("Тип действия не найден")
             steps.append(
                 {
                     "title": s.title,
                     "estimate_min": s.estimate_min,
-                    "action_type": key,
+                    "action_type_id": str(s.action_type_id) if s.action_type_id else None,
                     "depends_on": s.depends_on,
                     "note": s.note,
                 }
             )
         t = BreakdownTemplate(
-            user_id=self.user_id, name=data.name, task_type=data.task_type, steps=steps
+            user_id=self.user_id, name=data.name, task_type_id=data.task_type_id, steps=steps
         )
         self.db.add(t)
         await self.db.commit()
@@ -438,6 +435,8 @@ class BreakdownService:
         changes = data.model_dump(exclude_unset=True)
         if "name" in changes and changes["name"] is None:
             raise InvalidDataError("name: не может быть пустым")
+        if changes.get("task_type_id") is not None:
+            await self._check_task_type(changes["task_type_id"])
         for name, value in changes.items():
             setattr(t, name, value)
         await self.db.commit()

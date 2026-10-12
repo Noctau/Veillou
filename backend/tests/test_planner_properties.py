@@ -1,4 +1,5 @@
-"""M8.6: property-тесты планировщика и бенчмарк.
+"""M8.6: property-тесты планировщика и бенчмарк (M15.3 — лимиты нагрузки,
+M18.2 — режимы дня: размещения внутри своих `DaySpec`).
 
 Инварианты проверяются по исходному входу (datetime и «настенное» время),
 независимо от сетки и подготовки внутри планировщика.
@@ -15,9 +16,14 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from app.core.time import get_tz, wall_to_utc
+from app.domain import dayprofile
+from app.domain.dayprofile import Profile
 from app.domain.planner import (
     Block,
+    BlockId,
+    Budget,
     Busy,
+    DaySpec,
     FixedBlock,
     PlanInput,
     PlanResult,
@@ -38,6 +44,30 @@ WINDOWS = [
     (Window(WEEKDAYS, time(18), time(23)), Window(frozenset({6, 7}), time(10), time(23))),
 ]
 CLASSES = [(time(9), time(10, 35)), (time(10, 45), time(12, 20)), (time(13), time(14, 35))]
+# «LX» во входе нет — такой лимит ничего не ограничивает
+BUDGET_IDS = ["L0", "L1", "L2", "LX"]
+# Режимы дня: будни, выходные, «после ночной» (подъём 15:00), сова (отбой 02:00)
+PROFILES = [
+    dayprofile.FALLBACK_WEEKDAYS,
+    dayprofile.FALLBACK_WEEKENDS,
+    Profile(
+        "after_night",
+        "После ночной",
+        wake=time(15),
+        sleep=time(23, 30),
+        work=((time(16), time(22)),),
+        rest_evening_ok=False,
+    ),
+    Profile(
+        "owl",
+        "Сова",
+        wake=time(10),
+        sleep=time(2),
+        lunch=(time(14), time(15)),
+        work=((time(11), time(13)), (time(18), time(1, 30))),
+        rest_halfday_ok=True,
+    ),
+]
 
 
 def at(d: date, t: time) -> datetime:
@@ -50,6 +80,21 @@ def at(d: date, t: time) -> datetime:
 @st.composite
 def plan_inputs(draw) -> PlanInput:
     now = at(MON + timedelta(days=draw(st.integers(0, 6))), time(draw(st.integers(0, 23)), 7))
+    budgets = tuple(
+        Budget(
+            f"L{k}",
+            draw(st.sampled_from([60, 120, 240, 360])),
+            tuple(
+                (
+                    MON + timedelta(days=draw(st.integers(0, 12))),
+                    draw(st.sampled_from([0, 60, 480])),
+                )
+                for _ in range(draw(st.integers(0, 1)))
+            ),
+        )
+        for k in range(draw(st.integers(0, 3)))
+    )
+    some_budgets = st.frozensets(st.sampled_from(BUDGET_IDS), max_size=2)
     n = draw(st.integers(1, 12))
     blocks = []
     for i in range(n):
@@ -68,31 +113,52 @@ def plan_inputs(draw) -> PlanInput:
                     f"b{j}" for j in range(i) if draw(st.booleans()) and draw(st.booleans())
                 ),
                 splittable=draw(st.booleans()),
-                counts_as_study=draw(st.booleans()),
+                budgets=draw(some_budgets),
                 prefer_morning=draw(st.booleans()),
             )
         )
     busy = []
+    buf = draw(st.sampled_from([0, 30, 60]))
     for day in range(14):
         d = MON + timedelta(days=day)
         if d.isoweekday() <= 5 and draw(st.booleans()):
             for start, end in CLASSES[: draw(st.integers(1, 3))]:
-                busy.append(Busy(at(d, start), at(d, end), is_class=True))
+                busy.append(
+                    Busy(
+                        at(d, start),
+                        at(d, end),
+                        buffer_before=buf,
+                        buffer_after=buf,
+                        merge_key="class",
+                    )
+                )
     if draw(st.booleans()):
         d = MON + timedelta(days=draw(st.integers(0, 10)))
-        busy.append(Busy(at(d, time(17)), at(d, time(19))))
+        busy.append(Busy(at(d, time(17)), at(d, time(19)), budgets=draw(some_budgets)))
     fixed = []
     for k in range(draw(st.integers(0, 2))):
         start = now + timedelta(hours=draw(st.integers(-6, 72)))
         start = start.replace(minute=0)
-        fixed.append(FixedBlock(f"f{k}", start, start + timedelta(minutes=60), group_id="t0"))
+        fixed.append(
+            FixedBlock(
+                f"f{k}",
+                start,
+                start + timedelta(minutes=60),
+                group_id="t0",
+                budgets=draw(some_budgets),
+            )
+        )
     plan_settings = PlanSettings(
-        study_limit_min_per_day=draw(st.sampled_from([60, 120, 240, 360])),
         deadline_buffer_days=draw(st.integers(0, 2)),
-        travel_buffer_min=draw(st.sampled_from([0, 30, 60])),
         free_evenings_per_week=draw(st.integers(0, 3)),
         weekend_half_days=draw(st.integers(0, 2)),
     )
+    days: tuple[DaySpec, ...] = ()
+    if draw(st.booleans()):
+        days = tuple(
+            dayprofile.day_spec(d, draw(st.sampled_from(PROFILES)), TZ)
+            for d in (MON - timedelta(days=2) + timedelta(days=i) for i in range(30))
+        )
     return PlanInput(
         now=now,
         tz=TZ,
@@ -100,6 +166,8 @@ def plan_inputs(draw) -> PlanInput:
         busy=tuple(busy),
         fixed=tuple(fixed),
         settings=plan_settings,
+        days=days,
+        budgets=budgets,
     )
 
 
@@ -114,27 +182,42 @@ def _daily(d: date, start: time, end: time) -> tuple[datetime, datetime]:
     return at(d, start), at(d + timedelta(days=1) if end <= start else d, end)
 
 
-def _within_windows(block: Block, s: PlanSettings, start: datetime, end: datetime) -> bool:
-    windows = block.windows or (
-        Window(WEEKDAYS, s.work_weekdays.start, s.work_weekdays.end),
-        Window(frozenset({6, 7}), s.work_weekends.start, s.work_weekends.end),
-    )
+def _spec(inp: PlanInput, d: date) -> DaySpec:
+    return next((x for x in inp.days if x.date == d), None) or dayprofile.fallback_spec(d, TZ)
+
+
+def _within_windows(inp: PlanInput, block: Block, start: datetime, end: datetime) -> bool:
+    """Внутри окна блока (и рабочего окна дня, если `within_work`); без окон — внутри
+    рабочего окна своего дня."""
     first = start.astimezone(TZ).date() - timedelta(days=1)
-    for i in range(2):
-        d = first + timedelta(days=i)
-        for w in windows:
+    near = [first + timedelta(days=i) for i in range(2)]
+    in_work = any(lo <= start and end <= hi for d in near for lo, hi in _spec(inp, d).work)
+    if not block.windows:
+        return in_work
+    for d in near:
+        for w in block.windows:
             if d.isoweekday() in w.weekdays:
                 lo, hi = _daily(d, w.start, w.end)
                 if lo <= start and end <= hi:
-                    return True
+                    return in_work or not block.within_work
     return False
 
 
-def _planning_day(dt: datetime, s: PlanSettings) -> date:
-    """День планировщика: начинается с подъёма."""
-    local = dt.astimezone(TZ)
-    wake = datetime.combine(local.date(), s.sleep.end, TZ)
-    return local.date() if local >= wake else local.date() - timedelta(days=1)
+def _planning_day(inp: PlanInput, dt: datetime) -> date:
+    """День планировщика: начинается с подъёма своего режима."""
+    d = dt.astimezone(TZ).date()
+    return d if dt >= _spec(inp, d).wake else d - timedelta(days=1)
+
+
+def _asleep_or_lunch(inp: PlanInput, start: datetime, end: datetime) -> bool:
+    d = start.astimezone(TZ).date()
+    for day in (d - timedelta(days=1), d):
+        spec, after = _spec(inp, day), _spec(inp, day + timedelta(days=1))
+        if _overlap(start, end, spec.sleep, after.wake):
+            return True
+        if spec.lunch and _overlap(start, end, *spec.lunch):
+            return True
+    return False
 
 
 def check_invariants(inp: PlanInput, result: PlanResult) -> None:
@@ -148,13 +231,17 @@ def check_invariants(inp: PlanInput, result: PlanResult) -> None:
     for a, b in pairwise(placements):
         assert a.end <= b.start, f"пересечение {a} и {b}"
 
-    study: Counter = Counter()
+    known = {b.id for b in inp.budgets}
+    # (лимит, день) → минут: закреплённое и жёсткое, потом + размещённое
+    fixed_load: Counter = Counter()
+    for item in (*inp.fixed, *inp.busy):
+        for budget in item.budgets & known:
+            day = _planning_day(inp, item.start)
+            fixed_load[(budget, day)] += (item.end - item.start).total_seconds() / 60
+    load: Counter = Counter(fixed_load)
     per_group: dict = {}
     for f in inp.fixed:
-        day = _planning_day(f.start, s)
-        if f.counts_as_study:
-            study[day] += (f.end - f.start).total_seconds() / 60
-        per_group.setdefault((f.group_id, day), set()).add(f.id)
+        per_group.setdefault((f.group_id, _planning_day(inp, f.start)), set()).add(f.id)
 
     for block_id, parts in by_block.items():
         block = blocks[block_id]
@@ -164,18 +251,15 @@ def check_invariants(inp: PlanInput, result: PlanResult) -> None:
         assert len(parts) <= (2 if block.splittable else 1)
         for p in parts:
             assert p.start >= inp.now
-            assert _within_windows(block, s, p.start, p.end), f"{block_id} вне окна: {p}"
+            assert _within_windows(inp, block, p.start, p.end), f"{block_id} вне окна: {p}"
             for b in inp.busy:
                 assert not _overlap(p.start, p.end, b.start, b.end), f"{block_id} на занятом"
             for f in inp.fixed:
                 assert not _overlap(p.start, p.end, f.start, f.end)
-            d = p.start.astimezone(TZ).date()
-            for day in (d - timedelta(days=1), d):
-                assert not _overlap(p.start, p.end, *_daily(day, s.sleep.start, s.sleep.end))
-                assert not _overlap(p.start, p.end, *_daily(day, s.lunch.start, s.lunch.end))
-            day = _planning_day(p.start, s)
-            if block.counts_as_study:
-                study[day] += (p.end - p.start).total_seconds() / 60
+            assert not _asleep_or_lunch(inp, p.start, p.end), f"{block_id} во сне / обеде"
+            day = _planning_day(inp, p.start)
+            for budget in block.budgets & known:
+                load[(budget, day)] += (p.end - p.start).total_seconds() / 60
             if block.group_id is not None:
                 per_group.setdefault((block.group_id, day), set()).add(block_id)
         if block.deadline and block.deadline > inp.now:
@@ -187,14 +271,13 @@ def check_invariants(inp: PlanInput, result: PlanResult) -> None:
             elif fixed := next((f for f in inp.fixed if f.id == dep), None):
                 assert fixed.end <= parts[0].start
 
-    fixed_study: Counter = Counter()
-    for f in inp.fixed:
-        if f.counts_as_study:
-            fixed_study[_planning_day(f.start, s)] += (f.end - f.start).total_seconds() / 60
-    for day, minutes in study.items():
-        if minutes > fixed_study[day]:
-            # округление 20 мин → 30 на сетке даёт запас вверх, но не сверх лимита
-            assert minutes <= max(s.study_limit_min_per_day, fixed_study[day]), f"{day}: {minutes}"
+    limits: dict[BlockId, Budget] = {b.id: b for b in inp.budgets}
+    for (budget, day), minutes in load.items():
+        if minutes > fixed_load[(budget, day)]:
+            # В каждый день по каждому лимиту — не больше лимита (закреплённое могло
+            # занять больше само; округление 20 мин → 30 на сетке даёт запас вверх)
+            limit = dict(limits[budget].overrides).get(day, limits[budget].minutes_per_day)
+            assert minutes <= max(limit, fixed_load[(budget, day)]), f"{budget} {day}: {minutes}"
     for (group, day), ids in per_group.items():
         flex = [i for i in ids if i in blocks]
         if flex:
@@ -234,7 +317,9 @@ def test_cp_sat_invariants(inp: PlanInput):
 # ---------- бенчмарк ----------
 
 
-def benchmark_input(n_blocks: int = 150, days: int = 60, seed: int = 1) -> PlanInput:
+def benchmark_input(
+    n_blocks: int = 150, days: int = 60, seed: int = 1, n_budgets: int = 3
+) -> PlanInput:
     rnd = random.Random(seed)
     now = at(MON, time(7, 3))
     blocks: list[Block] = []
@@ -254,21 +339,31 @@ def benchmark_input(n_blocks: int = 150, days: int = 60, seed: int = 1) -> PlanI
                     windows=WINDOWS[1] if rnd.random() < 0.15 else WINDOWS[2],
                     depends_on=(f"t{task}s{k - 1}",) if k and rnd.random() < 0.5 else (),
                     splittable=rnd.random() < 0.5,
+                    budgets=frozenset(f"L{b}" for b in range(n_budgets) if rnd.random() < 0.5),
                 )
             )
         task += 1
     busy = [
-        Busy(at(d, start), at(d, end), is_class=True)
+        Busy(at(d, start), at(d, end), buffer_before=60, buffer_after=60, merge_key="class")
         for week in range(days // 7 + 1)
         for wd in range(5)
         for d in [MON + timedelta(days=7 * week + wd)]
         for start, end in rnd.sample(CLASSES, 2)
     ]
-    return PlanInput(now=now, tz=TZ, blocks=tuple(blocks), busy=tuple(busy), max_horizon_days=days)
+    budgets = tuple(Budget(f"L{b}", 240 + 60 * b) for b in range(n_budgets))
+    return PlanInput(
+        now=now,
+        tz=TZ,
+        blocks=tuple(blocks),
+        busy=tuple(busy),
+        budgets=budgets,
+        max_horizon_days=days,
+    )
 
 
 @pytest.mark.parametrize("n_blocks", [150])
 def test_benchmark_150_blocks_60_days(n_blocks):
+    """150 блоков × 60 дней × 3 лимита — меньше 2 с."""
     inp = benchmark_input(n_blocks)
     started = perf_counter()
     result = solve(inp)

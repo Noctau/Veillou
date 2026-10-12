@@ -1,13 +1,8 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
-import type { BacklogCondition } from './useBacklog'
+import { CONDITION_LABEL } from '@/lib/terms'
 
-export const CONDITION_LABEL: Record<BacklogCondition, string> = {
-  weekday_daytime: 'В будни днём',
-  on_class_days: 'В дни пар',
-  needs_laptop: 'Нужен ноутбук',
-  institution_hours: 'Часы учреждений',
-}
+import type { BacklogCondition } from './useBacklog'
 
 export const CONDITIONS = Object.keys(CONDITION_LABEL) as BacklogCondition[]
 

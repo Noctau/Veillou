@@ -53,7 +53,7 @@ class Job(EntityMixin, Base):
 
 class Reminder(UserOwnedMixin, Base):
     """Одно напоминание. Текст собирается в момент отправки по сущности (`entity_*`),
-    поэтому всегда свежий, а устаревшее (пару отменили, задание сделано) пропускается.
+    поэтому всегда свежий, а устаревшее (событие отменили, задача сделана) пропускается.
     """
 
     __tablename__ = "reminders"
@@ -75,7 +75,7 @@ class Reminder(UserOwnedMixin, Base):
     fire_at: Mapped[datetime] = mapped_column(UTCDateTime)
     # Когда пробовать отправить: fire_at, а после сбоя — время ретрая
     due_at: Mapped[datetime] = mapped_column(UTCDateTime)
-    # Позже этого момента напоминание бессмысленно (пара началась, дедлайн прошёл)
+    # Позже этого момента напоминание бессмысленно (событие началось, дедлайн прошёл)
     expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     channels: Mapped[list[str]] = mapped_column(JSONB, default=list)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

@@ -51,7 +51,7 @@ function SourceRow({
   onEdit: () => void
   onReading: () => void
 }) {
-  const update = useUpdateSource(source.subject_id)
+  const update = useUpdateSource(source.area_id)
   const Icon = KIND_ICON[source.kind]
   const done = source.status === 'done'
   return (
@@ -109,9 +109,9 @@ function SourceRow({
   )
 }
 
-/** Литература предмета: обязательная первой, статус — одним касанием, задание чтения из меню. */
-export function SourceList({ subjectId }: { subjectId: string }) {
-  const { data: sources, isPending, isError, error } = useSources(subjectId)
+/** Литература сферы: обязательная первой, статус — одним касанием, задание чтения из меню. */
+export function SourceList({ areaId }: { areaId: string }) {
+  const { data: sources, isPending, isError, error } = useSources(areaId)
   const [editing, setEditing] = useState<Source | null>(null)
   const [creating, setCreating] = useState(false)
   const [reading, setReading] = useState<Source | null>(null)
@@ -136,11 +136,11 @@ export function SourceList({ subjectId }: { subjectId: string }) {
         ))}
       </ul>
 
-      <SourceDialog open={creating} onOpenChange={setCreating} subjectId={subjectId} />
+      <SourceDialog open={creating} onOpenChange={setCreating} areaId={areaId} />
       <SourceDialog
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
-        subjectId={subjectId}
+        areaId={areaId}
         source={editing ?? undefined}
       />
       <ReadingTaskDialog source={reading} onOpenChange={(open) => !open && setReading(null)} />

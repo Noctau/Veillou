@@ -1,4 +1,5 @@
-.PHONY: dev dev-api dev-web db-up db-down migrate migration test test-cov test-web lint typecheck audit fmt gen-api create-user bot worker install vapid-keys ai-evals \
+.PHONY: dev dev-api dev-web db-up db-down migrate migration test test-cov test-web lint typecheck audit fmt gen-api create-user bot worker install vapid-keys ai-evals lexicon \
+	test-snapshots snapshots-update migrate-check migrate-fixture \
 	deploy prod-ps prod-logs prod-create-user prod-backup prod-restore backup-pull
 
 COMPOSE = docker compose -f docker-compose.dev.yml --env-file .env
@@ -42,10 +43,31 @@ test-cov:
 test-web:
 	cd frontend && npm test
 
-lint: typecheck
+# Характеризационные снимки студентки (M14.1): backend/tests/snapshots/student/
+test-snapshots:
+	$(BACK) pytest -m snapshots
+
+# Перезаписать снимки — только осознанно, с пометкой в коммите, что и почему поменялось
+snapshots-update:
+	cd backend && UPDATE_SNAPSHOTS=1 uv run pytest -m snapshots
+
+# Миграции на данных (M14.2): фикстура студентки или make migrate-check dump=…/db.dump
+migrate-check: db-up
+	$(BACK) python -m scripts.migrate_check $(if $(dump),--dump $(dump))
+
+# Пересобрать SQL-фикстуру для migrate-check на текущей ревизии (обычно не нужно:
+# фикстура — «старые данные», которые поднимают все следующие миграции)
+migrate-fixture:
+	cd backend && WRITE_MIGRATION_FIXTURE=1 uv run pytest tests/test_migration_fixture.py -q
+
+lint: typecheck lexicon
 	$(BACK) ruff check .
 	$(BACK) ruff format --check .
 	cd frontend && npx oxlint && npx tsc -b --noEmit
+
+# Студенческая лексика Part 1 — только в данных и миграциях (M22.3)
+lexicon:
+	$(BACK) python -m scripts.check_lexicon
 
 typecheck:
 	$(BACK) mypy

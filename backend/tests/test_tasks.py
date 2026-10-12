@@ -1,11 +1,36 @@
+import uuid
+
 from httpx import AsyncClient
 
 from .test_catalog import action_types, categories
-from .test_schedule_api import API, make_semester, make_subject, other_client
+from .test_schedule_api import API, make_area, make_period, other_client
+
+
+async def make_task_type(client: AsyncClient, **over) -> dict:
+    body = {"name": "Реферат", "synonyms": ["реферат", "эссе"], "icon": "file-text", **over}
+    resp = await client.post(f"{API}/task-types", json=body)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def seed_task_type(session, user_id, key: str, name: str) -> uuid.UUID:
+    """Тип задачи с ключом сида и синонимами — как у мигрированных пользователей Part 1
+    (после M21.1). Возвращает id."""
+    from app.models import TaskType
+
+    from .student import TASK_TYPES
+
+    synonyms = next((list(syn) for k, _, _, syn in TASK_TYPES if k == key), [])
+    task_type = TaskType(user_id=user_id, key=key, name=name, synonyms=synonyms, position=0)
+    session.add(task_type)
+    await session.flush()
+    type_id = task_type.id
+    await session.commit()
+    return type_id
 
 
 async def make_task(client: AsyncClient, **over) -> dict:
-    body = {"title": "Реферат", "task_type": "essay", **over}
+    body = {"title": "Реферат", **over}
     resp = await client.post(f"{API}/tasks", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -31,9 +56,9 @@ async def test_create_task_with_defaults(auth_client):
     )
     types = await action_types(auth_client)
     cats = await categories(auth_client)
-    # Без явных значений: «Самостоятельная учёба» и её категория «Учёба»
+    # Без явных значений: тип по умолчанию («Сосредоточенная работа») и его категория
     assert task["action_type_id"] == types["study"]["id"]
-    assert task["category_id"] == cats["study"]["id"]
+    assert task["category_id"] == cats["work"]["id"]
     assert task["deadline"] == "2026-10-15T20:59:00Z"
     assert task["status"] == "active"
     assert task["priority"] == "normal"
@@ -114,11 +139,11 @@ async def test_reorder(auth_client):
 
 
 async def test_list_filters_and_deadline_order(auth_client):
-    sem = await make_semester(auth_client)
-    subj = await make_subject(auth_client, sem["id"])
+    sem = await make_period(auth_client)
+    subj = await make_area(auth_client, sem["id"])
     late = await make_task(auth_client, title="Поздно", deadline="2026-11-01T12:00:00Z")
     soon = await make_task(
-        auth_client, title="Скоро", deadline="2026-10-08T12:00:00Z", subject_id=subj["id"]
+        auth_client, title="Скоро", deadline="2026-10-08T12:00:00Z", area_id=subj["id"]
     )
     await make_task(auth_client, title="Без срока")
     done = await make_task(auth_client, title="Готово", deadline="2026-10-07T12:00:00Z")
@@ -132,7 +157,7 @@ async def test_list_filters_and_deadline_order(auth_client):
     )
     assert [t["id"] for t in resp.json()] == [soon["id"]]
 
-    resp = await auth_client.get(f"{API}/tasks", params={"subject_id": subj["id"]})
+    resp = await auth_client.get(f"{API}/tasks", params={"area_id": subj["id"]})
     assert [t["id"] for t in resp.json()] == [soon["id"]]
     resp = await auth_client.get(f"{API}/tasks", params=[("status", "active"), ("status", "done")])
     assert len(resp.json()) == 4
@@ -160,7 +185,7 @@ async def test_schedule_subtask_and_calendar_sync(auth_client):
     assert event["source_type"] == "subtask"
     assert event["source_id"] == sub["id"]
     assert event["title"] == "Глава 1"
-    assert event["color"] == cats["study"]["color"]
+    assert event["color"] == cats["work"]["color"]
 
     # Перенос — тот же блок
     resp = await auth_client.post(url, json={"start": "2026-10-08T10:00:00+03:00"})
@@ -212,7 +237,7 @@ async def test_delete_task_removes_planned_blocks(auth_client):
 async def test_validation(auth_client):
     for bad in (
         {"title": ""},
-        {"title": "x", "task_type": "nope"},
+        {"title": "x", "task_type_id": "nope"},
         {"title": "x", "deadline": "2026-10-15T23:59:00"},  # без TZ
         {"title": "x", "subtasks": [{"title": "a", "estimate_min": 1}]},
         {"title": "x", "time_window": [{"weekdays": [], "start": "10:00", "end": "11:00"}]},

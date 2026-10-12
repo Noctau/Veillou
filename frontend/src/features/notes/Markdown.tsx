@@ -7,7 +7,7 @@ import remarkMath from 'remark-math'
 
 import { cn } from '@/lib/utils'
 
-// Ссылки из конспекта — в новой вкладке, приложение остаётся открытым
+// Ссылки из заметки — в новой вкладке, приложение остаётся открытым
 const components: Components = {
   a: ({ href, children }) => (
     <a href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noreferrer">

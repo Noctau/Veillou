@@ -18,8 +18,8 @@ from app.core.exceptions import InvalidDataError
 from app.core.time import get_tz, local_date, now_utc, wall_to_utc
 from app.domain import backlog as box
 from app.domain.enums import (
-    FIXED_KINDS,
     BacklogStatus,
+    EventKind,
     EventStatus,
     PlanReason,
     TaskStatus,
@@ -49,7 +49,7 @@ class ReviewService:
         return select(Event).where(
             Event.user_id == self.user_id,
             Event.deleted_at.is_(None),
-            Event.kind.not_in(FIXED_KINDS),
+            Event.kind != EventKind.busy,
             Event.source_type.in_(PLANNED_SOURCES),
             Event.start >= start,
             Event.start < end,
@@ -63,6 +63,20 @@ class ReviewService:
         rows = list(await self.db.scalars(self._flexible(start, end).order_by(Event.start)))
         items = [e for e in rows if e.status == EventStatus.planned and e.start < self.now]
         return items, sum(e.status == EventStatus.done for e in rows)
+
+    async def proposals(self) -> list[Task]:
+        """Предложения автозадач (правила с подтверждением), ближайшие — первыми."""
+        return list(
+            await self.db.scalars(
+                select(Task)
+                .where(
+                    Task.user_id == self.user_id,
+                    Task.deleted_at.is_(None),
+                    Task.status == TaskStatus.proposed,
+                )
+                .order_by(Task.deadline.asc().nulls_last(), Task.created_at)
+            )
+        )
 
     async def reschedule(
         self, event_ids: list[uuid.UUID] | None = None, day: date | None = None

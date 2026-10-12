@@ -22,17 +22,45 @@ from pydantic import (
 )
 
 from app.domain.breakdown import MAX_STEP_MIN, MIN_STEP_MIN, round_estimate
-from app.domain.enums import ActionTypeKey, CategoryKey, TaskType
 from app.domain.tasks import find_cycle
 
 MAX_STEPS = 15
+
+# «Нет значения» от модели — пустая строка (или «null», «нет»): Pydantic превращает в None
+_EMPTY = frozenset({"", "null", "none", "нет", "-"})
+
+
+def _blank(value: Any) -> Any:
+    if isinstance(value, str) and value.strip().lower() in _EMPTY:
+        return None
+    return value.strip() if isinstance(value, str) else value
+
+
+# Названия из справочников пользователя. Без справочника — свободная строка;
+# with_choices сужает до названий пользователя (enum)
+def _schema(description: str) -> WithJsonSchema:
+    return WithJsonSchema({"type": "string", "description": description})
+
+
+TaskTypeName = Annotated[
+    str | None, BeforeValidator(_blank), _schema("Тип задачи из списка или пустая строка")
+]
+ActionTypeName = Annotated[
+    str | None, BeforeValidator(_blank), _schema("Тип действия из списка или пустая строка")
+]
+CategoryName = Annotated[
+    str | None, BeforeValidator(_blank), _schema("Категория из списка или пустая строка")
+]
+AreaName = Annotated[
+    str | None, BeforeValidator(_blank), _schema("Сфера из списка или пустая строка")
+]
 
 
 class AIStep(BaseModel):
     order: int = Field(description="Номер шага, с 1")
     title: str = Field(description="Что сделать, глагол в начале", max_length=200)
     estimate_min: int = Field(description=f"Минуты, {MIN_STEP_MIN}–{MAX_STEP_MIN}")
-    action_type: ActionTypeKey
+    action_type: ActionTypeName = Field(description="Тип действия из списка")
     depends_on: list[int] = Field(description="Номера шагов, которые нужно сделать раньше")
     note: str = Field(description="Подсказка к шагу или пустая строка", max_length=500)
 
@@ -55,8 +83,8 @@ class AIStep(BaseModel):
 
 
 class AIBreakdown(BaseModel):
-    task_type: TaskType = Field(description="Тип самого задания")
-    category: CategoryKey = Field(description="Категория задания")
+    task_type: TaskTypeName = Field(description="Тип задачи из списка или пустая строка")
+    category: CategoryName = Field(description="Категория задания из списка")
     subtasks: list[AIStep] = Field(min_length=1, max_length=MAX_STEPS)
     total_estimate_min: int = Field(description="Сумма оценок шагов")
     warning: str | None = Field(
@@ -93,13 +121,6 @@ class AIBreakdown(BaseModel):
 # Pydantic превращает пустое в None; схема для модели — простые строки.
 
 _HHMM = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
-_EMPTY = frozenset({"", "null", "none", "нет", "-"})
-
-
-def _blank(value: Any) -> Any:
-    if isinstance(value, str) and value.strip().lower() in _EMPTY:
-        return None
-    return value.strip() if isinstance(value, str) else value
 
 
 def _hhmm(value: Any) -> str | None:
@@ -123,11 +144,6 @@ DeadlineTime = Annotated[
     WithJsonSchema(
         {"type": "string", "description": "ЧЧ:ММ, только если время названо; иначе пустая строка"}
     ),
-]
-Subject = Annotated[
-    str | None,
-    BeforeValidator(_blank),
-    WithJsonSchema({"type": "string", "description": "Предмет из списка или пустая строка"}),
 ]
 
 
@@ -154,15 +170,15 @@ class _Deadline:
 
 class AIParsed(_Deadline, BaseModel):
     kind: Literal["task", "backlog", "event"] = Field(
-        description="task — учебное/рабочее задание; backlog — бытовое или личное дело; "
+        description="task — задача с результатом; backlog — бытовое или личное дело; "
         "event — встреча с точным временем"
     )
     title: Title = Field(description="Короткое название, до 80 символов", max_length=200)
-    task_type: TaskType = Field(description="Тип задания; other — если не задание")
-    subject: Subject
+    task_type: TaskTypeName = Field(description="Тип задачи из списка; пустая строка — не задача")
+    area: AreaName
     deadline_date: DeadlineDate
     deadline_time: DeadlineTime
-    action_type: ActionTypeKey
+    action_type: ActionTypeName
     description: str = Field(
         description="Требования из сообщения или пустая строка", max_length=5000
     )
@@ -171,38 +187,55 @@ class AIParsed(_Deadline, BaseModel):
 class AIPhoto(_Deadline, BaseModel):
     text: str = Field(description="Весь текст задания с фото, как написан", max_length=10_000)
     title: Title = Field(description="Короткое название задания, до 80 символов", max_length=200)
-    task_type: TaskType
-    subject: Subject
+    task_type: TaskTypeName
+    area: AreaName
     deadline_date: DeadlineDate
     deadline_time: DeadlineTime
 
 
-def with_subjects[T: BaseModel](schema: type[T], names: list[str]) -> type[T]:
-    """Схема, где `subject` — одно из названий предметов пользователя или пустая строка."""
-    if not names:
-        return schema
-    subject: Any = Annotated[
+def _choice(names: list[str], what: str) -> Any:
+    """Строка из списка `names` или пустая строка (→ None). Пустой список — всегда None."""
+
+    def check(value: str | None) -> str | None:
+        if value is None or not names:
+            return None
+        if value not in names:
+            raise ValueError(f"{what} не из списка")
+        return value
+
+    return Annotated[
         str | None,
         BeforeValidator(_blank),
-        AfterValidator(lambda v: _one_of(v, names)),
+        AfterValidator(check),
         WithJsonSchema({"type": "string", "enum": [*names, ""]}),
     ]
-    fields = {name: (info.annotation, info) for name, info in schema.model_fields.items()}
-    fields["subject"] = (subject, Field(description="Предмет из списка или пустая строка"))
-    # Порядок полей сохраняем — модель заполняет их по порядку
-    # Модель строится в рантайме: mypy не выводит её тип из **fields
-    return create_model(schema.__name__, __base__=_base_of(schema), **fields)  # type: ignore[call-overload,no-any-return]
 
 
-def _one_of(value: str | None, names: list[str]) -> str | None:
-    if value is not None and value not in names:
-        raise ValueError("предмет не из списка")
-    return value
+CHOICES = {
+    "area": ("сфера", "Сфера из списка или пустая строка"),
+    "task_type": ("тип задачи", "Тип задачи из списка или пустая строка"),
+    "action_type": ("тип действия", "Тип действия из списка или пустая строка"),
+    "category": ("категория", "Категория из списка или пустая строка"),
+}
 
 
-def _base_of(schema: type[BaseModel]) -> tuple[type, ...]:
-    """Без самого BaseModel-класса со старыми полями: только примеси (`_Deadline`)."""
-    return (*(b for b in schema.__bases__ if b is not BaseModel), BaseModel)
+def with_choices[T: BaseModel](schema: type[T], **choices: list[str]) -> type[T]:
+    """Схема, где строковые поля (`area`, `task_type`, `action_type`, `category`) — одно из
+    названий справочника пользователя или пустая строка. Поля, которых в схеме нет,
+    пропускаются; `action_type` сужается и у шагов разбивки. Порядок полей и
+    валидаторы схемы сохраняются."""
+    fields: dict[str, Any] = {}
+    for name, names in choices.items():
+        if name not in schema.model_fields:
+            continue
+        what, description = CHOICES[name]
+        fields[name] = (_choice(names, what), Field(description=description))
+    if "subtasks" in schema.model_fields and "action_type" in choices:
+        step = with_choices(AIStep, action_type=choices["action_type"])
+        fields["subtasks"] = (list[step], Field(min_length=1, max_length=MAX_STEPS))  # type: ignore[valid-type]
+    if not fields:
+        return schema
+    return create_model(schema.__name__, __base__=schema, **fields)
 
 
 # ---------- этапы проекта (M13.2) ----------
@@ -233,3 +266,96 @@ class AIMilestones(BaseModel):
     @classmethod
     def _blank(cls, value: str) -> str:
         return (_blank(value) or "").strip()
+
+
+# ---------- ИИ-настройка (M21.4) ----------
+#
+# Упрощённая сборка для модели: ссылки — названиями, «нет» — пустая строка или 0,
+# паттерн — плоские поля. В `ConfigBundle` её переводит domain/bundle.normalize_setup.
+
+MAX_SETUP_ITEMS = 20
+HHMM = WithJsonSchema({"type": "string", "description": "ЧЧ:ММ или пустая строка"})
+
+
+def _setup_text(value: Any) -> str:
+    return " ".join(str(value or "").split())
+
+
+SetupText = Annotated[str, BeforeValidator(_setup_text)]
+SetupTime = Annotated[str, BeforeValidator(_setup_text), HHMM]
+
+
+class AISetupAreaType(BaseModel):
+    name: SetupText = Field(description="Тип сферы в единственном числе: «Ученик», «Предмет»")
+    name_plural: SetupText = Field(description="Во множественном: «Ученики»")
+    fields: list[SetupText] = Field(
+        description="Подписи полей карточки сферы: «Класс», «Телефон родителя»", max_length=10
+    )
+
+
+class AISetupArea(BaseModel):
+    name: SetupText = Field(description="Сфера: ученик, предмет, клиент, место работы, кружок")
+    type: SetupText = Field(description="Название типа сферы")
+
+
+class AISetupEventType(BaseModel):
+    name: SetupText = Field(description="Тип занятости: «Смена», «Урок», «Встреча»")
+    name_plural: SetupText
+    travel_min: int = Field(description="Дорога до и после, минут; 0 — без дороги")
+    remind_min: int = Field(description="Напомнить за N минут; 0 — не напоминать")
+    is_rest: bool = Field(description="Это отдых, который нельзя занимать делами")
+    show_now_next: bool = Field(description="Показывать на «Сегодня» как «Сейчас / Дальше»")
+
+
+Weekday = Literal["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+
+
+class AISetupRule(BaseModel):
+    event_type: SetupText = Field(description="Название типа занятости")
+    area: SetupText = Field(description="Название сферы из areas или пустая строка")
+    title: SetupText = Field(description="Название событий или пустая строка")
+    pattern: Literal["weekly", "shifts", "once"] = Field(
+        description="weekly — по дням недели; shifts — смены N через M; once — один раз"
+    )
+    weekdays: list[Weekday] = Field(description="weekly: дни недели")
+    on_days: int = Field(description="shifts: рабочих дней подряд")
+    off_days: int = Field(description="shifts: дней отдыха")
+    anchor: SetupText = Field(description="shifts: дата первой смены ГГГГ-ММ-ДД или пусто")
+    date: SetupText = Field(description="once: дата ГГГГ-ММ-ДД")
+    start: SetupTime
+    end: SetupTime = Field(description="ЧЧ:ММ; раньше начала — через полночь")
+
+
+class AISetupDayProfile(BaseModel):
+    name: SetupText = Field(description="Режим дня: «Будни», «Смена», «После ночной»")
+    wake: SetupTime
+    sleep: SetupTime
+    work_start: SetupTime = Field(description="С какого времени можно ставить дела")
+    work_end: SetupTime
+    weekdays: list[Weekday] = Field(description="По каким дням недели или пусто")
+    on_event_type: SetupText = Field(description="В дни событий этого типа или пусто")
+    after_event_type: SetupText = Field(description="На следующий день после события или пусто")
+
+
+class AISetupBudget(BaseModel):
+    name: SetupText = Field(description="Лимит: «Работа», «Учёба»")
+    minutes_per_day: int = Field(description="Не больше минут в день")
+    event_types: list[SetupText] = Field(description="Типы занятости, идущие в лимит")
+    action_types: list[SetupText] = Field(description="Типы действий, идущие в лимит")
+
+
+class AISetupTaskType(BaseModel):
+    name: SetupText = Field(description="Тип задачи: «ДЗ», «Отчёт»")
+    synonyms: list[SetupText] = Field(description="Слова для быстрого ввода", max_length=10)
+
+
+class AISetup(BaseModel):
+    about: SetupText = Field(description="О пользователе одной-двумя фразами", max_length=1000)
+    area_types: list[AISetupAreaType] = Field(max_length=MAX_SETUP_ITEMS)
+    areas: list[AISetupArea] = Field(max_length=MAX_SETUP_ITEMS * 2)
+    event_types: list[AISetupEventType] = Field(max_length=MAX_SETUP_ITEMS)
+    rules: list[AISetupRule] = Field(max_length=MAX_SETUP_ITEMS * 2)
+    day_profiles: list[AISetupDayProfile] = Field(max_length=MAX_SETUP_ITEMS)
+    budgets: list[AISetupBudget] = Field(max_length=MAX_SETUP_ITEMS)
+    task_types: list[AISetupTaskType] = Field(max_length=MAX_SETUP_ITEMS)
+    warning: SetupText = Field(description="Что уточнить, или пустая строка", max_length=500)

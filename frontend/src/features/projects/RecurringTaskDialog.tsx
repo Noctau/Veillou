@@ -12,7 +12,7 @@ import { WEEKDAYS_SHORT } from '@/lib/time'
 
 type Props = { open: boolean; onOpenChange: (open: boolean) => void; projectId: string }
 
-/** Регулярная задача проекта («встреча с научруком по чт») — тип «связь с людьми». */
+/** Регулярная задача проекта («созвон с руководителем по чт») — тип «связь с людьми». */
 export function RecurringTaskDialog({ open, onOpenChange, projectId }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -30,7 +30,7 @@ export function RecurringTaskDialog({ open, onOpenChange, projectId }: Props) {
 function RecurringForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
   const { data: actionTypes } = useActionTypes()
   const create = useCreateTask()
-  const [title, setTitle] = useState('Встреча с научруком')
+  const [title, setTitle] = useState('Созвон с руководителем')
   const [days, setDays] = useState<string[]>(['4'])
   const [estimate, setEstimate] = useState('60')
   const minutes = Number(estimate)
@@ -40,7 +40,6 @@ function RecurringForm({ projectId, onDone }: { projectId: string; onDone: () =>
     create.mutate(
       {
         title: title.trim(),
-        task_type: 'other',
         description: '',
         priority: 'normal',
         project_id: projectId,

@@ -31,9 +31,10 @@ NO_CONTENT = status.HTTP_204_NO_CONTENT
 async def list_projects(
     svc: Service,
     status: Annotated[list[ProjectStatus], Query()] = [],  # noqa: B006
+    area_id: uuid.UUID | None = None,
 ) -> list[ProjectRead]:
     """Ближайший итоговый срок первым. Прогресс — по разовым заданиям и этапам."""
-    return await svc.list(status)
+    return await svc.list(status, area_id)
 
 
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
@@ -50,7 +51,6 @@ async def read_project(project_id: uuid.UUID, svc: Service) -> ProjectDetail:
 async def update_project(
     project_id: uuid.UUID, patch: ProjectUpdate, svc: Service
 ) -> ProjectDetail:
-    """is_work_default=true снимает флаг с остальных проектов."""
     return await svc.update(project_id, patch)
 
 

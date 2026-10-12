@@ -45,7 +45,7 @@ export function useLatestBreakdown(taskId: string, enabled = true) {
   })
 }
 
-/** «Распознать фото задания»: текст, срок и предмет попадут в само задание. */
+/** «Распознать фото задания»: текст, срок и сфера попадут в само задание. */
 export function useRecognizePhoto(taskId: string) {
   return useMutation({
     mutationFn: async () => {

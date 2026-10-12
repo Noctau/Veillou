@@ -8,13 +8,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidDataError
-from app.domain.enums import AttachmentOwner, SourceStatus, TaskType
+from app.domain.enums import AttachmentOwner, SourceStatus
+from app.domain.quickparse import guess
 from app.domain.sources import reading_description, reading_title
-from app.models import Attachment, Source, Subject, User
+from app.models import Area, Attachment, Source, User
 from app.schemas.source import ReadingTaskCreate, SourceCreate, SourceRead, SourceUpdate
 from app.schemas.task import TaskCreate, TaskDetail
 from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
+from app.services.catalog import vocabulary
 from app.services.tasks import TaskService
 
 
@@ -23,12 +25,12 @@ class SourceRepo(UserScopedRepository[Source]):
     not_found_message = "Источник не найден"
 
 
-class _SubjectRepo(UserScopedRepository[Subject]):
-    model = Subject
-    not_found_message = "Предмет не найден"
+class _AreaRepo(UserScopedRepository[Area]):
+    model = Area
+    not_found_message = "Сфера не найдена"
 
 
-_REQUIRED = {"subject_id", "title", "author", "kind", "required", "status", "note"}
+_REQUIRED = {"area_id", "title", "author", "kind", "required", "status", "note"}
 # Обязательное и непрочитанное — выше
 _STATUS_ORDER: dict[str, int] = {
     SourceStatus.reading: 0,
@@ -43,7 +45,7 @@ class SourceService:
         self.user = user
         self.user_id = user.id
         self.sources = SourceRepo(db, user.id)
-        self.subjects = _SubjectRepo(db, user.id)
+        self.areas = _AreaRepo(db, user.id)
 
     async def _files_count(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         if not ids:
@@ -72,8 +74,8 @@ class SourceService:
             read.files_count = counts.get(read.id, 0)
         return reads
 
-    async def list(self, subject_id: uuid.UUID | None = None) -> list[SourceRead]:
-        where = [Source.subject_id == subject_id] if subject_id else []
+    async def list(self, area_id: uuid.UUID | None = None) -> list[SourceRead]:
+        where = [Source.area_id == area_id] if area_id else []
         sources = await self.sources.find_all(*where, order_by=[Source.created_at])
         sources.sort(key=lambda s: (not s.required, _STATUS_ORDER.get(s.status, 9)))
         return await self.reads(sources)
@@ -82,7 +84,7 @@ class SourceService:
         return await self._read(await self.sources.get_or_404(id))
 
     async def create(self, data: SourceCreate) -> SourceRead:
-        await self.subjects.get_or_404(data.subject_id)
+        await self.areas.get_or_404(data.area_id)
         source = Source(**data.model_dump(exclude={"url"}), url=str(data.url) if data.url else None)
         self.sources.add(source)
         await self.db.commit()
@@ -96,8 +98,8 @@ class SourceService:
                 raise InvalidDataError(f"{name}: не может быть пустым")
         if "url" in changes:
             changes["url"] = str(patch.url) if patch.url else None
-        if changes.get("subject_id"):
-            await self.subjects.get_or_404(changes["subject_id"])
+        if changes.get("area_id"):
+            await self.areas.get_or_404(changes["area_id"])
         for name, value in changes.items():
             setattr(source, name, value)
         await self.db.commit()
@@ -110,13 +112,20 @@ class SourceService:
         await self.db.commit()
 
     async def create_reading_task(self, id: uuid.UUID, data: ReadingTaskCreate) -> TaskDetail:
-        """«Прочитать главы 3–5»: задание типа «чтение» по предмету источника."""
+        """«Прочитать главы 3–5»: задание по сфере источника (тип — из запроса)."""
         source = await self.sources.get_or_404(id)
+        title = reading_title(source.title, data.chapters)
+        task_type_id = data.task_type_id
+        if task_type_id is None:
+            # Тип — по глаголу названия («Прочитать»), а не по словам из названия источника
+            words = await vocabulary(self.db, self.user.id)
+            guessed = guess(title.split(maxsplit=1)[0], words.task)
+            task_type_id = guessed if isinstance(guessed, uuid.UUID) else None
         task = TaskCreate(
-            title=reading_title(source.title, data.chapters),
-            task_type=TaskType.reading,
+            title=title,
+            task_type_id=task_type_id,
             description=reading_description(source.title, source.author, source.url),
-            subject_id=source.subject_id,
+            area_id=source.area_id,
             deadline=data.deadline,
             estimate_min=data.estimate_min,
         )

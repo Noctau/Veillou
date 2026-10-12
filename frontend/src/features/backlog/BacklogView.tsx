@@ -8,13 +8,15 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CategoryIcon } from '@/features/catalog/CategoryIcon'
-import { byId, type Category, useCategories } from '@/features/catalog/useCatalog'
+import { byId, type Category, useActionTypes, useCategories } from '@/features/catalog/useCatalog'
 import { errorMessage } from '@/lib/errors'
+import { useEventTypes } from '@/features/schedule/useSchedule'
+import { BACKLOG_DAYS, BACKLOG_HOURS, CONDITION_LABEL } from '@/lib/terms'
 import { formatDay } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import { BacklogItemDialog } from './BacklogItemDialog'
-import { ageLabel, CONDITION_LABEL, estimateLabel } from './labels'
+import { ageLabel, estimateLabel } from './labels'
 import { type BacklogItem, type BacklogStatus, useBacklog, useCreateBacklog, useUpdateBacklog } from './useBacklog'
 
 function QuickInput() {
@@ -51,10 +53,15 @@ function QuickInput() {
 function Row({
   item,
   category,
+  hours,
+  days,
   onOpen,
 }: {
   item: BacklogItem
   category?: Category
+  /** Название типа действия «только в часы…» */
+  hours?: string
+  days?: string
   onOpen: (item: BacklogItem) => void
 }) {
   const update = useUpdateBacklog()
@@ -105,6 +112,16 @@ function Row({
               {CONDITION_LABEL[c]}
             </Badge>
           ))}
+          {hours && (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+              {BACKLOG_HOURS.chip(hours)}
+            </Badge>
+          )}
+          {days && (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+              {BACKLOG_DAYS.chip(days)}
+            </Badge>
+          )}
         </span>
       </button>
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{ageLabel(item.created_at)}</span>
@@ -116,13 +133,22 @@ function List({ status, empty, onOpen }: { status: BacklogStatus; empty: string;
   const { data: items, isPending, isError, error } = useBacklog(status)
   const { data: categories } = useCategories()
   const cats = byId(categories)
+  const actionTypes = byId(useActionTypes().data)
+  const eventTypes = byId(useEventTypes().data)
   if (isPending) return <Skeleton className="h-32" />
   if (isError) return <p className="text-sm text-destructive">{errorMessage(error)}</p>
   if (!items.length) return <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>
   return (
     <ul className="flex flex-col">
       {items.map((i) => (
-        <Row key={i.id} item={i} category={i.category_id ? cats.get(i.category_id) : undefined} onOpen={onOpen} />
+        <Row
+          key={i.id}
+          item={i}
+          category={i.category_id ? cats.get(i.category_id) : undefined}
+          hours={i.hours_action_type_id ? actionTypes.get(i.hours_action_type_id)?.name : undefined}
+          days={i.days_event_type_id ? eventTypes.get(i.days_event_type_id)?.name_plural : undefined}
+          onOpen={onOpen}
+        />
       ))}
     </ul>
   )

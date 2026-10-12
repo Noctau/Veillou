@@ -52,8 +52,8 @@ def created_text(c: Created, tz: ZoneInfo, now: datetime) -> str:
         details.append(
             f"{fmt_day(c.start.astimezone(tz).date(), today)} {fmt_range(c.start, c.end, tz)}"
         )
-    if c.subject:
-        details.append(c.subject)
+    if c.area:
+        details.append(c.area)
     head = f"✓ <b>{KIND_TITLE[c.kind]}:</b> {html.escape(c.title)}"
     return "\n".join([head, html.escape(" · ".join(details))]) if details else head
 

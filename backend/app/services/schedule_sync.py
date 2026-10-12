@@ -1,16 +1,17 @@
-"""Материализация шаблонов в `events`.
+"""Материализация правил расписания в `events`.
 
-Серия шаблона синхронизируется по ключу (template_type, template_id,
+Серия правила синхронизируется по ключу (template_type, template_id,
 occurrence_date) начиная с сегодняшнего дня (локального):
 
-- вхождение есть и в шаблоне, и в БД → поля обновляются на месте (id, а значит
+- вхождение есть и в правиле, и в БД → поля обновляются на месте (id, а значит
   и привязанные конспекты/напоминания, сохраняются);
-- есть только в шаблоне → создаётся;
+- есть только в правиле → создаётся;
 - есть только в БД → мягко удаляется;
 - `detached` (правили руками) и прошедшие дни не трогаются.
 
-Вызывается после любого изменения ClassRule / BellSchedule / DayOff / Semester /
-Subject, а для личных повторов — RecurringEvent (и ночной докаткой окна).
+Горизонт: до конца периода правила, без периода — скользящие 90 дней (ночная
+джоба докатывает окно). Вызывается после любого изменения правила, периода,
+сетки слотов, исключений, сферы и типа занятости.
 """
 
 import logging
@@ -25,37 +26,32 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import get_tz, local_date, now_utc
-from app.domain.enums import EventKind, EventStatus, Parity, RuleParity, TemplateType
+from app.domain.enums import EventKind, EventStatus, PatternKind, TemplateType
 from app.domain.recurrence import (
-    Bells,
-    BellSlot,
-    ClassRuleSpec,
     DateRange,
-    SemesterSpec,
-    expand_class_rule,
-    expand_rrule,
+    DayCyclePattern,
+    OncePattern,
+    Pattern,
+    PeriodSpec,
+    RRulePattern,
+    RuleSpec,
+    Slot,
+    SlotGridSpec,
+    WeeklyPattern,
+    expand_rule,
 )
-from app.models import (
-    BellSchedule,
-    ClassRule,
-    DayOff,
-    Event,
-    RecurringEvent,
-    Semester,
-    Subject,
-    User,
-)
+from app.models import Area, DayOff, Event, EventType, Period, ScheduleRule, SlotGrid, User
 from app.services.jobs import request_reminders_sync
 
 log = logging.getLogger(__name__)
 
-# Личные повторы материализуются на столько дней вперёд (ночная джоба докатывает)
-RECURRING_HORIZON_DAYS = 90
+# Правила без периода материализуются на столько дней вперёд (ночная джоба докатывает)
+HORIZON_DAYS = 90
 
 
 @dataclass(frozen=True)
 class Desired:
-    """Каким должно быть вхождение по шаблону."""
+    """Каким должно быть вхождение по правилу."""
 
     date: date
     start: datetime
@@ -69,43 +65,104 @@ class SyncStats:
     updated: int = 0
     deleted: int = 0
 
+    def __add__(self, other: "SyncStats") -> "SyncStats":
+        return SyncStats(
+            self.created + other.created,
+            self.updated + other.updated,
+            self.deleted + other.deleted,
+        )
 
-# Поля, которые шаблон переписывает у не-detached вхождения
+
+# Поля, которые правило переписывает у не-detached вхождения
 _TEMPLATE_FIELDS = (
     "kind",
     "title",
     "is_fixed",
     "location",
     "color",
-    "subject_id",
-    "class_type",
-    "pair_number",
-    "teacher",
+    "area_id",
+    "event_type_id",
+    "fields",
+    "slot",
 )
 
 
-def bells_from_rows(rows: Sequence[BellSchedule]) -> Bells:
-    def slots(raw: list[dict[str, Any]]) -> list[BellSlot]:
+def grid_from_rows(rows: Sequence[SlotGrid]) -> SlotGridSpec:
+    def slots(raw: list[dict[str, Any]]) -> list[Slot]:
         return [
-            BellSlot(s["number"], time.fromisoformat(s["start"]), time.fromisoformat(s["end"]))
+            Slot(s["number"], time.fromisoformat(s["start"]), time.fromisoformat(s["end"]))
             for s in raw
         ]
 
     default = next((r for r in rows if r.weekday is None), None)
-    return Bells.from_slots(
+    return SlotGridSpec.from_slots(
         slots(default.slots) if default else [],
         {r.weekday: slots(r.slots) for r in rows if r.weekday is not None},
     )
 
 
-@dataclass
-class _ClassContext:
-    """Кэш на один проход синхронизации пар."""
+def period_spec(p: Period) -> PeriodSpec:
+    return PeriodSpec(
+        p.start_date,
+        p.end_date,
+        p.cycle_weeks,
+        p.first_cycle_week,
+        tuple(
+            DateRange(date.fromisoformat(x["from"]), date.fromisoformat(x["to"]))
+            for x in p.pauses or []
+        ),
+    )
 
-    days_off: list[DateRange]
-    semesters: dict[uuid.UUID, Semester | None] = field(default_factory=dict)
-    bells: dict[uuid.UUID, Bells] = field(default_factory=dict)
-    subjects: dict[uuid.UUID, Subject | None] = field(default_factory=dict)
+
+def pattern_from_json(raw: dict[str, Any]) -> Pattern:
+    match raw.get("kind"):
+        case PatternKind.weekly:
+            mask = raw.get("cycle_weeks")
+            return WeeklyPattern(
+                frozenset(raw.get("weekdays") or ()),
+                frozenset(mask) if mask else None,
+            )
+        case PatternKind.day_cycle:
+            return DayCyclePattern(
+                int(raw["on"]), int(raw["off"]), date.fromisoformat(raw["anchor"])
+            )
+        case PatternKind.rrule:
+            return RRulePattern(str(raw["rrule"]))
+        case PatternKind.once:
+            return OncePattern(date.fromisoformat(raw["date"]))
+    raise ValueError(f"Неизвестный паттерн: {raw!r}")
+
+
+def rule_spec(rule: ScheduleRule) -> RuleSpec:
+    return RuleSpec(
+        key=rule.id,
+        pattern=pattern_from_json(rule.pattern),
+        start_time=rule.start_time,
+        end_time=rule.end_time,
+        slot_from=rule.slot_from,
+        slot_to=rule.slot_to,
+        valid_from=rule.valid_from,
+        valid_to=rule.valid_to,
+    )
+
+
+def rule_title(rule: ScheduleRule, area: Area | None, event_type: EventType) -> str:
+    return rule.title or (area.name if area else None) or event_type.name
+
+
+@dataclass
+class _Context:
+    """Кэш на один проход синхронизации."""
+
+    days_off: list[DayOff]
+    periods: dict[uuid.UUID, Period | None] = field(default_factory=dict)
+    grids: dict[uuid.UUID, SlotGridSpec | None] = field(default_factory=dict)
+    areas: dict[uuid.UUID, Area | None] = field(default_factory=dict)
+    types: dict[uuid.UUID, EventType | None] = field(default_factory=dict)
+
+
+def _alive[M](obj: M | None) -> M | None:
+    return obj if obj is not None and getattr(obj, "deleted_at", None) is None else None
 
 
 class SeriesSync:
@@ -123,13 +180,17 @@ class SeriesSync:
         self.now = now or now_utc()
         self.today = local_date(self.now, tz)
 
+    @property
+    def horizon(self) -> date:
+        return self.today + timedelta(days=HORIZON_DAYS)
+
     # ---------- общий механизм ----------
 
-    async def _existing(self, template_type: TemplateType, template_id: uuid.UUID) -> list[Event]:
+    async def _existing(self, template_id: uuid.UUID) -> list[Event]:
         rows = await self.db.scalars(
             select(Event).where(
                 Event.user_id == self.user_id,
-                Event.template_type == template_type,
+                Event.template_type == TemplateType.schedule_rule,
                 Event.template_id == template_id,
                 Event.deleted_at.is_(None),
             )
@@ -138,18 +199,17 @@ class SeriesSync:
 
     async def sync_series(
         self,
-        template_type: TemplateType,
         template_id: uuid.UUID,
         desired: Sequence[Desired],
         *,
         until: date | None = None,
     ) -> SyncStats:
-        """Приводит будущие вхождения шаблона к `desired`.
+        """Приводит будущие вхождения правила к `desired`.
 
-        `until` — граница окна материализации (личные повторы на 90 дней):
+        `until` — граница окна материализации (правила без периода — на 90 дней):
         вхождения позже неё не удаляются, даже если их нет в `desired`.
         """
-        existing = {e.occurrence_date: e for e in await self._existing(template_type, template_id)}
+        existing = {e.occurrence_date: e for e in await self._existing(template_id)}
         wanted = {d.date: d for d in desired if d.date >= self.today}
         created = updated = deleted = 0
 
@@ -175,7 +235,7 @@ class SeriesSync:
             self.db.add(
                 Event(
                     user_id=self.user_id,
-                    template_type=template_type,
+                    template_type=TemplateType.schedule_rule,
                     template_id=template_id,
                     occurrence_date=day,
                     start=target.start,
@@ -188,27 +248,13 @@ class SeriesSync:
         await self.db.flush()
         return SyncStats(created, updated, deleted)
 
-    async def remove_series(
-        self,
-        template: ClassRule | RecurringEvent | uuid.UUID,
-        template_type: TemplateType | None = None,
-    ) -> None:
-        """Шаблон удалён: убираем все будущие вхождения, включая правленные руками."""
-        if isinstance(template, uuid.UUID):
-            template_id = template
-            template_type = template_type or TemplateType.class_rule
-        else:
-            template_id = template.id
-            template_type = (
-                TemplateType.recurring
-                if isinstance(template, RecurringEvent)
-                else TemplateType.class_rule
-            )
+    async def remove_series(self, template_id: uuid.UUID) -> None:
+        """Правило удалено: убираем все будущие вхождения, включая правленные руками."""
         await self.db.execute(
             update(Event)
             .where(
                 Event.user_id == self.user_id,
-                Event.template_type == template_type,
+                Event.template_type == TemplateType.schedule_rule,
                 Event.template_id == template_id,
                 Event.occurrence_date >= self.today,
                 Event.deleted_at.is_(None),
@@ -220,23 +266,17 @@ class SeriesSync:
     async def restore_occurrence(self, event: Event) -> None:
         """«Как в расписании» для одного вхождения — в том числе прошедшего.
 
-        Время и поля берутся из шаблона на дату вхождения, статус сбрасывается.
-        Если по шаблону в этот день вхождения нет (или шаблон удалён) — событие удаляется.
+        Время и поля берутся из правила на дату вхождения, статус сбрасывается.
+        Если по правилу в этот день вхождения нет (или правило удалено) — событие удаляется.
         """
         if event.template_id is None or event.occurrence_date is None:
-            raise ValueError(f"Событие {event.id} не из шаблона")
+            raise ValueError(f"Событие {event.id} не из правила")
         day = event.occurrence_date
-        window = DateRange(day, day)
         desired: list[Desired] | None = None
-        if event.template_type == TemplateType.class_rule:
-            rule = await self.db.get(ClassRule, event.template_id)
-            if rule is not None:
-                ctx = _ClassContext(await self._days_off())
-                desired = await self._rule_desired(rule, window, ctx)
-        elif event.template_type == TemplateType.recurring:
-            rec = await self.db.get(RecurringEvent, event.template_id)
-            if rec is not None and rec.deleted_at is None:
-                desired = self._recurring_desired(rec, window)
+        rule = await self.db.get(ScheduleRule, event.template_id)
+        if rule is not None and rule.user_id == self.user_id:
+            ctx = await self._context()
+            desired = await self._rule_desired(rule, DateRange(day, day), ctx)
 
         event.detached = False
         event.status = EventStatus.planned
@@ -249,199 +289,183 @@ class SeriesSync:
                 setattr(event, name, value)
         await self.db.flush()
 
-    # ---------- пары ----------
+    # ---------- правила ----------
 
-    async def _days_off(self) -> list[DateRange]:
+    async def _context(self) -> _Context:
         rows = await self.db.scalars(
             select(DayOff).where(DayOff.user_id == self.user_id, DayOff.deleted_at.is_(None))
         )
-        return [DateRange(r.date_from, r.date_to) for r in rows]
+        return _Context(list(rows))
 
-    async def _bells(self, semester_id: uuid.UUID) -> Bells:
+    async def _grid(self, grid_id: uuid.UUID) -> SlotGridSpec | None:
+        """Сетка — группа строк с тем же (period_id, name), что у общей строки `grid_id`."""
+        head = _alive(await self.db.get(SlotGrid, grid_id))
+        if head is None or head.user_id != self.user_id:
+            return None
         rows = await self.db.scalars(
-            select(BellSchedule).where(
-                BellSchedule.user_id == self.user_id,
-                BellSchedule.semester_id == semester_id,
-                BellSchedule.deleted_at.is_(None),
+            select(SlotGrid).where(
+                SlotGrid.user_id == self.user_id,
+                SlotGrid.deleted_at.is_(None),
+                SlotGrid.name == head.name,
+                SlotGrid.period_id == head.period_id
+                if head.period_id
+                else SlotGrid.period_id.is_(None),
             )
         )
-        return bells_from_rows(list(rows))
+        return grid_from_rows(list(rows))
 
-    async def _live_rules(self, *where: Any) -> list[ClassRule]:
+    async def _rule_desired(
+        self, rule: ScheduleRule, window: DateRange, ctx: _Context
+    ) -> list[Desired] | None:
+        """Вхождения правила в `window`; None — правило (или его тип, период, сфера) удалено."""
+        if rule.deleted_at is not None:
+            return None
+        if rule.event_type_id not in ctx.types:
+            ctx.types[rule.event_type_id] = _alive(await self.db.get(EventType, rule.event_type_id))
+        event_type = ctx.types[rule.event_type_id]
+        if event_type is None:
+            return None
+        area: Area | None = None
+        if rule.area_id is not None:
+            if rule.area_id not in ctx.areas:
+                ctx.areas[rule.area_id] = _alive(await self.db.get(Area, rule.area_id))
+            area = ctx.areas[rule.area_id]
+            if area is None:
+                return None
+        period: Period | None = None
+        if rule.period_id is not None:
+            if rule.period_id not in ctx.periods:
+                ctx.periods[rule.period_id] = _alive(await self.db.get(Period, rule.period_id))
+            period = ctx.periods[rule.period_id]
+            if period is None:
+                return None
+        grid: SlotGridSpec | None = None
+        if rule.slot_grid_id is not None:
+            if rule.slot_grid_id not in ctx.grids:
+                ctx.grids[rule.slot_grid_id] = await self._grid(rule.slot_grid_id)
+            grid = ctx.grids[rule.slot_grid_id]
+
+        # Исключения — только для правил периода: общие и этого периода
+        days_off = (
+            [
+                DateRange(d.date_from, d.date_to)
+                for d in ctx.days_off
+                if d.period_id is None or d.period_id == rule.period_id
+            ]
+            if period is not None
+            else []
+        )
+        occurrences = expand_rule(
+            rule_spec(rule),
+            tz=self.tz,
+            window=window,
+            period=period_spec(period) if period else None,
+            grid=grid,
+            days_off=days_off,
+        )
+        fields = {
+            "kind": EventKind.busy,
+            "title": rule_title(rule, area, event_type),
+            "is_fixed": True,
+            "location": rule.location,
+            "color": rule.color or (area.color if area else None),
+            "area_id": rule.area_id,
+            "event_type_id": rule.event_type_id,
+            "fields": dict(rule.fields or {}),
+        }
+        return [Desired(o.date, o.start, o.end, {**fields, "slot": o.slot}) for o in occurrences]
+
+    async def sync_rules(self, rules: Sequence[ScheduleRule]) -> SyncStats:
+        """Синхронизирует серии правил (удалённые правила — убирает)."""
+        total = SyncStats()
+        if not rules:
+            return total
+        ctx = await self._context()
+        for rule in rules:
+            # Горизонт: конец периода; без периода — 90 дней (дальше не трогаем)
+            until = None if rule.period_id else self.horizon
+            desired = await self._rule_desired(
+                rule, DateRange(self.today, until or self.today + timedelta(days=800)), ctx
+            )
+            if desired is None:
+                await self.remove_series(rule.id)
+                continue
+            total += await self.sync_series(rule.id, desired, until=until)
+        return total
+
+    async def _live_rules(self, *where: Any) -> list[ScheduleRule]:
         rows = await self.db.scalars(
-            select(ClassRule).where(
-                ClassRule.user_id == self.user_id, ClassRule.deleted_at.is_(None), *where
+            select(ScheduleRule).where(
+                ScheduleRule.user_id == self.user_id, ScheduleRule.deleted_at.is_(None), *where
             )
         )
         return list(rows)
 
-    async def _rule_desired(
-        self, rule: ClassRule, window: DateRange, ctx: _ClassContext
-    ) -> list[Desired] | None:
-        """Вхождения правила пары в `window`; None — правило (или его семестр/предмет) удалено."""
-        if rule.semester_id not in ctx.semesters:
-            ctx.semesters[rule.semester_id] = await self.db.get(Semester, rule.semester_id)
-            ctx.bells[rule.semester_id] = await self._bells(rule.semester_id)
-        if rule.subject_id not in ctx.subjects:
-            ctx.subjects[rule.subject_id] = await self.db.get(Subject, rule.subject_id)
-        semester = ctx.semesters[rule.semester_id]
-        subject = ctx.subjects[rule.subject_id]
-        if (
-            rule.deleted_at is not None
-            or semester is None
-            or semester.deleted_at is not None
-            or subject is None
-            or subject.deleted_at is not None
+    async def sync_period(self, period_id: uuid.UUID) -> SyncStats:
+        return await self.sync_rules(await self._live_rules(ScheduleRule.period_id == period_id))
+
+    async def sync_grid(self, grid_ids: Sequence[uuid.UUID]) -> SyncStats:
+        return await self.sync_rules(
+            await self._live_rules(ScheduleRule.slot_grid_id.in_(list(grid_ids)))
+        )
+
+    async def sync_event_type(self, event_type_id: uuid.UUID) -> SyncStats:
+        return await self.sync_rules(
+            await self._live_rules(ScheduleRule.event_type_id == event_type_id)
+        )
+
+    async def sync_area(self, area: Area) -> SyncStats:
+        rules = await self._live_rules(ScheduleRule.area_id == area.id)
+        stats = await self.sync_rules(rules)
+        # Название и цвет сферы обновляются и у правленных руками вхождений
+        for values, ids in (
+            ({"title": area.name}, [r.id for r in rules if r.title is None]),
+            ({"color": area.color}, [r.id for r in rules if r.color is None]),
         ):
-            return None
-
-        spec = SemesterSpec(
-            semester.start_date, semester.classes_end, Parity(semester.first_week_parity)
-        )
-        occurrences = expand_class_rule(
-            _rule_spec(rule),
-            spec,
-            ctx.bells[rule.semester_id],
-            self.tz,
-            days_off=ctx.days_off,
-            window=window,
-        )
-        fields = {
-            "kind": EventKind.class_,
-            "title": subject.name,
-            "is_fixed": True,
-            "location": rule.location,
-            "color": subject.color,
-            "subject_id": subject.id,
-            "class_type": rule.class_type,
-            "pair_number": rule.pair_number,
-            "teacher": rule.teacher,
-        }
-        return [Desired(o.date, o.start, o.end, fields) for o in occurrences]
-
-    async def sync_class_rules(self, rules: Sequence[ClassRule]) -> SyncStats:
-        """Синхронизирует серии правил пар (удалённые правила — убирает)."""
-        total = SyncStats()
-        if not rules:
-            return total
-        ctx = _ClassContext(await self._days_off())
-        for rule in rules:
-            desired = await self._rule_desired(rule, DateRange(self.today, date.max), ctx)
-            if desired is None:
-                await self.remove_series(rule)
+            if not ids:
                 continue
-            stats = await self.sync_series(TemplateType.class_rule, rule.id, desired)
-            total = SyncStats(
-                total.created + stats.created,
-                total.updated + stats.updated,
-                total.deleted + stats.deleted,
+            await self.db.execute(
+                update(Event)
+                .where(
+                    Event.user_id == self.user_id,
+                    Event.template_type == TemplateType.schedule_rule,
+                    Event.template_id.in_(ids),
+                    Event.detached.is_(True),
+                    Event.occurrence_date >= self.today,
+                    Event.deleted_at.is_(None),
+                )
+                .values(**values)
             )
-        return total
-
-    async def sync_semester(self, semester_id: uuid.UUID) -> SyncStats:
-        rules = await self._live_rules(ClassRule.semester_id == semester_id)
-        return await self.sync_class_rules(rules)
-
-    async def sync_subject(self, subject: Subject) -> SyncStats:
-        stats = await self.sync_class_rules(
-            await self._live_rules(ClassRule.subject_id == subject.id)
-        )
-        # Название и цвет предмета обновляются и у правленных руками вхождений
-        await self.db.execute(
-            update(Event)
-            .where(
-                Event.user_id == self.user_id,
-                Event.subject_id == subject.id,
-                Event.kind == EventKind.class_,
-                Event.detached.is_(True),
-                Event.occurrence_date >= self.today,
-                Event.deleted_at.is_(None),
-            )
-            .values(title=subject.name, color=subject.color)
-        )
         return stats
 
-    async def sync_all_class_rules(self) -> SyncStats:
-        """Праздники влияют на все семестры."""
-        return await self.sync_class_rules(await self._live_rules())
-
-    # ---------- личные повторы ----------
-
-    @property
-    def horizon(self) -> date:
-        return self.today + timedelta(days=RECURRING_HORIZON_DAYS)
-
-    def _recurring_desired(self, rec: RecurringEvent, window: DateRange) -> list[Desired]:
-        occurrences = expand_rrule(
-            rec.rrule,
-            dtstart=rec.start_date,
-            start_time=rec.start_time,
-            end_time=rec.end_time,
-            tz=self.tz,
-            window=window,
-            until=rec.until,
-            key=rec.id,
+    async def sync_with_days_off(self, period_id: uuid.UUID | None) -> SyncStats:
+        """Исключение без периода влияет на правила всех периодов."""
+        where = (
+            ScheduleRule.period_id == period_id
+            if period_id
+            else ScheduleRule.period_id.is_not(None)
         )
-        fields = {
-            "kind": rec.kind,
-            "title": rec.title,
-            "is_fixed": True,
-            "location": rec.location,
-            "color": rec.color,
-        }
-        return [Desired(o.date, o.start, o.end, fields) for o in occurrences]
+        return await self.sync_rules(await self._live_rules(where))
 
-    async def sync_recurring(self, rec: RecurringEvent) -> SyncStats:
-        """Вхождения повтора на [сегодня, сегодня + 90 дней]."""
-        if rec.deleted_at is not None:
-            await self.remove_series(rec)
-            return SyncStats()
-        return await self.sync_series(
-            TemplateType.recurring,
-            rec.id,
-            self._recurring_desired(rec, DateRange(self.today, self.horizon)),
-            until=self.horizon,
-        )
-
-    async def roll_recurring(self) -> int:
-        """Докатывает окно всех повторов пользователя. Возвращает число созданных вхождений."""
-        rows = await self.db.scalars(
-            select(RecurringEvent).where(
-                RecurringEvent.user_id == self.user_id, RecurringEvent.deleted_at.is_(None)
-            )
-        )
-        created = 0
-        for rec in rows:
-            created += (await self.sync_recurring(rec)).created
-        return created
+    async def roll(self) -> int:
+        """Докатывает окно правил без периода. Возвращает число созданных вхождений."""
+        rules = await self._live_rules(ScheduleRule.period_id.is_(None))
+        return (await self.sync_rules(rules)).created
 
 
 def _items(target: Desired) -> list[tuple[str, Any]]:
     return [(name, target.fields[name]) for name in _TEMPLATE_FIELDS if name in target.fields]
 
 
-def _rule_spec(rule: ClassRule) -> ClassRuleSpec:
-    return ClassRuleSpec(
-        key=rule.id,
-        weekday=rule.weekday,
-        parity=RuleParity(rule.parity),
-        pair_number=rule.pair_number,
-        start_time=rule.start_time,
-        end_time=rule.end_time,
-        valid_from=rule.valid_from,
-        valid_to=rule.valid_to,
-    )
-
-
 async def roll_all_users(db: AsyncSession, *, now: datetime | None = None) -> int:
-    """Ночная джоба: докатывает окно личных повторов у всех пользователей."""
+    """Ночная джоба: докатывает окно правил без периода у всех пользователей."""
     users = list(await db.execute(select(User.id, User.timezone).where(User.deleted_at.is_(None))))
     created = 0
     for user_id, timezone in users:
         try:
-            created += await SeriesSync(db, user_id, get_tz(timezone), now=now).roll_recurring()
+            created += await SeriesSync(db, user_id, get_tz(timezone), now=now).roll()
             await db.commit()
         except Exception:
-            log.exception("Докатка повторов пользователя %s упала", user_id)
+            log.exception("Докатка правил расписания пользователя %s упала", user_id)
             await db.rollback()
     return created

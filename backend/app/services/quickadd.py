@@ -1,56 +1,55 @@
-"""Быстрый ввод: разбор строки (domain/quickparse) с предметами пользователя."""
+"""Быстрый ввод: разбор строки (domain/quickparse) на словаре пользователя — сферах,
+типах задач, действий и занятости с их синонимами (`catalog.vocabulary`)."""
 
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
 from app.core.time import get_tz, now_utc, wall_to_utc
-from app.domain.enums import EventKind, TaskType
-from app.domain.quickparse import KindHint, ParseResult, SubjectRef, parse
-from app.models import ActionType, Semester, Subject, User
+from app.domain.quickparse import KindHint, ParseResult, parse
+from app.models import Area, User
 from app.schemas.backlog import BacklogCreate
 from app.schemas.event import EventCreate
 from app.schemas.task import TaskCreate
+from app.services.areas import area_refs_for_parse
 from app.services.backlog import BacklogService
-from app.services.catalog import ensure_defaults
+from app.services.catalog import default_action_type, ensure_defaults, vocabulary
 from app.services.events import EventService
 from app.services.tasks import TaskService
 
 
-async def subject_refs(db: AsyncSession, user: User, today: date) -> list[SubjectRef]:
-    """Предметы текущих семестров (и без семестра). Если текущих нет — все:
-    так одинаковые названия из прошлых семестров не делают разбор неоднозначным."""
-    current = select(Semester.id).where(
-        Semester.user_id == user.id,
-        Semester.deleted_at.is_(None),
-        Semester.start_date <= today,
-        or_(
-            Semester.session_end >= today,
-            Semester.session_end.is_(None) & (Semester.classes_end >= today),
-        ),
-    )
-    base = select(Subject).where(Subject.user_id == user.id, Subject.deleted_at.is_(None))
-    subjects = list(
-        await db.scalars(
-            base.where(or_(Subject.semester_id.in_(current), Subject.semester_id.is_(None)))
-        )
-    )
-    if not subjects:
-        subjects = list(await db.scalars(base))
-    return [
-        SubjectRef(s.id, tuple(n for n in (s.name, s.short_name, *s.synonyms) if n))
-        for s in subjects
-    ]
+@dataclass(frozen=True)
+class QuickParse:
+    """Разбор строки + типы задачи и действия из справочников пользователя."""
+
+    result: ParseResult
+    task_type_id: uuid.UUID | None
+    action_type_id: uuid.UUID | None
+    event_type_id: uuid.UUID | None
+    # Есть ли у пользователя сферы: без них «задача без сферы» — не неуверенность
+    has_areas: bool
 
 
-async def parse_text(db: AsyncSession, user: User, text: str) -> ParseResult:
+def _id(value: object) -> uuid.UUID | None:
+    return value if isinstance(value, uuid.UUID) else None
+
+
+async def parse_text(db: AsyncSession, user: User, text: str) -> QuickParse:
     now = now_utc().astimezone(get_tz(user.timezone))
-    return parse(text, now, await subject_refs(db, user, now.date()))
+    if await ensure_defaults(db, user.id):
+        await db.flush()
+    words = await vocabulary(db, user.id)
+    areas = await area_refs_for_parse(db, user, now.date())
+    p = parse(text, now, areas, words.task, words.action, words.event)
+    action_type_id = _id(p.action_type)
+    if action_type_id is None and p.default_action:
+        default = await default_action_type(db, user)
+        action_type_id = default.id if default else None
+    return QuickParse(p, _id(p.task_type), action_type_id, _id(p.event_type), bool(areas))
 
 
 # ---------- создание из текста (бот) ----------
@@ -67,7 +66,7 @@ class Created:
     desired_by: date | None = None  # дело в ящике
     start: datetime | None = None  # событие
     end: datetime | None = None
-    subject: str | None = None
+    area: str | None = None
 
 
 class NeedsTimeError(AppError):
@@ -90,7 +89,7 @@ def _event_bounds(p: ParseResult, tz: ZoneInfo) -> tuple[datetime, datetime]:
 def resolve_kind(p: ParseResult, kind: KindHint | None) -> KindHint:
     kind = kind or p.kind_hint
     if kind == KindHint.event and (p.date is None or p.time is None):
-        return KindHint.task if p.task_type or p.is_deadline else KindHint.backlog
+        return KindHint.task if p.task_type is not None or p.is_deadline else KindHint.backlog
     return kind
 
 
@@ -102,35 +101,30 @@ async def create_from_text(
     `kind` — явный выбор («Изменить» в боте); без него — подсказка разбора.
     """
     text = text.strip()[:500]
-    p = await parse_text(db, user, text)
+    parsed = await parse_text(db, user, text)
+    p = parsed.result
     if kind == KindHint.event and (p.date is None or p.time is None):
         raise NeedsTimeError()
     kind = resolve_kind(p, kind)
     title = (p.title or text)[:300]
-    subject_id = p.subject_id if isinstance(p.subject_id, uuid.UUID) else None
-    subject = await db.get(Subject, subject_id) if subject_id else None
-    action_type_id = None
-    if p.action_type is not None:
-        if await ensure_defaults(db, user.id):
-            await db.flush()
-        action_type_id = await db.scalar(
-            select(ActionType.id).where(
-                ActionType.user_id == user.id,
-                ActionType.deleted_at.is_(None),
-                ActionType.key == p.action_type,
-            )
-        )
+    area_id = p.area_id if isinstance(p.area_id, uuid.UUID) else None
+    area = await db.get(Area, area_id) if area_id else None
+    action_type_id = parsed.action_type_id
     tz = get_tz(user.timezone)
 
     if kind == KindHint.event:
         start, end = _event_bounds(p, tz)
         event = await EventService(db, user).create(
             EventCreate(
-                kind=EventKind.personal, title=title, start=start, end=end, subject_id=subject_id
+                title=title,
+                start=start,
+                end=end,
+                area_id=area_id,
+                event_type_id=parsed.event_type_id,
             )
         )
         return Created(
-            kind, event.id, title, start=start, end=end, subject=subject.name if subject else None
+            kind, event.id, title, start=start, end=end, area=area.name if area else None
         )
 
     if kind == KindHint.backlog:
@@ -143,15 +137,13 @@ async def create_from_text(
     task = await TaskService(db, user).create(
         TaskCreate(
             title=title,
-            task_type=p.task_type or TaskType.other,
-            subject_id=subject_id,
+            task_type_id=parsed.task_type_id,
+            area_id=area_id,
             action_type_id=action_type_id,
             deadline=deadline,
         )
     )
-    return Created(
-        kind, task.id, title, deadline=deadline, subject=subject.name if subject else None
-    )
+    return Created(kind, task.id, title, deadline=deadline, area=area.name if area else None)
 
 
 async def delete_created(db: AsyncSession, user: User, kind: KindHint, id: uuid.UUID) -> None:

@@ -7,17 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.schedule_sync import roll_all_users
 from app.worker.__main__ import NIGHTLY_AT, seconds_until
 
-from .test_schedule_api import API, other_client
+from .test_schedule_api import API, make_event_type, other_client
 from .test_schedule_sync import NOW, live_events
 
 GYM = {
-    "kind": "rest",
     "title": "Бассейн",
-    "rrule": "FREQ=WEEKLY;BYDAY=TU,TH",
-    "start_date": "2026-10-01",
+    "pattern": {"kind": "rrule", "rrule": "FREQ=WEEKLY;BYDAY=TU,TH"},
+    "valid_from": "2026-10-01",
     "start_time": "19:00",
     "end_time": "20:30",
 }
+
+
+def rrule(value: str) -> dict:
+    return {"pattern": {"kind": "rrule", "rrule": value}}
 
 
 @pytest.fixture
@@ -28,17 +31,27 @@ def clock(monkeypatch):
 
 
 async def create_recurring(client: AsyncClient, **over) -> dict:
-    resp = await client.post(f"{API}/recurring-events", json={**GYM, **over})
+    """Правило без периода (бывший личный повтор) с типом «Отдых»."""
+    types = {t["name"]: t["id"] for t in (await client.get(f"{API}/event-types")).json()}
+    rest = (
+        types.get("Отдых")
+        or (
+            await make_event_type(
+                client, name="Отдых", is_rest=True, fields=[], buffer_before_min=0
+            )
+        )["id"]
+    )
+    resp = await client.post(f"{API}/schedule-rules", json={"event_type_id": rest, **GYM, **over})
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
-# ---------- личные повторы ----------
+# ---------- правила без периода (бывшие личные повторы) ----------
 
 
 async def test_recurring_materializes_90_days(auth_client, session: AsyncSession, clock):
     rec = await create_recurring(auth_client)
-    assert rec["rrule"] == "FREQ=WEEKLY;BYDAY=TU,TH"
+    assert rec["pattern"] == {"kind": "rrule", "rrule": "FREQ=WEEKLY;BYDAY=TU,TH"}
     events = await live_events(session)
     dates = [e.occurrence_date for e in events]
     # С сегодня (вт 06.10) до 04.01.2027 включительно: 13 вт + 13 чт
@@ -46,7 +59,8 @@ async def test_recurring_materializes_90_days(auth_client, session: AsyncSession
     assert dates[-1] <= date(2027, 1, 4)
     assert len(dates) == 26
     first = events[0]
-    assert first.kind == "rest"
+    assert first.kind == "busy"
+    assert str(first.event_type_id) == rec["event_type_id"]
     assert first.is_fixed
     assert first.title == "Бассейн"
     assert first.start == datetime(2026, 10, 6, 16, 0, tzinfo=UTC)
@@ -54,14 +68,16 @@ async def test_recurring_materializes_90_days(auth_client, session: AsyncSession
 
 
 async def test_recurring_validation(auth_client, clock):
+    rest = await make_event_type(auth_client, name="Отдых", fields=[])
     for over in (
-        {"rrule": "FREQ=HOURLY"},
-        {"rrule": "garbage"},
-        {"until": "2026-09-01"},
+        rrule("FREQ=HOURLY"),
+        rrule("garbage"),
+        {"valid_to": "2026-09-01"},
         {"end_time": "19:00"},
         {"kind": "class"},
     ):
-        resp = await auth_client.post(f"{API}/recurring-events", json={**GYM, **over})
+        body = {"event_type_id": rest["id"], **GYM, **over}
+        resp = await auth_client.post(f"{API}/schedule-rules", json=body)
         assert resp.status_code == 422, over
 
 
@@ -73,7 +89,7 @@ async def test_series_edit_keeps_detached_occurrence(auth_client, session: Async
         json={"start": "2026-10-06T20:00:00+03:00", "end": "2026-10-06T21:00:00+03:00"},
     )
     resp = await auth_client.patch(
-        f"{API}/recurring-events/{rec['id']}", json={"start_time": "18:00", "end_time": "19:00"}
+        f"{API}/schedule-rules/{rec['id']}", json={"start_time": "18:00", "end_time": "19:00"}
     )
     assert resp.status_code == 200
     events = {e.id: e for e in await live_events(session)}
@@ -85,21 +101,19 @@ async def test_series_edit_keeps_detached_occurrence(auth_client, session: Async
 
 async def test_rrule_change_and_delete(auth_client, session: AsyncSession, clock):
     rec = await create_recurring(auth_client)
-    await auth_client.patch(
-        f"{API}/recurring-events/{rec['id']}", json={"rrule": "FREQ=WEEKLY;BYDAY=SA"}
-    )
+    await auth_client.patch(f"{API}/schedule-rules/{rec['id']}", json=rrule("FREQ=WEEKLY;BYDAY=SA"))
     dates = [e.occurrence_date for e in await live_events(session)]
     assert all(d.isoweekday() == 6 for d in dates)
     assert len(dates) == 13
 
-    resp = await auth_client.delete(f"{API}/recurring-events/{rec['id']}")
+    resp = await auth_client.delete(f"{API}/schedule-rules/{rec['id']}")
     assert resp.status_code == 204
     assert await live_events(session) == []
-    assert (await auth_client.get(f"{API}/recurring-events")).json() == []
+    assert (await auth_client.get(f"{API}/schedule-rules")).json() == []
 
 
 async def test_nightly_roll_extends_window(auth_client, session: AsyncSession, clock):
-    await create_recurring(auth_client, until=None)
+    await create_recurring(auth_client, valid_to=None)
     before = await live_events(session)
 
     later = datetime(2026, 11, 5, 0, 0, tzinfo=UTC)  # через месяц
@@ -226,7 +240,7 @@ async def test_calendar_day_off_on_next_day_not_included(auth_client, clock):
 
 async def test_mark_done_does_not_detach(auth_client, session: AsyncSession, clock):
     # «Сделано» — не ручная правка: серия по-прежнему обновляет вхождение
-    await create_recurring(auth_client, kind="personal")
+    await create_recurring(auth_client)
     target = (await live_events(session))[0]
     resp = await auth_client.patch(f"{API}/events/{target.id}", json={"status": "done"})
     assert resp.json()["status"] == "done"
@@ -241,9 +255,7 @@ async def test_reset_when_series_no_longer_has_day(auth_client, session: AsyncSe
     target = (await live_events(session))[0]  # вт 06.10
     await auth_client.patch(f"{API}/events/{target.id}", json={"title": "Тренажёрка"})
     # Серия теперь только по четвергам; правленный вторник остаётся (detached)
-    await auth_client.patch(
-        f"{API}/recurring-events/{rec['id']}", json={"rrule": "FREQ=WEEKLY;BYDAY=TH"}
-    )
+    await auth_client.patch(f"{API}/schedule-rules/{rec['id']}", json=rrule("FREQ=WEEKLY;BYDAY=TH"))
     assert (await auth_client.get(f"{API}/events/{target.id}")).status_code == 200
     resp = await auth_client.post(f"{API}/events/{target.id}/reset")
     assert resp.status_code == 200

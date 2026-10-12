@@ -68,7 +68,7 @@ async def test_roll_all_users_continues_after_failure(
         done.append(self.user_id)
         return 0
 
-    monkeypatch.setattr(schedule_sync.SeriesSync, "roll_recurring", roll)
+    monkeypatch.setattr(schedule_sync.SeriesSync, "roll", roll)
     async with session_factory() as db:
         await schedule_sync.roll_all_users(db)
     assert done == [good]

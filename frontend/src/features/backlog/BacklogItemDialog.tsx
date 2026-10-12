@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { ActionTypeSelect, CategorySelect } from '@/features/catalog/CatalogSelect'
 
-import { CONDITION_LABEL, CONDITIONS, ESTIMATES } from './labels'
+import { CONDITIONS, ESTIMATES } from './labels'
 import { usePreviewPlan } from '@/features/plan/usePlan'
+import { useEventTypes } from '@/features/schedule/useSchedule'
+import { BACKLOG_DAYS, BACKLOG_HOURS, CONDITION_LABEL } from '@/lib/terms'
 
 import {
   type BacklogCondition,
@@ -20,6 +23,8 @@ import {
   useTakeForWeek,
   useUpdateBacklog,
 } from './useBacklog'
+
+const NO_DAYS = 'none'
 
 type Props = { item: BacklogItem | null; onOpenChange: (open: boolean) => void }
 
@@ -48,6 +53,9 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
   const [estimate, setEstimate] = useState(item.estimate_min)
   const [desiredBy, setDesiredBy] = useState(item.desired_by ?? '')
   const [conditions, setConditions] = useState<BacklogCondition[]>(item.conditions)
+  const [hoursTypeId, setHoursTypeId] = useState(item.hours_action_type_id)
+  const [daysTypeId, setDaysTypeId] = useState(item.days_event_type_id)
+  const { data: eventTypes = [] } = useEventTypes()
   const pending = item.id.startsWith('tmp-')
 
   const save = () =>
@@ -62,6 +70,8 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
           estimate_min: estimate,
           desired_by: desiredBy || null,
           conditions,
+          hours_action_type_id: hoursTypeId,
+          days_event_type_id: daysTypeId,
         },
       },
       { onSuccess: onDone },
@@ -121,6 +131,28 @@ function BacklogForm({ item, onDone }: { item: BacklogItem; onDone: () => void }
           ))}
         </ToggleGroup>
       </Field>
+      <Field>
+        <FieldLabel htmlFor="bl-hours">{BACKLOG_HOURS.label}</FieldLabel>
+        <ActionTypeSelect id="bl-hours" value={hoursTypeId} onChange={setHoursTypeId} emptyLabel={BACKLOG_HOURS.any} />
+      </Field>
+      {eventTypes.length > 0 && (
+        <Field>
+          <FieldLabel htmlFor="bl-days">{BACKLOG_DAYS.label}</FieldLabel>
+          <Select value={daysTypeId ?? NO_DAYS} onValueChange={(v) => setDaysTypeId(v === NO_DAYS ? null : v)}>
+            <SelectTrigger id="bl-days" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_DAYS}>{BACKLOG_DAYS.any}</SelectItem>
+              {eventTypes.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name_plural}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field>
           <FieldLabel htmlFor="bl-category">Категория</FieldLabel>

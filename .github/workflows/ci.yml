@@ -50,6 +50,8 @@ jobs:
           uv run ruff format --check .
       - name: mypy (strict)
         run: uv run mypy
+      - name: lexicon (студенческие слова только в данных)
+        run: uv run python -m scripts.check_lexicon
       - name: dependencies declared (deptry)
         run: uv run deptry .
       - name: migrations match models
@@ -60,6 +62,8 @@ jobs:
           uv run alembic check
       - name: pytest + coverage (порог — pyproject.toml)
         run: uv run pytest --cov --cov-report=term
+      - name: migrations on data (make migrate-check)
+        run: uv run python -m scripts.migrate_check
 
   frontend:
     runs-on: ubuntu-latest

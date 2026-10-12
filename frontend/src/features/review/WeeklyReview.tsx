@@ -108,7 +108,7 @@ function Picker({ review }: { review: Review }) {
           Из ящика на неделю с {formatDay(review.week_start, { weekday: undefined })}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          До {review.per_week} {plural(review.per_week, 'дела', 'дел', 'дел')}: встанут в свободные окна после учёбы, с учётом
+          До {review.per_week} {plural(review.per_week, 'дела', 'дел', 'дел')}: встанут в свободные окна после задач, с учётом
           условий.
         </p>
       </CardHeader>

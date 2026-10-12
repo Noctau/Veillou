@@ -15,7 +15,7 @@ Note = Annotated[str, StringConstraints(max_length=5000)]
 
 
 class SourceCreate(InputModel):
-    subject_id: uuid.UUID
+    area_id: uuid.UUID
     title: Title
     author: Author = ""
     kind: SourceKind = SourceKind.textbook
@@ -26,7 +26,7 @@ class SourceCreate(InputModel):
 
 
 class SourceUpdate(InputModel):
-    subject_id: uuid.UUID | None = None
+    area_id: uuid.UUID | None = None
     title: Title | None = None
     author: Author | None = None
     kind: SourceKind | None = None
@@ -38,7 +38,7 @@ class SourceUpdate(InputModel):
 
 class SourceRead(ReadModel):
     id: uuid.UUID
-    subject_id: uuid.UUID
+    area_id: uuid.UUID
     title: str
     author: str
     kind: SourceKind
@@ -51,10 +51,13 @@ class SourceRead(ReadModel):
 
 
 class ReadingTaskCreate(InputModel):
-    """Задание «прочитать» из источника: тип «чтение», предмет источника."""
+    """Задание «прочитать» из источника: сфера источника, тип — по словам названия."""
 
     chapters: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         default="", description="«главы 3–5», «с. 40–75»; пусто — весь источник"
     )
     deadline: Moment | None = None
     estimate_min: TaskEstimate | None = None
+    task_type_id: uuid.UUID | None = Field(
+        default=None, description="null — угадать по названию («прочитать» → тип с этим словом)"
+    )

@@ -2,23 +2,6 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 
 import { formatDay, wallDate, wallTime } from '@/lib/time'
 
-import type { Feel, Priority, TaskType } from './useTasks'
-
-export const TASK_TYPE_LABEL: Record<TaskType, string> = {
-  homework: 'ДЗ',
-  report: 'Доклад',
-  essay: 'Реферат',
-  lab: 'Лабораторная',
-  coursework: 'Курсовая',
-  reading: 'Чтение',
-  exam_prep: 'К экзамену',
-  other: 'Другое',
-}
-
-export const PRIORITY_LABEL: Record<Priority, string> = { normal: 'Обычная', high: 'Высокая' }
-
-export const FEEL_LABEL: Record<Feel, string> = { faster: 'Быстрее', ok: 'Как думала', slower: 'Дольше' }
-
 /** 90 → «1 ч 30 мин», 30 → «30 мин». */
 export function formatMinutes(min: number): string {
   const h = Math.floor(min / 60)

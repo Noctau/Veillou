@@ -12,7 +12,7 @@ from app.domain.breakdown import (
     round_estimate,
     time_warning,
 )
-from app.domain.planner import Block, Busy, PlanInput, PlanSettings, Window, free_minutes
+from app.domain.planner import Block, Budget, Busy, PlanInput, PlanSettings, Window, free_minutes
 
 TZ = get_tz("Europe/Moscow")
 MON = date(2026, 10, 12)
@@ -112,37 +112,52 @@ def test_time_warning():
 # ---------- свободное время ----------
 
 
-def plan(*blocks, busy=(), now=None, **settings):
+STUDY = frozenset({"study"})
+
+
+def plan(*blocks, busy=(), now=None, budgets=(), **settings):
     return PlanInput(
         now=now or at(MON, 0),
         tz=TZ,
         blocks=blocks,
         busy=busy,
         settings=PlanSettings(**settings) if settings else PlanSettings(),
+        budgets=budgets,
     )
 
 
-def test_free_minutes_counts_work_hours_and_study_limit():
-    # Пн: рабочие часы 9–21 минус обед = 11 ч, но лимит учёбы по умолчанию меньше
-    inp = plan()
-    limit = PlanSettings().study_limit_min_per_day
-    assert free_minutes(inp, deadline=at(MON + timedelta(days=1), 0)) == min(11 * 60, limit)
+def test_free_minutes_counts_work_hours_and_budget():
+    # Пн: рабочие часы 9–21 минус обед = 11 ч, но лимит меньше
+    inp = plan(budgets=(Budget("study", 360),))
+    deadline = at(MON + timedelta(days=1), 0)
+    assert free_minutes(inp, deadline=deadline, budgets=STUDY) == 360
+    assert free_minutes(inp, deadline=deadline) == 11 * 60
 
 
-def test_free_minutes_without_study_limit_for_non_study():
+def test_free_minutes_budget_competitors():
+    """С лимитом конкуренты — только блоки того же лимита."""
+    deadline = at(MON + timedelta(days=1), 0)
+    other = Block("o", 120, deadline=at(MON, 20))
+    same = Block("s", 60, deadline=at(MON, 20), budgets=STUDY)
+    inp = plan(other, same, budgets=(Budget("study", 240),))
+    assert free_minutes(inp, deadline=deadline, budgets=STUDY) == 180
+    assert free_minutes(inp, deadline=deadline) == 11 * 60 - 180
+
+
+def test_free_minutes_without_budget():
     inp = plan()
-    assert free_minutes(inp, deadline=at(MON, 12), counts_as_study=False) == 3 * 60
+    assert free_minutes(inp, deadline=at(MON, 12)) == 3 * 60
 
 
 def test_free_minutes_subtracts_busy_and_competing_blocks():
     deadline = at(MON, 13)
-    busy = (Busy(at(MON, 10), at(MON, 11), is_class=False),)
+    busy = (Busy(at(MON, 10), at(MON, 11)),)
     competing = Block("x", 60, group_id="other", deadline=at(MON, 12))
     later = Block("y", 60, group_id="other", deadline=at(MON + timedelta(days=3), 12))
     mine = Block("m", 60, group_id="me", deadline=at(MON, 12))
     inp = plan(competing, later, mine, busy=busy)
     # 9–13 = 4 ч, минус пара 1 ч, минус «x» 1 ч; свои блоки и более поздний «y» не мешают
-    assert free_minutes(inp, deadline=deadline, counts_as_study=False, exclude_group="me") == 2 * 60
+    assert free_minutes(inp, deadline=deadline, exclude_group="me") == 2 * 60
 
 
 def test_free_minutes_respects_windows():
@@ -161,4 +176,4 @@ def test_free_minutes_all_day_window():
     window = (Window(ALL_DAYS, time(0), time(0)),)
     inp = plan()
     # Окно на весь день, но сон всё равно вычитается
-    assert free_minutes(inp, deadline=at(MON, 12), windows=window, counts_as_study=False) > 0
+    assert free_minutes(inp, deadline=at(MON, 12), windows=window) > 0

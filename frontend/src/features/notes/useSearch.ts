@@ -24,15 +24,15 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /** Поиск по конспектам и литературе по мере набора. Пустая строка — запроса нет. */
-export function useSearch(text: string, subjectId?: string) {
+export function useSearch(text: string, areaId?: string) {
   const q = useDebounced(text.trim(), DEBOUNCE_MS)
   return useQuery({
-    queryKey: queryKeys.search(q, subjectId),
+    queryKey: queryKeys.search(q, areaId),
     enabled: q.length > 0,
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/search', {
-        params: { query: { q, subject_id: subjectId } },
+        params: { query: { q, area_id: areaId } },
       })
       if (error) throw error
       return data

@@ -4,9 +4,9 @@ import { useEffect } from 'react'
 import { attachmentsQueryOptions } from '@/features/attachments/useAttachments'
 import { calendarQueryOptions } from '@/features/calendar/useCalendar'
 import { noteQueryOptions, notesQueryOptions } from '@/features/notes/useNotes'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
 import { FILES_CACHE, fileCacheKey } from '@/lib/pwa-shared'
 import { addDaysIso, dayStartUtc, todayIn, weekMonday } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 /** Сколько последних конспектов держать открываемыми без сети. */
 const RECENT_NOTES = 10
@@ -35,7 +35,7 @@ async function warmImages(urls: string[]) {
 /**
  * Пока есть сеть, заранее грузит то, что должно открываться офлайн:
  * календарь на 7+ дней вперёд и последние конспекты со страницами.
- * Всё остальное (задания, предметы, ящик…) сохраняется по мере открытия экранов.
+ * Всё остальное (задания, сферы, ящик…) сохраняется по мере открытия экранов.
  */
 export function useOfflinePrefetch(online: boolean) {
   const queryClient = useQueryClient()

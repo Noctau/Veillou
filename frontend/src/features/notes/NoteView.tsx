@@ -16,22 +16,21 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { AttachmentList } from '@/features/attachments/AttachmentList'
 import { useAttachments } from '@/features/attachments/useAttachments'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { AreaSelect } from '@/features/areas/AreaSelect'
+import { AREAS_UI } from '@/lib/terms'
 import { errorMessage } from '@/lib/errors'
 import { normalizeUrl } from '@/lib/url'
+import { useTimeZone } from '@/lib/useTimeZone'
 
 import { isPageImage, NOTE_KIND, NOTE_KINDS, pairLabel } from './labels'
 import { NotePages } from './NotePages'
 import { NoteTextEditor } from './NoteTextEditor'
 import { type Note, type NoteKind, type NoteUpdate, useDeleteNote, useNote, useUpdateNote } from './useNotes'
 
-const NONE = 'none'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -55,7 +54,7 @@ function TitleEditor({ note, onSave }: { note: Note; onSave: (title: string) => 
     <Textarea
       value={value}
       rows={1}
-      aria-label="Название конспекта"
+      aria-label="Название заметки"
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -115,25 +114,14 @@ function LinkEditor({ note, onSave }: { note: Note; onSave: (url: string | null)
 
 function Meta({ note, patch }: { note: Note; patch: (body: NoteUpdate) => void }) {
   const tz = useTimeZone()
-  const { data: subjects } = useSubjects()
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-      <Select value={note.subject_id ?? NONE} onValueChange={(v) => patch({ subject_id: v === NONE ? null : v })}>
-        <SelectTrigger size="sm" aria-label="Предмет" className="max-w-56">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NONE}>Без предмета</SelectItem>
-          {subjects?.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="max-w-56" aria-label={AREAS_UI.area}>
+        <AreaSelect value={note.area_id} onChange={(area_id) => patch({ area_id })} />
+      </div>
       <Input
         type="date"
-        aria-label="Дата пары"
+        aria-label="Дата события"
         value={note.class_date ?? ''}
         onChange={(e) => patch({ class_date: e.target.value || null })}
         className="h-8 w-40"
@@ -197,13 +185,13 @@ export function NoteView({ noteId }: { noteId: string }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {note.subject_id && (
+            {note.area_id && (
               <DropdownMenuItem asChild>
-                <Link to={`/subjects/${note.subject_id}?tab=notes`}>Все конспекты предмета</Link>
+                <Link to={`/areas/${note.area_id}?tab=notes`}>Все заметки сферы</Link>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-              <Trash2Icon /> Удалить конспект
+              <Trash2Icon /> Удалить заметку
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -246,7 +234,7 @@ export function NoteView({ noteId }: { noteId: string }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить «{note.title}»?</AlertDialogTitle>
-            <AlertDialogDescription>Текст, страницы и файлы конспекта удалятся.</AlertDialogDescription>
+            <AlertDialogDescription>Текст, страницы и файлы заметки удалятся.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>

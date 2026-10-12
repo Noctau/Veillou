@@ -1,6 +1,5 @@
 import {
   BookOpenIcon,
-  BriefcaseIcon,
   CalendarIcon,
   CheckIcon,
   ClockIcon,
@@ -25,11 +24,10 @@ import { type AttachmentOwner, uploadAttachment } from '@/features/attachments/u
 import { useCreateBacklog } from '@/features/backlog/useBacklog'
 import { useCreateEvent } from '@/features/calendar/useCalendar'
 import { useCreateNote } from '@/features/notes/useNotes'
-import { type ActionTypeKey, useActionTypes } from '@/features/catalog/useCatalog'
-import { WorkTaskDialog } from '@/features/projects/WorkTaskDialog'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
-import { useSubjects } from '@/features/subjects/useSubjects'
-import { TASK_TYPE_LABEL } from '@/features/tasks/labels'
+import { byId, useActionTypes, useTaskTypes } from '@/features/catalog/useCatalog'
+import { useAreas } from '@/features/areas/useAreas'
+import { QuickTypeButtons } from '@/features/tasks/QuickTypes'
+import { useEventTypes } from '@/features/schedule/useSchedule'
 import { useCreateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
@@ -37,6 +35,7 @@ import { compressImage } from '@/lib/image'
 import { SHARE_PARAM } from '@/lib/pwa-shared'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDay, wallDate, wallToUtc } from '@/lib/time'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
 import { type AiCardResult, AiParseCard } from './AiParseCard'
@@ -50,17 +49,17 @@ const KINDS: { value: Kind; label: string; icon: typeof InboxIcon }[] = [
   { value: 'task', label: 'Задание', icon: ListTodoIcon },
   { value: 'backlog', label: 'В ящик', icon: InboxIcon },
   { value: 'event', label: 'Событие', icon: CalendarIcon },
-  { value: 'note', label: 'Конспект', icon: NotebookPenIcon },
+  { value: 'note', label: 'Заметка', icon: NotebookPenIcon },
 ]
 
 const DEFAULT_EVENT_MIN = 60
-/** С файлами (из «Поделиться») можно создать только задание или конспект. */
+/** С файлами (из «Поделиться») можно создать только задачу или заметку. */
 const FILE_KINDS: Kind[] = ['task', 'note']
 /** Название задания из фото без подписи — распознавание заменит его (как на сервере). */
 const PHOTO_TITLE = 'Задание с фото'
 
 /** Неуверенный ввод ушёл в ИИ: быстрый разбор держим на случай «создать как есть». */
-type AiPending = { jobId: string; raw: string; p: QuickParse; day: string | null; subjectId: string | null }
+type AiPending = { jobId: string; raw: string; p: QuickParse; day: string | null; areaId: string | null }
 
 type Saved = { id: string; kind: Kind; title: string; link?: string }
 
@@ -97,10 +96,9 @@ export function QuickAdd() {
   const tz = useTimeZone()
   const [text, setText] = useState(params.get('text') ?? '')
   const [kindOverride, setKindOverride] = useState<Kind | null>(null)
-  const [dropSubject, setDropSubject] = useState(false)
+  const [dropArea, setDropArea] = useState(false)
   const [dropDate, setDropDate] = useState(false)
   const [saved, setSaved] = useState<Saved[]>([])
-  const [workTask, setWorkTask] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [skipAi, setSkipAi] = useState(false)
   const [ai, setAi] = useState<AiPending | null>(null)
@@ -112,8 +110,10 @@ export function QuickAdd() {
 
   const { data: parsed } = useQuickParse(text)
   const parseNow = useParseNow()
-  const { data: subjects } = useSubjects()
-  const { data: actionTypes } = useActionTypes()
+  const { data: areas } = useAreas()
+  const actionTypes = byId(useActionTypes().data)
+  const taskTypes = byId(useTaskTypes().data)
+  const eventTypes = byId(useEventTypes().data)
   const createTask = useCreateTask()
   const createBacklog = useCreateBacklog()
   const createEvent = useCreateEvent()
@@ -122,24 +122,21 @@ export function QuickAdd() {
   const live = text.trim() ? parsed : undefined
   const wanted: Kind = kindOverride ?? live?.kind_hint ?? (hasFiles ? 'task' : 'backlog')
   const kind: Kind = hasFiles && !FILE_KINDS.includes(wanted) ? 'task' : wanted
-  const subject = !dropSubject && live?.subject_id ? subjects?.find((s) => s.id === live.subject_id) : undefined
+  const area = !dropArea && live?.area_id ? areas?.find((s) => s.id === live.area_id) : undefined
   const date = dropDate ? null : (live?.date ?? null)
   const needsTime = kind === 'event' && (!date || !live?.time)
-
-  const actionTypeId = (key: ActionTypeKey | null) =>
-    (key && actionTypes?.find((a) => a.key === key)?.id) || null
 
   const reset = () => {
     setText('')
     setKindOverride(null)
-    setDropSubject(false)
+    setDropArea(false)
     setDropDate(false)
     setSkipAi(false)
   }
 
   const remember = (item: Saved) => setSaved((old) => [item, ...old].slice(0, 5))
 
-  /** Задание или конспект с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
+  /** Задача или заметка с файлами из «Поделиться»: создаём, грузим файлы, открываем. */
   const saveWithFiles = async () => {
     const raw = text.trim()
     const allImages = share.files.every((f) => f.type.startsWith('image/'))
@@ -152,14 +149,14 @@ export function QuickAdd() {
     try {
       const p = raw ? await parseNow(raw) : null
       const day = dropDate ? null : (p?.date ?? null)
-      const subjectId = dropSubject ? null : (p?.subject_id ?? null)
+      const areaId = dropArea ? null : (p?.area_id ?? null)
       if (kind === 'task') {
         const t = await createTask.mutateAsync({
           title: p?.title || raw || PHOTO_TITLE,
-          task_type: p?.task_type ?? 'other',
+          task_type_id: p?.task_type_id ?? null,
           description: '',
-          subject_id: subjectId,
-          action_type_id: actionTypeId(p?.action_type ?? null),
+          area_id: areaId,
+          action_type_id: p?.action_type_id ?? null,
           deadline: day ? (p?.deadline ?? null) : null,
           priority: 'normal',
           subtasks: [],
@@ -170,7 +167,7 @@ export function QuickAdd() {
         const n = await createNote.mutateAsync({
           title: p?.title || raw || null,
           kind: allImages ? 'photo' : 'file',
-          subject_id: subjectId,
+          area_id: areaId,
           class_date: day,
           body_md: '',
         })
@@ -188,7 +185,7 @@ export function QuickAdd() {
       navigate(owner.link, { replace: true })
     } catch (error) {
       toast.error(errorMessage(error, 'Не удалось загрузить файл'), {
-        description: 'Само задание или конспект создан — добавьте файлы на его странице',
+        description: 'Задача или заметка создана — добавьте файлы на её странице',
         action: { label: 'Открыть', onClick: () => navigate(owner.link) },
       })
     } finally {
@@ -210,7 +207,7 @@ export function QuickAdd() {
       return
     }
     const day = dropDate ? null : p.date
-    const subjectId = dropSubject ? null : p.subject_id
+    const areaId = dropArea ? null : p.area_id
     const title = p.title || raw
     const restore = () => setText(raw)
 
@@ -222,7 +219,14 @@ export function QuickAdd() {
       const start = wallToUtc(day, p.time, tz)
       reset()
       createEvent.mutate(
-        { kind: 'personal', title, start, end: eventEnd(p, start, tz), note: '', subject_id: subjectId },
+        {
+          title,
+          start,
+          end: eventEnd(p, start, tz),
+          note: '',
+          area_id: areaId,
+          event_type_id: p.event_type_id ?? null,
+        },
         { onSuccess: (e) => remember({ id: e.id, kind, title, link: '/calendar' }), onError: restore },
       )
       return
@@ -231,7 +235,7 @@ export function QuickAdd() {
     if (kind === 'note') {
       reset()
       createNote.mutate(
-        { title, kind: 'text', subject_id: subjectId, class_date: day, body_md: '' },
+        { title, kind: 'text', area_id: areaId, class_date: day, body_md: '' },
         { onSuccess: (n) => navigate(`/notes/${n.id}`), onError: restore },
       )
       return
@@ -240,7 +244,7 @@ export function QuickAdd() {
     if (kind === 'backlog') {
       reset()
       createBacklog.mutate(
-        { title, note: '', desired_by: day, action_type_id: actionTypeId(p.action_type) },
+        { title, note: '', desired_by: day, action_type_id: p.action_type_id },
         { onError: restore },
       )
       remember({ id: crypto.randomUUID(), kind, title, link: '/inbox' })
@@ -250,26 +254,26 @@ export function QuickAdd() {
     if (p.needs_ai && !skipAi) {
       reset()
       aiParse.mutate(raw, {
-        onSuccess: (jobId) => setAi({ jobId, raw, p, day, subjectId }),
+        onSuccess: (jobId) => setAi({ jobId, raw, p, day, areaId }),
         onError: restore,
       })
       return
     }
 
     reset()
-    createPlainTask(raw, p, day, subjectId)
+    createPlainTask(raw, p, day, areaId)
   }
 
   /** Задание по быстрому разбору (без ИИ). */
-  const createPlainTask = (raw: string, p: QuickParse, day: string | null, subjectId: string | null) => {
+  const createPlainTask = (raw: string, p: QuickParse, day: string | null, areaId: string | null) => {
     const title = p.title || raw
     createTask.mutate(
       {
         title,
-        task_type: p.task_type ?? 'other',
+        task_type_id: p.task_type_id,
         description: '',
-        subject_id: subjectId,
-        action_type_id: actionTypeId(p.action_type),
+        area_id: areaId,
+        action_type_id: p.action_type_id,
         deadline: day ? (p.deadline ?? null) : null,
         priority: 'normal',
         subtasks: [],
@@ -302,9 +306,9 @@ export function QuickAdd() {
     try {
       const t = await createTask.mutateAsync({
         title: card.title,
-        task_type: card.task_type,
+        task_type_id: card.task_type_id,
         description: card.description,
-        subject_id: card.subject_id,
+        area_id: card.area_id,
         action_type_id: card.action_type_id,
         deadline: card.deadline,
         priority: 'normal',
@@ -365,8 +369,8 @@ export function QuickAdd() {
               enterKeyHint="send"
               placeholder={
                 hasFiles
-                  ? 'Что это: «реферат климатология до 15 окт» или тема конспекта'
-                  : 'реферат климатология до 15 окт · купить продукты · завтра в 14 врач'
+                  ? 'Что это: «отчёт к пятнице» или тема заметки'
+                  : 'отчёт к пятнице · купить продукты · завтра в 14 врач'
               }
               aria-label="Что добавить"
               className="min-h-14 resize-none text-base"
@@ -413,30 +417,33 @@ export function QuickAdd() {
                 <span className="font-medium">{live.title || text.trim()}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {subject && kind !== 'backlog' && (
+                {area && kind !== 'backlog' && (
                   <Chip
-                    icon={<span className={cn('size-2 rounded-full', paletteColor(subject.color).bg)} />}
-                    onRemove={() => setDropSubject(true)}
+                    icon={<span className={cn('size-2 rounded-full', paletteColor(area.color).bg)} />}
+                    onRemove={() => setDropArea(true)}
                   >
-                    {subject.short_name || subject.name}
+                    {area.short_name || area.name}
                   </Chip>
                 )}
                 {dateChip()}
                 {kind === 'event' && live.duration_min && !live.end_time && (
                   <Chip icon={<ClockIcon className="size-3" />}>{live.duration_min} мин</Chip>
                 )}
-                {kind === 'task' && live.task_type && (
-                  <Chip icon={<BookOpenIcon className="size-3" />}>{TASK_TYPE_LABEL[live.task_type]}</Chip>
+                {kind === 'event' && live.event_type_id && eventTypes.has(live.event_type_id) && (
+                  <Chip>{eventTypes.get(live.event_type_id)?.name}</Chip>
                 )}
-                {live.action_type && kind !== 'event' && (
-                  <Chip>{actionTypes?.find((a) => a.key === live.action_type)?.name}</Chip>
+                {kind === 'task' && live.task_type_id && taskTypes.has(live.task_type_id) && (
+                  <Chip icon={<BookOpenIcon className="size-3" />}>{taskTypes.get(live.task_type_id)?.name}</Chip>
+                )}
+                {live.action_type_id && actionTypes.has(live.action_type_id) && kind !== 'event' && (
+                  <Chip>{actionTypes.get(live.action_type_id)?.name}</Chip>
                 )}
               </div>
               {needsTime && <p className="text-xs text-destructive">Для события напишите время: «завтра в 14».</p>}
               {kind === 'task' && !hasFiles && live.needs_ai && (
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   <SparklesIcon className="size-3.5 text-primary" />
-                  {skipAi ? 'Сохраню как есть, без ИИ.' : 'ИИ уточнит предмет, тип и срок — вы проверите.'}
+                  {skipAi ? 'Сохраню как есть, без ИИ.' : 'ИИ уточнит сферу, тип и срок — вы проверите.'}
                   <button type="button" className="underline underline-offset-4" onClick={() => setSkipAi((v) => !v)}>
                     {skipAi ? 'с ИИ' : 'без ИИ'}
                   </button>
@@ -454,7 +461,7 @@ export function QuickAdd() {
           busy={createTask.isPending}
           onCreate={(card, breakDown) => void createFromAi(card, breakDown)}
           onPlain={() => {
-            createPlainTask(ai.raw, ai.p, ai.day, ai.subjectId)
+            createPlainTask(ai.raw, ai.p, ai.day, ai.areaId)
             setAi(null)
           }}
           onClose={() => {
@@ -464,10 +471,9 @@ export function QuickAdd() {
         />
       )}
 
-      <Button variant="outline" size="sm" className="self-start" onClick={() => setWorkTask(true)}>
-        <BriefcaseIcon /> Задание с работы
-      </Button>
-      <WorkTaskDialog open={workTask} onOpenChange={setWorkTask} />
+      <div className="flex flex-wrap gap-2">
+        <QuickTypeButtons />
+      </div>
 
       {saved.length > 0 && (
         <div className="flex flex-col gap-1">

@@ -13,11 +13,10 @@ import {
 } from '@/components/ui/field'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { REMINDER_LABEL } from '@/lib/terms'
 
-import { NumberField } from '../fields'
 import { SettingsSection } from '../SettingsSection'
 import { useUpdateSettings, type UserSettings } from '../useSettings'
-import { intIn } from '../zod'
 
 const channel = z.enum(['push', 'telegram'])
 
@@ -31,12 +30,6 @@ const rule = z
 const schema = z.object({
   reminders: z.object({
     morning_digest: rule,
-    before_class: z
-      .object({ enabled: z.boolean(), channels: z.array(channel), minutes_before: intIn(0, 180) })
-      .refine((r) => !r.enabled || r.channels.length > 0, {
-        message: 'Выберите хотя бы один канал',
-        path: ['channels'],
-      }),
     deadlines: z
       .object({
         enabled: z.boolean(),
@@ -60,14 +53,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 type RuleKey = keyof FormValues['reminders']
 
-const RULES: { key: RuleKey; title: string; description: string }[] = [
-  { key: 'morning_digest', title: 'Утренняя сводка', description: 'Пары, дела и дедлайны на день.' },
-  { key: 'before_class', title: 'Перед парой', description: 'С аудиторией.' },
-  { key: 'deadlines', title: 'Дедлайны', description: 'Во время утренней сводки, одним сообщением с ней.' },
-  { key: 'evening_review', title: 'Вечерний разбор', description: 'Что сделано, что перенести.' },
-  { key: 'weekly_review', title: 'Недельный разбор', description: 'Итоги недели и дела из ящика.' },
-  { key: 'subtask_start', title: 'Начало подзадачи', description: 'Когда пора браться за дело.' },
-]
+const RULES = (Object.keys(REMINDER_LABEL) as RuleKey[]).map((key) => ({ key, ...REMINDER_LABEL[key] }))
 
 const DEADLINE_DAYS = [
   { value: 7, label: 'за неделю' },
@@ -124,8 +110,7 @@ function ChannelPicker({ control, name }: { control: Control<FormValues>; name: 
 export function RemindersSection({ settings }: { settings: UserSettings }) {
   const update = useUpdateSettings()
   const form = useForm({ resolver: zodResolver(schema), values: { reminders: settings.reminders } })
-  const { errors, isDirty } = form.formState
-  const beforeClassEnabled = useWatch({ control: form.control, name: 'reminders.before_class.enabled' })
+  const { isDirty } = form.formState
   const deadlinesEnabled = useWatch({ control: form.control, name: 'reminders.deadlines.enabled' })
 
   return (
@@ -177,18 +162,6 @@ export function RemindersSection({ settings }: { settings: UserSettings }) {
                   {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
                 </div>
               )}
-            />
-          )}
-          {r.key === 'before_class' && (
-            <NumberField
-              id="minutes_before"
-              label="За сколько до пары"
-              suffix="мин"
-              step={5}
-              min={0}
-              disabled={!beforeClassEnabled}
-              error={errors.reminders?.before_class?.minutes_before?.message}
-              {...form.register('reminders.before_class.minutes_before', { valueAsNumber: true })}
             />
           )}
         </div>

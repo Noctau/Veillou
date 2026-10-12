@@ -1,6 +1,6 @@
 """Текст напоминания — собирается в момент отправки по актуальной сущности.
 
-None — напоминание устарело (пару отменили или перенесли, задание сделано или
+None — напоминание устарело (событие отменили или перенесли, задание сделано или
 дедлайн сдвинут): отправитель его пропускает, а пересборка уже создала новое.
 """
 
@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import day_bounds_utc, get_tz, local_date
 from app.domain.enums import (
-    ClassType,
     EventKind,
     EventStatus,
     ReminderAction,
@@ -21,9 +20,10 @@ from app.domain.enums import (
     SubtaskStatus,
     TaskStatus,
 )
-from app.models import Event, Reminder, Subject, Subtask, Task, User
+from app.models import Area, Event, EventType, Reminder, Subtask, Task, User
 from app.notify.message import Message, Section, fmt_moment, fmt_range, lines, plural
-from app.services.digest import CLASS_TYPE_SHORT, Digest, deadline_line, task_progress
+from app.services.digest import Digest, deadline_line, task_progress
+from app.services.event_text import event_parts
 
 ACTIONS = (ReminderAction.done, ReminderAction.snooze, ReminderAction.tomorrow)
 
@@ -54,10 +54,11 @@ async def _task(db: AsyncSession, r: Reminder) -> Task | None:
     return t
 
 
-async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
+async def _before_event(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
     e = await _event(db, r)
-    if e is None or e.kind != EventKind.class_:
+    if e is None or e.kind != EventKind.busy:
         return None
+    event_type = await db.get(EventType, e.event_type_id) if e.event_type_id else None
     tz = get_tz(user.timezone)
     minutes = round((e.start - now).total_seconds() / 60)
     if minutes <= 0:
@@ -67,16 +68,15 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
     else:
         when = f"В {e.start.astimezone(tz):%H:%M}"
 
-    kind = CLASS_TYPE_SHORT.get(ClassType(e.class_type)) if e.class_type else None
-    where = f"ауд. {e.location}" if e.location else None
-    head = " · ".join(p for p in (fmt_range(e.start, e.end, tz), kind, where) if p)
-    info = lines(head, f"Преподаватель: {e.teacher}" if e.teacher else None)
+    parts = event_parts(e, event_type)
+    head = " · ".join(p for p in (fmt_range(e.start, e.end, tz), *parts.inline, parts.place) if p)
+    info = lines(head, *(f"{label}: {text}" for label, text in parts.details))
     sections = [Section(None, info)]
     if e.note.strip():
         sections.append(Section("Взять / подготовить", tuple(e.note.strip().splitlines())))
 
-    if e.subject_id is not None:
-        # Что сдавать по предмету до конца завтрашнего дня
+    if e.area_id is not None:
+        # Что сдавать по сфере до конца завтрашнего дня
         day = local_date(e.start, tz)
         _, until = day_bounds_utc(day + timedelta(days=1), tz)
         tasks = list(
@@ -86,7 +86,7 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
                     Task.user_id == user.id,
                     Task.deleted_at.is_(None),
                     Task.status == TaskStatus.active,
-                    Task.subject_id == e.subject_id,
+                    Task.area_id == e.area_id,
                     Task.deadline >= now,
                     Task.deadline < until,
                 )
@@ -98,13 +98,13 @@ async def _before_class(db: AsyncSession, user: User, r: Reminder, now: datetime
             sections.append(
                 Section("Сдать", tuple(deadline_line(t, shares[t.id], tz, day) for t in tasks))
             )
-    url = f"/subjects/{e.subject_id}" if e.subject_id else "/calendar"
+    url = f"/areas/{e.area_id}" if e.area_id else "/calendar"
     return Message(
         title=f"{when}: {e.title}",
         sections=tuple(sections),
         url=url,
-        kind=ReminderKind.before_class,
-        tag=f"class-{e.id}",
+        kind=ReminderKind.before_event,
+        tag=f"event-{e.id}",
     )
 
 
@@ -124,7 +124,7 @@ async def _deadline(db: AsyncSession, user: User, r: Reminder, now: datetime) ->
     today = local_date(now, tz)
     days_before = (local_date(t.deadline, tz) - today).days
     share = (await task_progress(db, [t]))[t.id]
-    subject = await db.get(Subject, t.subject_id) if t.subject_id else None
+    subject = await db.get(Area, t.area_id) if t.area_id else None
     info = lines(
         f"Сдать: {fmt_moment(t.deadline, tz, today)}",
         f"Готово {round(share * 100)}%" if share > 0 else None,
@@ -175,24 +175,36 @@ def _minutes(total: int) -> str:
 
 
 async def _evening(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
-    """Вечерний разбор. Всё отмечено — не присылаем."""
+    """Вечерний разбор: неотмеченные блоки и предложения автозадач. Нечего — не присылаем."""
     from app.services.review import ReviewService
 
     day = date.fromisoformat(r.payload["date"])
-    items, done = await ReviewService(db, user, now).evening_items(day)
-    if not items:
+    svc = ReviewService(db, user, now)
+    items, done = await svc.evening_items(day)
+    proposals = await svc.proposals()
+    if not items and not proposals:
         return None
     tz = get_tz(user.timezone)
-    head = f"Сделано: {done}. " if done else ""
-    hint = "Перенести невыполненное? Остальное сдвинется, предупрежу, если дедлайн под угрозой."
-    return Message(
-        title=f"Вечерний разбор: не отмечено {len(items)}",
-        sections=(
+    sections = []
+    if items:
+        head = f"Сделано: {done}. " if done else ""
+        hint = "Перенести невыполненное? Остальное сдвинется, предупрежу, если дедлайн под угрозой."
+        sections += [
             Section(None, tuple(f"{fmt_range(e.start, e.end, tz)} {e.title}" for e in items)),
             Section(None, (head + hint,)),
-        ),
+        ]
+    if proposals:
+        sections.append(Section("Предлагаю задачи", tuple(t.title for t in proposals)))
+    title = (
+        f"Вечерний разбор: не отмечено {len(items)}"
+        if items
+        else f"Вечерний разбор: предложено задач — {len(proposals)}"
+    )
+    return Message(
+        title=title,
+        sections=tuple(sections),
         url="/review",
-        actions=(ReminderAction.reschedule, ReminderAction.pick),
+        actions=(ReminderAction.reschedule, ReminderAction.pick) if items else (),
         kind=ReminderKind.evening_review,
         tag=f"evening-{day.isoformat()}",
     )
@@ -243,8 +255,8 @@ def _test(*_: object) -> Message:
 
 async def render(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
     kind = ReminderKind(r.kind)
-    if kind == ReminderKind.before_class:
-        msg = await _before_class(db, user, r, now)
+    if kind == ReminderKind.before_event:
+        msg = await _before_event(db, user, r, now)
     elif kind == ReminderKind.deadline:
         msg = await _deadline(db, user, r, now)
     elif kind == ReminderKind.subtask_start:

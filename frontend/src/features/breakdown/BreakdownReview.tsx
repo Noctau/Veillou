@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { jobResult, useJob } from '@/features/ai/useJob'
-import { useTimeZone } from '@/features/schedule/useCurrentSemester'
-import { describeDeadline, formatMinutes, TASK_TYPE_LABEL } from '@/features/tasks/labels'
-import { type TaskDetail, type TaskType, useTask } from '@/features/tasks/useTasks'
+import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
+import { describeDeadline, formatMinutes } from '@/features/tasks/labels'
+import { type TaskDetail, useTask } from '@/features/tasks/useTasks'
 import { errorMessage } from '@/lib/errors'
 import { queryKeys } from '@/lib/queryKeys'
+import { WITHOUT_TYPE } from '@/lib/terms'
+import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
 import { type DraftStep, fromSteps, timeWarning, toSteps, totalMinutes, validStep } from './draft'
@@ -22,9 +24,9 @@ import { StepList } from './StepList'
 import { TemplatesDialog } from './TemplatesDialog'
 import { useApplyBreakdown, useRecognizePhoto, useStartBreakdown, useTemplates } from './useBreakdown'
 
-const TASK_TYPES = Object.keys(TASK_TYPE_LABEL) as TaskType[]
+const NONE = 'none'
 
-type Meta = { taskType: TaskType; categoryId: string | null; free: number | null; coef: number; warning: string | null }
+type Meta = { taskTypeId: string | null; categoryId: string | null; free: number | null; coef: number; warning: string | null }
 
 function Thinking({ children, waiting }: { children: ReactNode; waiting?: string | null }) {
   return (
@@ -89,6 +91,8 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
   const { data: job } = useJob(jobId)
   const { data: photoJob } = useJob(photoJobId)
   const { data: templateList } = useTemplates()
+  const { data: taskTypeList } = useTaskTypes()
+  const taskTypes = byId(taskTypeList)
 
   const [draft, setDraft] = useState<DraftStep[] | null>(null)
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -142,7 +146,7 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
     setLoadedJob(jobId)
     setDraft(fromSteps(result.steps))
     setMeta({
-      taskType: result.task_type,
+      taskTypeId: result.task_type_id ?? null,
       categoryId: result.category_id,
       free: result.free_minutes,
       coef: result.coef,
@@ -156,7 +160,7 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
     setLoadedJob(`template:${template.id}`)
     setDraft(fromSteps(template.steps))
     setMeta({
-      taskType: template.task_type ?? task?.task_type ?? 'other',
+      taskTypeId: template.task_type_id ?? task?.task_type_id ?? null,
       categoryId: null,
       free: null,
       coef: 1,
@@ -169,7 +173,7 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
 
   const manual = (steps: DraftStep[]) => {
     setDraft(steps)
-    setMeta((m) => m ?? { taskType: task.task_type, categoryId: null, free: null, coef: 1, warning: null })
+    setMeta((m) => m ?? { taskTypeId: task.task_type_id, categoryId: null, free: null, coef: 1, warning: null })
   }
   const thinking = start.isPending || (!!jobId && !!job && !result && job.status !== 'failed')
   const photoThinking = recognize.isPending || (!!photoJobId && photoJob?.status !== 'done' && photoJob?.status !== 'failed')
@@ -188,7 +192,7 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
     apply.mutate(
       {
         steps: toSteps(draft),
-        task_type: meta?.taskType ?? null,
+        task_type_id: meta?.taskTypeId ?? null,
         category_id: task.category_id ? null : (meta?.categoryId ?? null),
         plan: true,
         // Черновик ИИ применён — задание перестанет о нём напоминать
@@ -266,15 +270,19 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
                   <span className="text-muted-foreground"> (с вашим темпом ~{formatMinutes(Math.round(total * meta.coef))})</span>
                 )}
               </span>
-              {meta && (
-                <Select value={meta.taskType} onValueChange={(v) => setMeta({ ...meta, taskType: v as TaskType })}>
-                  <SelectTrigger size="sm" aria-label="Тип задания">
+              {meta && taskTypeList && taskTypeList.length > 0 && (
+                <Select
+                  value={meta.taskTypeId ?? NONE}
+                  onValueChange={(v) => setMeta({ ...meta, taskTypeId: v === NONE ? null : v })}
+                >
+                  <SelectTrigger size="sm" aria-label="Тип задачи">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TASK_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {TASK_TYPE_LABEL[t]}
+                    <SelectItem value={NONE}>{WITHOUT_TYPE}</SelectItem>
+                    {taskTypeList.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -333,11 +341,11 @@ export function BreakdownReview({ taskId }: { taskId: string }) {
         open={templates}
         onOpenChange={setTemplates}
         steps={draft?.every(validStep) ? toSteps(draft) : []}
-        taskType={meta?.taskType ?? task.task_type}
-        defaultName={TASK_TYPE_LABEL[meta?.taskType ?? task.task_type]}
+        taskTypeId={meta?.taskTypeId ?? task.task_type_id}
+        defaultName={taskTypes.get(meta?.taskTypeId ?? task.task_type_id ?? '')?.name ?? task.title}
         onApply={(t) => {
           manual(fromSteps(t.steps))
-          if (t.task_type) setMeta((m) => (m ? { ...m, taskType: t.task_type! } : m))
+          if (t.task_type_id) setMeta((m) => (m ? { ...m, taskTypeId: t.task_type_id } : m))
         }}
       />
     </div>

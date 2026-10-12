@@ -17,15 +17,18 @@ def test_has_occurrences():
     assert not recurrence.has_occurrences(IMPOSSIBLE)
 
 
-async def test_recurring_event_with_impossible_rule(auth_client: AsyncClient):
+async def test_schedule_rule_with_impossible_rule(auth_client: AsyncClient):
+    from .test_schedule_api import make_event_type
+
+    t = await make_event_type(auth_client, fields=[])
     body = {
+        "event_type_id": t["id"],
         "title": "Никогда",
-        "rrule": IMPOSSIBLE,
-        "start_date": "2026-10-01",
+        "pattern": {"kind": "rrule", "rrule": IMPOSSIBLE},
         "start_time": "10:00",
         "end_time": "11:00",
     }
-    resp = await auth_client.post(f"{API}/recurring-events", json=body)
+    resp = await auth_client.post(f"{API}/schedule-rules", json=body)
     assert resp.status_code == 400
     assert "ни одного" in resp.json()["error"]["message"]
 

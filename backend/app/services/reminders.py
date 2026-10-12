@@ -1,6 +1,6 @@
 """Пересборка будущих напоминаний пользователя.
 
-Собирает из БД пары, дедлайны и блоки, считает желаемый набор через
+Собирает из БД события с напоминанием, дедлайны и блоки, считает желаемый набор через
 `notify.builder` и сверяет его с таблицей `reminders` по `dedupe_key`:
 недостающие создаёт, изменившиеся двигает, лишние удаляет.
 
@@ -11,9 +11,9 @@
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, delete, select
@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import get_tz, local_date, now_utc
+from app.domain.dayprofile import Days
 from app.domain.enums import (
     EventKind,
     EventStatus,
@@ -31,14 +32,18 @@ from app.domain.enums import (
 )
 from app.models import ActionType, Event, Job, Reminder, Subtask, Task, User
 from app.notify import builder
-from app.notify.builder import Candidate, Planned, TimeRange, Window, windows_from_json
+from app.notify.builder import Candidate, Planned, Quiet, TimeRange, Window, windows_from_json
 from app.schemas.settings import ReminderRule, UserSettings
+from app.services.day_profiles import load_days
+from app.services.event_types import event_types_by_id
 from app.services.settings import effective_settings
 
 log = logging.getLogger(__name__)
 
 # На сколько вперёд держим напоминания (окно докатывает периодическая пересборка)
 HORIZON = timedelta(days=8)
+# Дедлайн-напоминание — не раньше чем за столько дней (schemas/settings.DaysBefore)
+MAX_DAYS_BEFORE = 14
 # Не трогаем то, что вот-вот заберёт отправитель
 FREEZE = timedelta(seconds=30)
 
@@ -50,8 +55,23 @@ class SyncStats:
     deleted: int = 0
 
 
-def quiet_range(s: UserSettings) -> TimeRange:
-    return TimeRange(s.quiet_hours.start, s.quiet_hours.end)
+def quiet_hours(s: UserSettings, days: Days, dates: Iterable[date]) -> Quiet:
+    """Тихие часы: ночи режимов «тихие часы — сон» — их сон, остальные — из настроек."""
+    nights = {}
+    for d in dates:
+        if days.profile(d).quiet_follows_sleep and (night := days.sleep(d)) is not None:
+            nights[d] = night
+    return Quiet(TimeRange(s.quiet_hours.start, s.quiet_hours.end), nights)
+
+
+async def load_quiet(db: AsyncSession, user: User, s: UserSettings, around: datetime) -> Quiet:
+    """Тихие часы на ±`SEARCH_DAYS` вокруг момента (для «+15 мин», «На завтра»)."""
+    tz = get_tz(user.timezone)
+    center = local_date(around, tz)
+    start = center - timedelta(days=builder.SEARCH_DAYS + 1)
+    end = center + timedelta(days=builder.SEARCH_DAYS + 1)
+    days = await load_days(db, user, start, end)
+    return quiet_hours(s, days, days.by_date)
 
 
 def _channels(rule: ReminderRule) -> list[str] | None:
@@ -61,14 +81,27 @@ def _channels(rule: ReminderRule) -> list[str] | None:
 
 
 class _Collector:
-    def __init__(self, db: AsyncSession, user: User, s: UserSettings, now: datetime) -> None:
+    def __init__(
+        self, db: AsyncSession, user: User, s: UserSettings, now: datetime, days: Days
+    ) -> None:
         self.db = db
         self.user = user
         self.s = s
         self.now = now
         self.tz = get_tz(user.timezone)
         self.horizon = now + HORIZON
+        self.days = days
         self._windows: dict[uuid.UUID, tuple[Window, ...]] | None = None
+
+    def digest_at(self, d: date) -> datetime:
+        """Утренняя сводка даты: через N минут после подъёма её режима."""
+        offset = self.s.schedule.morning_digest_after_wake_min
+        return self.days.wake(d) + timedelta(minutes=offset)
+
+    def review_at(self, d: date) -> datetime:
+        """Вечерний разбор даты: за N минут до отбоя её режима."""
+        offset = self.s.schedule.evening_review_before_sleep_min
+        return self.days.bedtime(d) - timedelta(minutes=offset)
 
     async def windows_by_type(self) -> dict[uuid.UUID, tuple[Window, ...]]:
         if self._windows is None:
@@ -91,21 +124,34 @@ class _Collector:
             return ()
         return (await self.windows_by_type()).get(type_id, ())
 
-    async def classes(self, channels: list[str]) -> list[Candidate]:
+    async def events(self) -> list[Candidate]:
+        """Перед событием — по типу занятости: `remind_before_min` и его каналы."""
+        types = {
+            t.id: t
+            for t in (await event_types_by_id(self.db, self.user.id)).values()
+            if t.remind_before_min is not None and t.remind_channels
+        }
+        if not types:
+            return []
         rows = await self.db.scalars(
             select(Event).where(
                 Event.user_id == self.user.id,
                 Event.deleted_at.is_(None),
-                Event.kind == EventKind.class_,
+                Event.kind == EventKind.busy,
+                Event.event_type_id.in_(types),
                 Event.status == EventStatus.planned,
                 Event.start > self.now,
                 Event.start <= self.horizon,
             )
         )
-        infos = [builder.ClassInfo(e.id, e.start) for e in rows]
-        return builder.class_candidates(
-            infos, self.s.reminders.before_class.minutes_before, channels
-        )
+        infos = []
+        for e in rows:
+            t = types[e.event_type_id]  # type: ignore[index]
+            minutes = t.remind_before_min or 0
+            infos.append(
+                builder.EventInfo(e.id, e.start, minutes, tuple(str(c) for c in t.remind_channels))
+            )
+        return builder.event_candidates(infos)
 
     async def deadlines(self, channels: list[str]) -> list[Candidate]:
         days = self.s.reminders.deadlines.days_before
@@ -125,14 +171,12 @@ class _Collector:
             for t in rows
             if t.deadline is not None
         ]
-        return builder.deadline_candidates(
-            infos, days, self.s.schedule.morning_digest, self.tz, channels
-        )
+        return builder.deadline_candidates(infos, days, self.digest_at, self.tz, channels)
 
     def digests(self, channels: list[str]) -> list[Candidate]:
         today = local_date(self.now, self.tz)
         days = [today + timedelta(days=i) for i in range(HORIZON.days)]
-        return builder.digest_candidates(days, self.s.schedule.morning_digest, self.tz, channels)
+        return builder.digest_candidates(days, self.digest_at, channels)
 
     def reviews(self) -> list[Candidate]:
         r, at = self.s.reminders, self.s.schedule
@@ -141,19 +185,13 @@ class _Collector:
         result: list[Candidate] = []
         if ch := _channels(r.evening_review):
             result += builder.review_candidates(
-                ReminderKind.evening_review,
-                days,
-                at.evening_review,
-                self.tz,
-                ch,
-                builder.EVENING_TTL,
+                ReminderKind.evening_review, days, self.review_at, ch, builder.EVENING_TTL
             )
         if ch := _channels(r.weekly_review):
             result += builder.review_candidates(
                 ReminderKind.weekly_review,
                 [d for d in days if d.isoweekday() == at.weekly_review_weekday],
-                at.weekly_review,
-                self.tz,
+                builder.daily_at(at.weekly_review, self.tz),
                 ch,
                 builder.WEEKLY_TTL,
             )
@@ -186,8 +224,7 @@ class _Collector:
     async def candidates(self) -> list[Candidate]:
         r = self.s.reminders
         result: list[Candidate] = []
-        if ch := _channels(r.before_class):
-            result += await self.classes(ch)
+        result += await self.events()
         if ch := _channels(r.deadlines):
             result += await self.deadlines(ch)
         if ch := _channels(r.morning_digest):
@@ -203,8 +240,14 @@ async def desired_reminders(
 ) -> list[Planned]:
     now = now or now_utc()
     s = effective_settings(user)
-    candidates = await _Collector(db, user, s, now).candidates()
-    return builder.build(candidates, quiet_range(s), get_tz(user.timezone))
+    tz = get_tz(user.timezone)
+    today = local_date(now, tz)
+    # Режимы на горизонт напоминаний, дедлайны за 14 дней и поиск времени (±8 дней)
+    start = today - timedelta(days=builder.SEARCH_DAYS + 1)
+    end = today + HORIZON + timedelta(days=MAX_DAYS_BEFORE + builder.SEARCH_DAYS + 2)
+    days = await load_days(db, user, start, end)
+    candidates = await _Collector(db, user, s, now, days).candidates()
+    return builder.build(candidates, quiet_hours(s, days, days.by_date), tz)
 
 
 def _fields(p: Planned) -> dict[str, Any]:

@@ -33,7 +33,7 @@ export function usePlanState() {
 function useInvalidatePlanned() {
   const queryClient = useQueryClient()
   return () => {
-    for (const queryKey of [queryKeys.calendarAll, queryKeys.tasks, queryKeys.examsAll, queryKeys.review]) {
+    for (const queryKey of [queryKeys.calendarAll, queryKeys.tasks, queryKeys.prepAll, queryKeys.review]) {
       queryClient.invalidateQueries({ queryKey })
     }
   }
@@ -125,23 +125,6 @@ export function useDismissPlan() {
       toast.error(errorMessage(error))
     },
     onSuccess: (data) => queryClient.setQueryData(queryKeys.plan, data),
-  })
-}
-
-/** Разовый лимит учёбы на день (вариант «больше учёбы в этот день»). */
-export function usePutDayLimit() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ day, minutes }: { day: string; minutes: number }) => {
-      const { data, error } = await api.PUT('/api/v1/plan/day-limits/{day}', {
-        params: { path: { day } },
-        body: { minutes },
-      })
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dayLimits }),
-    onError: (error) => toast.error(errorMessage(error)),
   })
 }
 

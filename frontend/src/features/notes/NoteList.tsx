@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSubjects } from '@/features/subjects/useSubjects'
+import { useAreas } from '@/features/areas/useAreas'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
 import { formatDay } from '@/lib/time'
@@ -17,7 +17,7 @@ import { NOTE_KIND, NOTE_KINDS } from './labels'
 import { useSearch } from './useSearch'
 import { type NoteCreate, type NoteListItem, useCreateNote, useNotes } from './useNotes'
 
-/** «＋ Конспект» → вид → сразу открыть новый конспект. */
+/** «＋ Заметка» → вид → сразу открыть новую заметку. */
 export function NewNoteButton({ draft = {}, size = 'sm' }: { draft?: Partial<NoteCreate>; size?: 'sm' | 'default' }) {
   const navigate = useNavigate()
   const create = useCreateNote()
@@ -27,7 +27,7 @@ export function NewNoteButton({ draft = {}, size = 'sm' }: { draft?: Partial<Not
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size={size} variant="ghost" disabled={create.isPending}>
-          <PlusIcon /> Конспект
+          <PlusIcon /> Заметка
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -44,9 +44,9 @@ export function NewNoteButton({ draft = {}, size = 'sm' }: { draft?: Partial<Not
   )
 }
 
-export function NoteRow({ note, showSubject, snippet }: { note: NoteListItem; showSubject?: boolean; snippet?: ReactNode }) {
-  const { data: subjects } = useSubjects()
-  const subject = showSubject && note.subject_id ? subjects?.find((s) => s.id === note.subject_id) : undefined
+export function NoteRow({ note, showArea, snippet }: { note: NoteListItem; showArea?: boolean; snippet?: ReactNode }) {
+  const { data: areas } = useAreas()
+  const area = showArea && note.area_id ? areas?.find((s) => s.id === note.area_id) : undefined
   const Icon = NOTE_KIND[note.kind].icon
   return (
     <Link to={`/notes/${note.id}`} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted">
@@ -60,10 +60,10 @@ export function NoteRow({ note, showSubject, snippet }: { note: NoteListItem; sh
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{note.title}</div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {subject && (
+          {area && (
             <>
-              <span className={cn('size-2 shrink-0 rounded-full', paletteColor(subject.color).bg)} />
-              <span className="truncate">{subject.short_name || subject.name}</span>
+              <span className={cn('size-2 shrink-0 rounded-full', paletteColor(area.color).bg)} />
+              <span className="truncate">{area.short_name || area.name}</span>
               {note.class_date && <span>·</span>}
             </>
           )}
@@ -84,15 +84,15 @@ export function NoteRow({ note, showSubject, snippet }: { note: NoteListItem; sh
 }
 
 type Props = {
-  subjectId?: string
-  /** Показывать предмет у каждого конспекта (общий список). */
-  showSubject?: boolean
+  areaId?: string
+  /** Показывать сферу у каждой заметки (общий список). */
+  showArea?: boolean
   limit?: number
 }
 
-function SearchResultsList({ text, subjectId, showSubject }: { text: string; subjectId?: string; showSubject?: boolean }) {
-  const { data, isPending, isError, error, isPlaceholderData } = useSearch(text, subjectId)
-  const { data: subjects } = useSubjects()
+function SearchResultsList({ text, areaId, showArea }: { text: string; areaId?: string; showArea?: boolean }) {
+  const { data, isPending, isError, error, isPlaceholderData } = useSearch(text, areaId)
+  const { data: areas } = useAreas()
   if (isPending) return <Skeleton className="h-24" />
   if (isError) return <p className="text-sm text-destructive">{errorMessage(error)}</p>
   if (!data.notes.length && !data.sources.length) {
@@ -104,7 +104,7 @@ function SearchResultsList({ text, subjectId, showSubject }: { text: string; sub
         <ul className="flex flex-col gap-1">
           {data.notes.map((n) => (
             <li key={n.id}>
-              <NoteRow note={n} showSubject={showSubject} snippet={n.snippet ? <Highlight text={n.snippet} /> : undefined} />
+              <NoteRow note={n} showArea={showArea} snippet={n.snippet ? <Highlight text={n.snippet} /> : undefined} />
             </li>
           ))}
         </ul>
@@ -114,18 +114,18 @@ function SearchResultsList({ text, subjectId, showSubject }: { text: string; sub
           <h3 className="px-1 text-xs text-muted-foreground uppercase">Литература</h3>
           <ul className="flex flex-col gap-1">
             {data.sources.map((s) => {
-              const subject = subjects?.find((x) => x.id === s.subject_id)
+              const area = areas?.find((x) => x.id === s.area_id)
               return (
                 <li key={s.id}>
                   <Link
-                    to={`/subjects/${s.subject_id}?tab=sources`}
+                    to={`/areas/${s.area_id}?tab=sources`}
                     className="flex items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted"
                   >
                     <BookIcon className="size-5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{s.title}</div>
                       <div className="truncate text-xs text-muted-foreground">
-                        {[s.author, showSubject && subject && (subject.short_name || subject.name)].filter(Boolean).join(' · ')}
+                        {[s.author, showArea && area && (area.short_name || area.name)].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                   </Link>
@@ -139,11 +139,11 @@ function SearchResultsList({ text, subjectId, showSubject }: { text: string; sub
   )
 }
 
-/** Конспекты предмета (или все): свежие пары первыми. */
-export function NoteList({ subjectId, showSubject, limit }: Props) {
+/** Заметки сферы (или все): свежие первыми. */
+export function NoteList({ areaId, showArea, limit }: Props) {
   const [text, setText] = useState('')
   const searching = text.trim().length > 0
-  const { data: notes, isPending, isError, error } = useNotes({ subject_id: subjectId, limit })
+  const { data: notes, isPending, isError, error } = useNotes({ area_id: areaId, limit })
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -153,8 +153,8 @@ export function NoteList({ subjectId, showSubject, limit }: Props) {
             type="search"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Поиск по конспектам и литературе"
-            aria-label="Поиск по конспектам"
+            placeholder="Поиск по заметкам и материалам"
+            aria-label="Поиск по заметкам"
             className="pr-8 pl-8 [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
@@ -168,23 +168,23 @@ export function NoteList({ subjectId, showSubject, limit }: Props) {
             </button>
           )}
         </div>
-        <NewNoteButton draft={{ subject_id: subjectId ?? null }} />
+        <NewNoteButton draft={{ area_id: areaId ?? null }} />
       </div>
       {searching ? (
-        <SearchResultsList text={text} subjectId={subjectId} showSubject={showSubject} />
+        <SearchResultsList text={text} areaId={areaId} showArea={showArea} />
       ) : (
         <>
           {isPending && <Skeleton className="h-24" />}
           {isError && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
           {notes && notes.length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Конспектов пока нет. Текст с формулами, фото тетради, PDF или ссылка на Диск.
+              Заметок пока нет. Текст с формулами, фото страниц, PDF или ссылка на Диск.
             </p>
           )}
           <ul className="flex flex-col gap-1">
             {notes?.map((n) => (
               <li key={n.id}>
-                <NoteRow note={n} showSubject={showSubject} />
+                <NoteRow note={n} showArea={showArea} />
               </li>
             ))}
           </ul>

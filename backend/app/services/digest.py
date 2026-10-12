@@ -1,11 +1,14 @@
 """Утренняя сводка и планы для бота: /today, /week.
 
-Сводка v2 (M11.6): пары с аудиториями, план на день (шаги заданий и подготовка
-к экзаменам — из плана), дело из ящика (поставленное на сегодня, иначе самое
-старое), прочие события, просроченное, дедлайны и экзамены недели. Если план
-ждёт подтверждения — напоминание открыть приложение.
+Сводка v2 (M11.6, M17.5): секции типов занятости с «Сейчас / Дальше» (заголовок —
+название типа во множественном, строка — время · название · поля · место), план на
+день (шаги заданий и подготовка — из плана), дело из ящика (поставленное на
+сегодня, иначе самое старое), прочие события, просроченное, дедлайны и экзамены
+недели. Если план ждёт подтверждения — напоминание открыть приложение.
 """
 
+import uuid
+from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -15,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.time import day_bounds_utc, get_tz, local_date, now_utc
 from app.domain.enums import (
     BacklogStatus,
-    ClassType,
     EventKind,
     EventStatus,
     PlanRevisionStatus,
@@ -25,7 +27,7 @@ from app.domain.enums import (
     TaskStatus,
 )
 from app.domain.tasks import progress
-from app.models import BacklogItem, Event, PlanRevision, Subtask, Task, User
+from app.models import BacklogItem, Event, EventType, PlanRevision, Subtask, Task, User
 from app.notify.message import (
     Message,
     Section,
@@ -34,35 +36,24 @@ from app.notify.message import (
     fmt_range,
     plural,
 )
+from app.services.event_text import busy_line, place
+from app.services.event_types import event_types_by_id
 
 # Просроченных в сводке — не больше, остальные «…и ещё N»
 OVERDUE_LIMIT = 5
 
-CLASS_TYPE_SHORT = {
-    ClassType.lecture: "лекция",
-    ClassType.seminar: "семинар",
-    ClassType.lab: "лаба",
-}
 
-
-def class_line(e: Event, tz: ZoneInfo) -> str:
-    parts = [f"{fmt_range(e.start, e.end, tz)} {e.title}"]
-    if e.class_type and (label := CLASS_TYPE_SHORT.get(ClassType(e.class_type))):
-        parts[0] += f" ({label})"
-    if e.location:
-        parts.append(f"ауд. {e.location}")
-    line = " · ".join(parts)
-    return f"{line} — отменена" if e.status == EventStatus.cancelled else line
-
-
-def event_line(e: Event, tz: ZoneInfo, context: str | None = None) -> str:
+def event_line(
+    e: Event, tz: ZoneInfo, context: str | None = None, event_type: EventType | None = None
+) -> str:
     mark = "✓ " if e.status == EventStatus.done else ""
-    loc = f" · {e.location}" if e.location else ""
+    where = place(e, event_type)
+    loc = f" · {where}" if where else ""
     ctx = f" — {context}" if context and context != e.title else ""
     return f"{mark}{fmt_range(e.start, e.end, tz)} {e.title}{ctx}{loc}"
 
 
-PLAN_KINDS = frozenset({EventKind.subtask, EventKind.exam_prep, EventKind.project})
+PLAN_KINDS = frozenset({EventKind.subtask, EventKind.prep, EventKind.project})
 
 
 async def task_progress(db: AsyncSession, tasks: list[Task]) -> dict[object, float]:
@@ -102,6 +93,19 @@ class Digest:
         self.tz = get_tz(user.timezone)
         self.now = now or now_utc()
         self.today = local_date(self.now, self.tz)
+        self._types: dict[uuid.UUID, EventType] | None = None
+
+    async def types(self) -> dict[uuid.UUID, EventType]:
+        if self._types is None:
+            self._types = await event_types_by_id(self.db, self.user.id)
+        return self._types
+
+    async def _sectioned(self, e: Event) -> EventType | None:
+        """Тип события, если у него своя секция («Сейчас / Дальше»)."""
+        if e.kind != EventKind.busy or e.event_type_id is None:
+            return None
+        t = (await self.types()).get(e.event_type_id)
+        return t if t is not None and t.show_now_next else None
 
     async def _events(self, start: datetime, end: datetime) -> list[Event]:
         return list(
@@ -171,19 +175,26 @@ class Digest:
 
     async def _day_sections(self, events: list[Event]) -> tuple[list[Section], bool]:
         """Разделы дня и есть ли в нём дело из ящика."""
+        types = await self.types()
         live = [e for e in events if e.status != EventStatus.cancelled]
-        classes = [e for e in events if e.kind == EventKind.class_]
+        by_type: dict[uuid.UUID, list[Event]] = defaultdict(list)
+        for e in events:
+            if (t := await self._sectioned(e)) is not None:
+                by_type[t.id].append(e)
+        sectioned = {e.id for group in by_type.values() for e in group}
         plan = [e for e in live if e.kind in PLAN_KINDS and e.status != EventStatus.missed]
         box = [e for e in live if e.kind == EventKind.backlog and e.status != EventStatus.missed]
         others = [
             e
             for e in live
-            if e.kind not in PLAN_KINDS | {EventKind.class_, EventKind.backlog}
+            if e.kind not in PLAN_KINDS | {EventKind.backlog}
+            and e.id not in sectioned
             and e.status != EventStatus.missed
         ]
         sections = []
-        if classes:
-            sections.append(Section("Пары", tuple(class_line(e, self.tz) for e in classes)))
+        for t in sorted((types[i] for i in by_type), key=lambda t: (t.position, t.name)):
+            lines = tuple(busy_line(e, t, self.tz) for e in by_type[t.id])
+            sections.append(Section(t.name_plural, lines))
         if plan:
             tasks = await self._task_titles(plan)
             sections.append(
@@ -195,23 +206,36 @@ class Digest:
         if box:
             sections.append(Section("Из долгого ящика", tuple(event_line(e, self.tz) for e in box)))
         if others:
-            sections.append(Section("В календаре", tuple(event_line(e, self.tz) for e in others)))
+            lines = tuple(
+                event_line(e, self.tz, event_type=types.get(e.event_type_id))  # type: ignore[arg-type]
+                for e in others
+            )
+            sections.append(Section("В календаре", lines))
         return sections, bool(box)
 
-    async def _exam_section(self, start: datetime, end: datetime) -> list[Section]:
-        from app.services.exams import days_until, upcoming_exams
+    async def _prep_section(self, start: datetime, end: datetime) -> list[Section]:
+        """Ближайшие события с планом подготовки (и планы к дате). Заголовок — тип
+        занятости во множественном числе («Экзамены»), без типа — «Подготовка»."""
+        from app.services.prep import days_until, upcoming
 
-        exams = await upcoming_exams(self.db, self.user, start, end)
-        if not exams:
+        plans = await upcoming(self.db, self.user, start, end)
+        if not plans:
             return []
-        lines = []
-        for exam, title in exams:
-            n = days_until(exam, self.today, self.tz)
-            when = fmt_day(local_date(exam.starts_at, self.tz), self.today)
+        types = await self.types()
+        sections: dict[str, list[str]] = {}
+        for _, title, target, event in plans:
+            event_type = types.get(event.event_type_id) if event and event.event_type_id else None
+            n = days_until(target, self.today, self.tz)
+            when = fmt_day(local_date(target, self.tz), self.today)
             left = f" · через {n} {plural(n, 'день', 'дня', 'дней')}" if n > 1 else ""
-            room = f" · ауд. {exam.location}" if exam.location else ""
-            lines.append(f"{when} {exam.starts_at.astimezone(self.tz):%H:%M} — {title}{room}{left}")
-        return [Section("Экзамены", tuple(lines))]
+            room = ""
+            if event is not None and event.location:
+                label = event_type.location_label if event_type else ""
+                room = f" · {label} {event.location}" if label else f" · {event.location}"
+            clock = f" {target.astimezone(self.tz):%H:%M}" if event is not None else ""
+            heading = event_type.name_plural if event_type else "Подготовка"
+            sections.setdefault(heading, []).append(f"{when}{clock} — {title}{room}{left}")
+        return [Section(h, tuple(lines)) for h, lines in sections.items()]
 
     async def _pending_plan(self) -> list[Section]:
         rev = await self.db.scalar(
@@ -234,7 +258,7 @@ class Digest:
         start, end = day_bounds_utc(day, self.tz)
         sections, has_box = await self._day_sections(await self._events(start, end))
         if not sections:
-            sections.append(Section(None, ("Пар и дел в календаре нет.",)))
+            sections.append(Section(None, ("Событий и дел в календаре нет.",)))
         # Несданное к сроку не пропадает из сводки, пока его не закроют
         sections += await self._deadline_section(
             datetime.min.replace(tzinfo=UTC), self.now, "Просрочено", limit=OVERDUE_LIMIT
@@ -242,7 +266,7 @@ class Digest:
         sections += await self._deadline_section(
             max(start, self.now), start + timedelta(days=7), "Дедлайны недели"
         )
-        sections += await self._exam_section(max(start, self.now), start + timedelta(days=8))
+        sections += await self._prep_section(max(start, self.now), start + timedelta(days=8))
         if not has_box and (item := await self._oldest_backlog()):
             waiting = (self.today - local_date(item.created_at, self.tz)).days
             age = f" — ждёт {waiting} {plural(waiting, 'день', 'дня', 'дней')}" if waiting else ""
@@ -268,21 +292,19 @@ class Digest:
         by_day: dict[date, list[Event]] = {}
         for e in events:
             by_day.setdefault(local_date(e.start, self.tz), []).append(e)
+        types = await self.types()
         sections = []
         for i in range(7):
-            d = first + timedelta(days=i)
-            day_events = [
-                e
-                for e in by_day.get(d, [])
-                if not (e.kind != EventKind.class_ and e.status == EventStatus.cancelled)
-            ]
-            if not day_events:
-                continue
-            items = tuple(
-                class_line(e, self.tz) if e.kind == EventKind.class_ else event_line(e, self.tz)
-                for e in day_events
-            )
-            sections.append(Section(fmt_day(d, self.today).capitalize(), items))
+            items = []
+            for e in by_day.get(first + timedelta(days=i), []):
+                t = await self._sectioned(e)
+                if t is not None:
+                    items.append(busy_line(e, t, self.tz))
+                elif e.status != EventStatus.cancelled:
+                    items.append(event_line(e, self.tz, event_type=types.get(e.event_type_id)))  # type: ignore[arg-type]
+            if items:
+                day = first + timedelta(days=i)
+                sections.append(Section(fmt_day(day, self.today).capitalize(), tuple(items)))
         if not sections:
             sections.append(Section(None, ("На неделе в календаре пусто.",)))
         sections += await self._deadline_section(start, end, "Дедлайны")

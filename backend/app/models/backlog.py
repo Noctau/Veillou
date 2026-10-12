@@ -34,6 +34,14 @@ class BacklogItem(UserOwnedMixin, Base):
     desired_by: Mapped[date | None] = mapped_column(Date)
     # Чипы BacklogCondition
     conditions: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    # «Только в часы типа действия» (бывший чип «часы учреждений»): окна этого типа
+    hours_action_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("action_types.id", ondelete="SET NULL")
+    )
+    # «В дни событий этого типа» (бывший чип «в дни пар»): только в такие дни
+    days_event_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("event_types.id", ondelete="SET NULL")
+    )
     # Своё окно (часы работы места); NULL — как у типа действия
     time_window: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     # «Взято на неделю» (понедельник недели): только такие дела ставит планировщик (M11.2)

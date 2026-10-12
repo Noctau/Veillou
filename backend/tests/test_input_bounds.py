@@ -3,7 +3,7 @@
 import pytest
 from httpx import AsyncClient
 
-from .test_schedule_api import SEMESTER, make_semester
+from .test_schedule_api import PERIOD, make_event_type, make_period
 from .test_tasks import make_task
 
 API = "/api/v1"
@@ -12,23 +12,21 @@ API = "/api/v1"
 @pytest.mark.parametrize(
     "over",
     [
-        {"classes_end": "9999-12-31", "session_start": None, "session_end": None},
+        {"end_date": "9999-12-31", "pauses": []},
         {"start_date": "1900-09-01"},
         # Длиннее года
-        {"classes_end": "2027-12-27", "session_start": "2028-01-09", "session_end": "2028-01-25"},
-        {"session_end": "2027-12-25"},
+        {"end_date": "2027-12-25", "pauses": []},
     ],
 )
-async def test_semester_dates_are_bounded(auth_client: AsyncClient, over: dict):
-    resp = await auth_client.post(f"{API}/semesters", json={**SEMESTER, **over})
+async def test_period_dates_are_bounded(auth_client: AsyncClient, over: dict):
+    resp = await auth_client.post(f"{API}/periods", json={**PERIOD, **over})
     assert resp.status_code == 422, resp.text
 
 
-async def test_semester_patch_is_bounded(auth_client: AsyncClient):
-    sem = await make_semester(auth_client)
+async def test_period_patch_is_bounded(auth_client: AsyncClient):
+    sem = await make_period(auth_client)
     resp = await auth_client.patch(
-        f"{API}/semesters/{sem['id']}",
-        json={"classes_end": "9999-12-01", "session_start": None, "session_end": None},
+        f"{API}/periods/{sem['id']}", json={"end_date": "9999-12-01", "pauses": []}
     )
     assert resp.status_code in (400, 422), resp.text
 
@@ -73,21 +71,31 @@ async def test_day_off_range_is_bounded(auth_client: AsyncClient):
     assert resp.status_code == 422, resp.text
 
 
-async def test_recurring_until_is_bounded(auth_client: AsyncClient):
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"valid_to": "9999-12-31"},
+        {"pattern": {"kind": "once", "date": "3000-01-01"}},
+        {"pattern": {"kind": "day_cycle", "on": 1, "off": 1, "anchor": "1000-01-01"}},
+    ],
+)
+async def test_schedule_rule_dates_are_bounded(auth_client: AsyncClient, over: dict):
+    t = await make_event_type(auth_client, fields=[])
     body = {
+        "event_type_id": t["id"],
         "title": "Бассейн",
-        "rrule": "FREQ=WEEKLY;BYDAY=TU",
-        "start_date": "2026-10-01",
-        "until": "9999-12-31",
+        "pattern": {"kind": "weekly", "weekdays": [2]},
+        "valid_from": "2026-10-01",
         "start_time": "10:00",
         "end_time": "11:00",
+        **over,
     }
-    resp = await auth_client.post(f"{API}/recurring-events", json=body)
+    resp = await auth_client.post(f"{API}/schedule-rules", json=body)
     assert resp.status_code == 422, resp.text
 
 
 async def test_normal_values_still_work(auth_client: AsyncClient):
-    await make_semester(auth_client)
+    await make_period(auth_client)
     resp = await auth_client.post(
         f"{API}/events",
         json={"title": "Поездка", "start": "2026-10-20T10:00:00Z", "end": "2026-10-25T10:00:00Z"},

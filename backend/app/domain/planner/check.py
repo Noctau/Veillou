@@ -21,7 +21,7 @@ def violations(prep: Prepared, solution: Solution) -> list[str]:
         ((lo, hi + prep.pad_for(hi - lo)), f"fixed {f.id}") for (lo, hi), f in prep.fixed if lo < hi
     ]
     plain: list[Interval] = []
-    study: dict[int, int] = defaultdict(int)
+    load: dict[tuple[BlockId, int], int] = defaultdict(int)
     per_group: dict[tuple[BlockId, int], int] = defaultdict(int)
 
     for block_id, parts in solution.items():
@@ -47,8 +47,8 @@ def violations(prep: Prepared, solution: Solution) -> list[str]:
             plain.append((lo, hi))
             day = prep.day_of(lo)
             days.add(day)
-            if pb.block.counts_as_study:
-                study[day] += hi - lo
+            for budget in prep.budgets_of(pb.block.budgets):
+                load[(budget, day)] += hi - lo
         if pb.block.group_id is not None:
             for day in days:
                 per_group[(pb.block.group_id, day)] += 1
@@ -66,9 +66,9 @@ def violations(prep: Prepared, solution: Solution) -> list[str]:
         if overlaps(a, b):
             errors.append(f"пересечение {name_a} и {name_b}")
 
-    for day, used in study.items():
-        if used + prep.fixed_study.get(day, 0) > prep.limit(day) and used:
-            errors.append(f"день {day}: учёба {used} слотов сверх лимита")
+    for (budget, day), used in load.items():
+        if used + prep.fixed_budget.get((budget, day), 0) > prep.limit(budget, day) and used:
+            errors.append(f"день {day}: лимит {budget} — {used} слотов, сверх лимита")
     for (group, day), count in per_group.items():
         if count + prep.fixed_per_group.get((group, day), 0) > prep.max_per_group:
             errors.append(f"день {day}: задание {group} — {count} подзадач")

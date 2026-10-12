@@ -13,6 +13,13 @@ export type CategoryIconName = components['schemas']['CategoryIcon']
 export type ActionType = components['schemas']['ActionTypeRead']
 export type ActionTypeKey = components['schemas']['ActionTypeKey']
 export type ActionTypeUpdate = components['schemas']['ActionTypeUpdate']
+export type ActionTypeCreate = components['schemas']['ActionTypeCreate']
+export type TaskType = components['schemas']['TaskTypeRead']
+export type TaskTypeCreate = components['schemas']['TaskTypeCreate']
+export type TaskTypeUpdate = components['schemas']['TaskTypeUpdate']
+export type LoadBudget = components['schemas']['LoadBudgetRead']
+export type LoadBudgetCreate = components['schemas']['LoadBudgetCreate']
+export type LoadBudgetUpdate = components['schemas']['LoadBudgetUpdate']
 // Вход и выход совпадают по форме (дни + "HH:MM")
 export type TimeWindow = components['schemas']['TimeWindow-Output']
 
@@ -37,6 +44,35 @@ export function useActionTypes() {
     staleTime: STALE,
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/action-types')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useTaskTypes() {
+  return useQuery({
+    queryKey: queryKeys.taskTypes,
+    staleTime: STALE,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/task-types')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** «Быстрые типы»: типы с правилом срока — кнопками в ＋ и проектах. */
+export function quickTypes(types: TaskType[] | undefined): TaskType[] {
+  return (types ?? []).filter((t) => t.deadline_rule?.kind === 'days')
+}
+
+export function useBudgets() {
+  return useQuery({
+    queryKey: queryKeys.budgets,
+    staleTime: STALE,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/load-budgets')
       if (error) throw error
       return data
     },
@@ -133,6 +169,161 @@ export function useResetActionType() {
       )
       toast.success('Вернули как было')
     },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useCreateActionType() {
+  const invalidate = useInvalidate(queryKeys.actionTypes)
+  return useMutation({
+    mutationFn: async (body: ActionTypeCreate) => {
+      const { data, error } = await api.POST('/api/v1/action-types', { body })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useDeleteActionType() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/action-types/{action_type_id}', {
+        params: { path: { action_type_id: id } },
+      })
+      if (error) throw error
+    },
+    // Дела переехали на тип по умолчанию, из лимитов тип вышел, умолчание могло сброситься
+    onSuccess: () =>
+      Promise.all(
+        [queryKeys.actionTypes, queryKeys.budgets, queryKeys.taskTypes, queryKeys.settings, queryKeys.tasks, queryKeys.backlogAll].map(
+          (queryKey) => queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+// ---------- типы задач ----------
+
+export function useCreateTaskType() {
+  const invalidate = useInvalidate(queryKeys.taskTypes)
+  return useMutation({
+    mutationFn: async (body: TaskTypeCreate) => {
+      const { data, error } = await api.POST('/api/v1/task-types', { body })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useUpdateTaskType() {
+  const invalidate = useInvalidate(queryKeys.taskTypes)
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: TaskTypeUpdate }) => {
+      const { data, error } = await api.PATCH('/api/v1/task-types/{task_type_id}', {
+        params: { path: { task_type_id: id } },
+        body,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useDeleteTaskType() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/task-types/{task_type_id}', {
+        params: { path: { task_type_id: id } },
+      })
+      if (error) throw error
+    },
+    // Задачи этого типа остались без типа
+    onSuccess: () =>
+      Promise.all(
+        [queryKeys.taskTypes, queryKeys.tasks, queryKeys.calibration].map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      ),
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+// ---------- лимиты нагрузки ----------
+
+function useInvalidateBudgets() {
+  const queryClient = useQueryClient()
+  // Лимиты меняют план — превью пересчитывается на сервере
+  return () =>
+    Promise.all(
+      [queryKeys.budgets, queryKeys.plan].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    )
+}
+
+export function useCreateBudget() {
+  const invalidate = useInvalidateBudgets()
+  return useMutation({
+    mutationFn: async (body: LoadBudgetCreate) => {
+      const { data, error } = await api.POST('/api/v1/load-budgets', { body })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useUpdateBudget() {
+  const invalidate = useInvalidateBudgets()
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: LoadBudgetUpdate }) => {
+      const { data, error } = await api.PATCH('/api/v1/load-budgets/{budget_id}', {
+        params: { path: { budget_id: id } },
+        body,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+export function useDeleteBudget() {
+  const invalidate = useInvalidateBudgets()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/api/v1/load-budgets/{budget_id}', {
+        params: { path: { budget_id: id } },
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+}
+
+/** «Расширить часы в этот день»: разовый лимит на дату. */
+export function usePutBudgetOverride() {
+  const invalidate = useInvalidateBudgets()
+  return useMutation({
+    mutationFn: async ({ budgetId, day, minutes }: { budgetId: string; day: string; minutes: number }) => {
+      const { data, error } = await api.PUT('/api/v1/load-budgets/{budget_id}/overrides/{day}', {
+        params: { path: { budget_id: budgetId, day } },
+        body: { minutes },
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidate,
     onError: (error) => toast.error(errorMessage(error)),
   })
 }

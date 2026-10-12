@@ -57,6 +57,8 @@ export function useCreateBacklog() {
         estimate_min: body.estimate_min ?? null,
         desired_by: body.desired_by ?? null,
         conditions: body.conditions ?? [],
+        hours_action_type_id: body.hours_action_type_id ?? null,
+        days_event_type_id: body.days_event_type_id ?? null,
         time_window: null,
         status: 'active',
         planned_week: null,

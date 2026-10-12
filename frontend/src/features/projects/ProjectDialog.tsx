@@ -2,38 +2,39 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { AreaSelect } from '@/features/areas/AreaSelect'
 import { CategorySelect } from '@/features/catalog/CatalogSelect'
+import { AREAS_UI } from '@/lib/terms'
 
 import { useCreateProject } from './useProjects'
 
-type Props = { open: boolean; onOpenChange: (open: boolean) => void }
+type Props = { open: boolean; onOpenChange: (open: boolean) => void; areaId?: string }
 
-export function ProjectDialog({ open, onOpenChange }: Props) {
+export function ProjectDialog({ open, onOpenChange, areaId }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Новый проект</DialogTitle>
         </DialogHeader>
-        {open && <ProjectForm onDone={() => onOpenChange(false)} />}
+        {open && <ProjectForm areaId={areaId} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function ProjectForm({ onDone }: { onDone: () => void }) {
+function ProjectForm({ areaId: initialArea, onDone }: { areaId?: string; onDone: () => void }) {
   const navigate = useNavigate()
   const create = useCreateProject()
   const [title, setTitle] = useState('')
   const [deadline, setDeadline] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [areaId, setAreaId] = useState<string | null>(initialArea ?? null)
   const [description, setDescription] = useState('')
-  const [workDefault, setWorkDefault] = useState(false)
   const [hours, setHours] = useState('')
   const norm = hours ? Math.round(Number(hours) * 60) : null
   const normValid = norm === null || (norm >= 0 && norm <= 60 * 60)
@@ -44,10 +45,10 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         title: title.trim(),
         deadline: deadline || null,
         category_id: categoryId,
+        area_id: areaId,
         description,
         contacts: [],
         links: [],
-        is_work_default: workDefault,
         weekly_norm_min: norm || null,
       },
       {
@@ -68,7 +69,7 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
     >
       <Field>
         <FieldLabel htmlFor="pr-title">Название</FieldLabel>
-        <Input id="pr-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ВКР, поступление в магистратуру…" />
+        <Input id="pr-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Диплом, ремонт, запуск сайта…" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field>
@@ -77,9 +78,13 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         </Field>
         <Field>
           <FieldLabel htmlFor="pr-category">Категория</FieldLabel>
-          <CategorySelect id="pr-category" value={categoryId} onChange={setCategoryId} emptyLabel="Учёба" />
+          <CategorySelect id="pr-category" value={categoryId} onChange={setCategoryId} emptyLabel="По умолчанию" />
         </Field>
       </div>
+      <Field>
+        <FieldLabel htmlFor="pr-area">{AREAS_UI.area}</FieldLabel>
+        <AreaSelect id="pr-area" value={areaId} onChange={setAreaId} />
+      </Field>
       <Field>
         <FieldLabel htmlFor="pr-norm">Часов в неделю</FieldLabel>
         <Input
@@ -98,10 +103,6 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
         <FieldLabel htmlFor="pr-desc">Описание</FieldLabel>
         <Textarea id="pr-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={workDefault} onCheckedChange={(v) => setWorkDefault(v === true)} />
-        Сюда по умолчанию идут задания с работы
-      </label>
       <DialogFooter>
         <Button type="submit" disabled={!title.trim() || !normValid || create.isPending}>
           Создать

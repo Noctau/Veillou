@@ -3,50 +3,14 @@
 from enum import StrEnum
 
 
-class Parity(StrEnum):
-    """Чётность недели: числитель = odd, знаменатель = even."""
-
-    odd = "odd"
-    even = "even"
-
-
-class RuleParity(StrEnum):
-    """Когда идёт пара: каждую неделю, по числителям или по знаменателям."""
-
-    all = "all"
-    odd = "odd"
-    even = "even"
-
-
-class ClassType(StrEnum):
-    lecture = "lecture"
-    seminar = "seminar"
-    lab = "lab"
-    other = "other"
-
-
-class ControlForm(StrEnum):
-    """Форма контроля по предмету."""
-
-    exam = "exam"
-    credit = "credit"  # зачёт
-    graded_credit = "graded_credit"  # дифзачёт
-    coursework = "coursework"
-    none = "none"
-
-
 class EventKind(StrEnum):
-    class_ = "class"  # пара (из ClassRule)
-    personal = "personal"  # личное (жёсткое)
-    rest = "rest"  # отдых (жёсткое)
-    subtask = "subtask"  # подзадача (гибкое, M4+)
-    backlog = "backlog"  # дело из ящика (гибкое, M11)
-    exam_prep = "exam_prep"  # подготовка к экзамену (гибкое, M12)
-    exam = "exam"  # сам экзамен (жёсткое, из Exam)
-    project = "project"  # работа над проектом — резерв недельной нормы (гибкое, M13)
+    """Поведение события в планировщике (смысл задаёт тип занятости, Part 2 M17.1)."""
 
-
-FIXED_KINDS = frozenset({EventKind.class_, EventKind.personal, EventKind.rest, EventKind.exam})
+    busy = "busy"  # жёсткое: занятость (тип занятости — `event_type_id`)
+    subtask = "subtask"  # шаг задачи (гибкое)
+    backlog = "backlog"  # дело из ящика (гибкое)
+    prep = "prep"  # подготовка к событию (гибкое)
+    project = "project"  # работа над проектом — резерв недельной нормы (гибкое)
 
 
 class EventStatus(StrEnum):
@@ -59,8 +23,26 @@ class EventStatus(StrEnum):
 class TemplateType(StrEnum):
     """Откуда материализовано вхождение."""
 
-    class_rule = "class_rule"
-    recurring = "recurring"  # RecurringEvent (личные блоки и отдых с повтором)
+    schedule_rule = "schedule_rule"
+
+
+class PatternKind(StrEnum):
+    """Паттерн правила расписания (domain/recurrence.py)."""
+
+    weekly = "weekly"  # по дням недели, с маской недель цикла периода
+    day_cycle = "day_cycle"  # смены: N дней через M от якорной даты
+    rrule = "rrule"
+    once = "once"
+
+
+class DayRuleKind(StrEnum):
+    """Правило назначения режима дня (domain/dayprofile.py). Приоритет: dates >
+    event_day / day_after (по позиции) > weekdays > первый режим."""
+
+    dates = "dates"  # конкретные даты: «завтра — выходной», «отпуск 1–14 августа»
+    event_day = "event_day"  # в день, когда начинается событие типа
+    day_after = "day_after"  # на следующий день после начала события типа («после ночной»)
+    weekdays = "weekdays"  # по дням недели
 
 
 # ---------- справочники (M4.1) ----------
@@ -101,12 +83,52 @@ class CategoryIcon(StrEnum):
     plane = "plane"
     star = "star"
     tag = "tag"
+    pencil = "pencil"
+    presentation = "presentation"
+    flask_conical = "flask-conical"
+    book_open = "book-open"
+    clipboard_check = "clipboard-check"
+    user = "user"
+    coffee = "coffee"
+    calendar = "calendar"
+    clock = "clock"
+
+
+# ---------- сферы и поля (Part 2, M16) ----------
+
+
+class FieldType(StrEnum):
+    """Тип пользовательского поля (domain/fields.py)."""
+
+    text = "text"
+    number = "number"
+    bool = "bool"
+    select = "select"  # один из списка
+    multiselect = "multiselect"  # несколько из списка
+    date = "date"
+    contact = "contact"  # имя, роль, телефон, email, ссылка
+    link = "link"
+    area_ref = "area_ref"  # ссылка на другую сферу
+
+
+class AreaSection(StrEnum):
+    """Разделы страницы сферы."""
+
+    schedule = "schedule"
+    tasks = "tasks"
+    notes = "notes"
+    materials = "materials"
+    prep = "prep"
+    projects = "projects"
 
 
 # ---------- задания (M4.2) ----------
 
 
-class TaskType(StrEnum):
+class TaskTypeKey(StrEnum):
+    """Ключи типов задач из Part 1: только для сида справочника `task_types` (миграция)
+    и словаря быстрого ввода (`quickparse`, до M21.1). Логику по ним не ветвить."""
+
     homework = "homework"  # ДЗ
     report = "report"  # доклад
     essay = "essay"  # реферат
@@ -126,6 +148,15 @@ class TaskStatus(StrEnum):
     active = "active"
     done = "done"
     cancelled = "cancelled"
+    # Предложение автозадачи с подтверждением: не планируется, ждёт вечернего разбора
+    proposed = "proposed"
+
+
+class EventRuleWhen(StrEnum):
+    """Автозадача (M19): до или после вхождения события."""
+
+    before = "before"  # закончить за N минут до начала
+    after = "after"  # не раньше конца; не позже чем через N дней / до следующего вхождения
 
 
 class SubtaskStatus(StrEnum):
@@ -147,8 +178,7 @@ class SourceType(StrEnum):
     subtask = "subtask"
     task = "task"  # задание без подзадач — одним блоком
     backlog_item = "backlog_item"
-    exam_session = "exam_session"  # день подготовки к экзамену (M12)
-    exam = "exam"  # жёсткое событие самого экзамена
+    prep_session = "prep_session"  # день подготовки к событию (M20, бывший exam_session)
     project = "project"  # резерв недельной нормы проекта (M13.1)
 
 
@@ -165,9 +195,9 @@ class BacklogCondition(StrEnum):
     """Условия дела — фиксированный набор чипов, без свободного текста."""
 
     weekday_daytime = "weekday_daytime"  # только в будни днём
-    on_class_days = "on_class_days"  # в дни пар (в городе)
     needs_laptop = "needs_laptop"  # нужен ноутбук
-    institution_hours = "institution_hours"  # в часы работы учреждений
+    # «В часы работы учреждений» — теперь `BacklogItem.hours_action_type_id` (M15.2),
+    # «в дни пар» — `BacklogItem.days_event_type_id` (в дни событий типа, M17.5)
 
 
 # ---------- файлы (M5.1) ----------
@@ -241,17 +271,25 @@ class JobKind(StrEnum):
     ai_parse = "ai.parse"  # разобрать свободный текст (бот, ＋)
     ai_photo = "ai.photo"  # распознать фото задания
     ai_milestones = "ai.milestones"  # предложить этапы проекта (черновик)
+    ai_setup = "ai.setup"  # настройка по описанию: черновик сборки
+    event_tasks_sync = "event_tasks.sync"  # автозадачи от событий и сроки «к следующему»
 
 
 # ИИ-джобы идут своей очередью: по одной, по порядку постановки, и ждут, если ИИ недоступен
 AI_JOB_KINDS = frozenset(
-    {JobKind.ai_breakdown, JobKind.ai_parse, JobKind.ai_photo, JobKind.ai_milestones}
+    {
+        JobKind.ai_breakdown,
+        JobKind.ai_parse,
+        JobKind.ai_photo,
+        JobKind.ai_milestones,
+        JobKind.ai_setup,
+    }
 )
 
 
 class ReminderKind(StrEnum):
     morning_digest = "morning_digest"
-    before_class = "before_class"
+    before_event = "before_event"  # перед событием типа с `remind_before_min`
     deadline = "deadline"
     subtask_start = "subtask_start"
     evening_review = "evening_review"
@@ -262,7 +300,7 @@ class ReminderKind(StrEnum):
 class ReminderStatus(StrEnum):
     pending = "pending"
     sent = "sent"
-    skipped = "skipped"  # устарело (пара отменена, задание сделано, истёк срок)
+    skipped = "skipped"  # устарело (событие отменено, задание сделано, истёк срок)
     failed = "failed"  # кончились попытки
 
 
@@ -296,7 +334,7 @@ class PlanReason(StrEnum):
     missed = "missed"  # «не сделано»
     nightly = "nightly"  # ночная джоба: прошедшее неотмеченное → missed
     weekly = "weekly"  # недельный разбор: дела из ящика на неделю
-    exam = "exam"  # план подготовки к экзамену
+    prep = "prep"  # план подготовки к событию
 
 
 # ---------- ИИ (M10) ----------
@@ -309,6 +347,7 @@ class AIPurpose(StrEnum):
     parse = "parse"
     photo = "photo"
     milestones = "milestones"
+    setup = "setup"
 
 
 class AIOrigin(StrEnum):
@@ -318,22 +357,27 @@ class AIOrigin(StrEnum):
     telegram = "telegram"  # воркер сам отвечает в чат
 
 
-# ---------- экзамены (M12) ----------
+# ---------- подготовка (M20, бывшие экзамены M12) ----------
 
 
-class ExamQuestionStatus(StrEnum):
+class PrepStrategy(StrEnum):
+    spaced = "spaced"  # выучить, повторить через +1 / +3 / +7, накануне прогон (domain/srs.py)
+    even = "even"  # поровну по дням, без повторов; прогон накануне — если run_min > 0
+
+
+class PrepItemStatus(StrEnum):
     not_started = "not_started"
     learned = "learned"
-    review = "review"  # «повторить»: вопрос возвращается в цикл повторений
+    review = "review"  # «повторить»: пункт возвращается в цикл повторений
 
 
-class ExamSessionKind(StrEnum):
-    learn = "learn"  # выучить новые вопросы
+class PrepSessionKind(StrEnum):
+    learn = "learn"  # выучить / пройти новые пункты
     review = "review"  # повторить (+1 / +3 / +7 дней)
-    run = "run"  # общий прогон накануне экзамена
+    run = "run"  # общий прогон накануне
 
 
-class ExamSessionStatus(StrEnum):
+class PrepSessionStatus(StrEnum):
     planned = "planned"
     done = "done"
     missed = "missed"

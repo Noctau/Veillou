@@ -4,8 +4,10 @@
 вверх). Интервалы — полуоткрытые `[lo, hi)` в слотах. Свободное время
 округляется внутрь (окно 10:35–12:00 → 10:45–12:00), занятое — наружу.
 
-«День» планировщика начинается в момент подъёма (конец сна): блок в 00:30
-относится к вечеру предыдущего дня — для лимита учёбы и «≤ 2 подзадач в день».
+«День» планировщика начинается в момент подъёма своего режима дня (`DaySpec`):
+блок в 00:30 относится к вечеру предыдущего дня — для лимитов и «≤ 2 подзадач в
+день». Сон дня — от его отбоя до подъёма следующего; рабочие окна, обед и флаги
+отдыха — тоже свои у каждой даты. Дата без `DaySpec` — по встроенному режиму.
 """
 
 import bisect
@@ -19,16 +21,14 @@ from app.core.time import ensure_aware, local_date, wall_to_utc
 from app.domain.planner.contracts import (
     Block,
     BlockId,
+    Busy,
+    DaySpec,
     FixedBlock,
     PlanInput,
-    PlanSettings,
-    TimeRange,
     Window,
 )
 
 Interval = tuple[int, int]
-
-SATURDAY, SUNDAY = 6, 7
 
 
 # ---------- операции над интервалами ----------
@@ -220,10 +220,11 @@ class Prepared:
     evenings_required: dict[tuple[int, int], int]
     halves_required: dict[tuple[int, int], int]
     min_part: int
-    study_limit: int  # слотов в день
-    study_limit_by_day: dict[int, int]  # разовые лимиты: день → слотов
+    budget_limit: dict[BlockId, int]  # лимит → слотов в день
+    budget_limit_by_day: dict[tuple[BlockId, int], int]  # разовые: (лимит, день) → слотов
     max_per_group: int
-    fixed_study: dict[int, int] = field(default_factory=dict)  # день → слотов
+    # (лимит, день) → слотов уже занято закреплённым, сделанным сегодня и жёстким
+    fixed_budget: dict[tuple[BlockId, int], int] = field(default_factory=dict)
     fixed_per_group: dict[tuple[BlockId, int], int] = field(default_factory=dict)
     quotas: list[PreparedQuota] = field(default_factory=list)
     _day_starts: list[int] = field(default_factory=list)
@@ -237,9 +238,17 @@ class Prepared:
         """Индекс дня, к которому относится слот (-1 — до первого дня)."""
         return bisect.bisect_right(self._day_starts, slot) - 1
 
-    def limit(self, day: int) -> int:
-        """Лимит учёбы дня в слотах."""
-        return self.study_limit_by_day.get(day, self.study_limit)
+    def budgets_of(self, ids: frozenset[BlockId]) -> list[BlockId]:
+        """Лимиты блока, которые есть во входе (неизвестный id не ограничивает)."""
+        return sorted((b for b in ids if b in self.budget_limit), key=repr)
+
+    def limit(self, budget: BlockId, day: int) -> int:
+        """Лимит дня в слотах."""
+        return self.budget_limit_by_day.get((budget, day), self.budget_limit[budget])
+
+    def remaining(self, budget: BlockId, day: int) -> int:
+        """Сколько слотов лимита дня осталось гибким блокам."""
+        return max(0, self.limit(budget, day) - self.fixed_budget.get((budget, day), 0))
 
     def pad_for(self, length: int) -> int:
         s = self.inp.settings
@@ -261,11 +270,18 @@ def _daily(d: date, start: time, end: time, tz: ZoneInfo) -> tuple[datetime, dat
     return wall_to_utc(d, start, tz), wall_to_utc(end_date, end, tz)
 
 
-def _work_windows(s: PlanSettings) -> tuple[Window, ...]:
-    def window(days: set[int], r: TimeRange) -> Window:
-        return Window(frozenset(days), r.start, r.end)
+def day_specs(inp: PlanInput, dates: Sequence[date]) -> dict[date, DaySpec]:
+    """`DaySpec` каждой даты (+ следующей за последней — для её сна)."""
+    from app.domain.dayprofile import fallback_spec  # dayprofile импортирует contracts
 
-    return (window({1, 2, 3, 4, 5}, s.work_weekdays), window({6, 7}, s.work_weekends))
+    given = {d.date: d for d in inp.days}
+    wanted = [*dates, dates[-1] + timedelta(days=1)] if dates else []
+    return {d: given.get(d) or fallback_spec(d, inp.tz) for d in wanted}
+
+
+def work_slots(grid: Grid, specs: dict[date, DaySpec], dates: Sequence[date]) -> list[Interval]:
+    """Общие рабочие окна дат (для блоков без своих окон)."""
+    return merge(grid.inner(start, end) for d in dates for start, end in specs[d].work)
 
 
 def window_slots(
@@ -279,33 +295,44 @@ def window_slots(
     )
 
 
-def busy_slots(inp: PlanInput, grid: Grid, dates: Sequence[date]) -> list[Interval]:
-    """Всё, куда нельзя ставить гибкие блоки: сон, обед, жёсткое, дорога, закреплённое."""
-    s, tz = inp.settings, inp.tz
+def busy_slots(
+    inp: PlanInput, grid: Grid, dates: Sequence[date], specs: dict[date, DaySpec] | None = None
+) -> list[Interval]:
+    """Всё, куда нельзя ставить гибкие блоки: сон, обед, жёсткое с буферами дороги,
+    закреплённое."""
+    tz = inp.tz
+    specs = specs if specs is not None else day_specs(inp, dates)
     holes: list[Interval] = []
     for d in dates:
-        holes.append(grid.outer(*_daily(d, s.sleep.start, s.sleep.end, tz)))
-        if s.lunch:
-            holes.append(grid.outer(*_daily(d, s.lunch.start, s.lunch.end, tz)))
-    classes_by_date: dict[date, list[tuple[datetime, datetime]]] = defaultdict(list)
+        spec, after = specs[d], specs[d + timedelta(days=1)]
+        if spec.sleep < after.wake:
+            holes.append(grid.outer(spec.sleep, after.wake))
+        if spec.lunch:
+            holes.append(grid.outer(*spec.lunch))
+    merged: dict[tuple[date, str], list[Busy]] = defaultdict(list)
+    spans: list[tuple[datetime, datetime, int, int]] = []
     for b in inp.busy:
         holes.append(grid.outer(b.start, b.end))
-        if b.is_class:
-            classes_by_date[local_date(b.start, tz)].append((b.start, b.end))
-    if s.travel_buffer_min > 0:
-        buf = timedelta(minutes=s.travel_buffer_min)
-        for classes in classes_by_date.values():
-            first = min(c[0] for c in classes)
-            last = max(c[1] for c in classes)
-            holes.append(grid.outer(first - buf, first))
-            holes.append(grid.outer(last, last + buf))
+        if b.merge_key is not None:
+            merged[(local_date(b.start, tz), b.merge_key)].append(b)
+        else:
+            spans.append((b.start, b.end, b.buffer_before, b.buffer_after))
+    for group in merged.values():
+        first = min(group, key=lambda b: b.start)
+        last = max(group, key=lambda b: b.end)
+        spans.append((first.start, last.end, first.buffer_before, last.buffer_after))
+    for start, end, before, after_min in spans:
+        if before > 0:
+            holes.append(grid.outer(start - timedelta(minutes=before), start))
+        if after_min > 0:
+            holes.append(grid.outer(end, end + timedelta(minutes=after_min)))
     holes.extend(grid.outer(f.start, f.end) for f in inp.fixed)
     return merge(holes)
 
 
-def _days(grid: Grid, s: PlanSettings, dates: Sequence[date], tz: ZoneInfo) -> list[Day]:
+def _days(grid: Grid, specs: dict[date, DaySpec], dates: Sequence[date]) -> list[Day]:
     days: list[Day] = []
-    bounds = [grid.ceil(wall_to_utc(d, s.sleep.end, tz)) for d in dates]
+    bounds = [grid.ceil(specs[d].wake) for d in dates]
     for d, lo, hi in zip(dates, bounds, bounds[1:], strict=False):
         lo, hi = max(lo, 0), min(hi, grid.n)
         if lo < hi:
@@ -342,12 +369,16 @@ def _horizon_end(inp: PlanInput) -> datetime:
 
 
 def _rest_windows(
-    inp: PlanInput, grid: Grid, dates: Sequence[date], fixed: Sequence[Interval]
+    inp: PlanInput,
+    grid: Grid,
+    specs: dict[date, DaySpec],
+    dates: Sequence[date],
+    fixed: Sequence[Interval],
 ) -> tuple[list[RestWindow], list[RestWindow]]:
     s, tz = inp.settings, inp.tz
 
-    def make(d: date, start: time, end: time) -> RestWindow | None:
-        lo, hi = grid.inner(*_daily(d, start, end, tz))
+    def make(d: date, start: datetime, end: datetime) -> RestWindow | None:
+        lo, hi = grid.inner(start, end)
         if lo >= hi or any(overlaps((lo, hi), f) for f in fixed):
             return None
         iso = d.isocalendar()
@@ -355,12 +386,18 @@ def _rest_windows(
 
     evenings, halves = [], []
     for d in dates:
-        if s.free_evenings_per_week > 0 and (w := make(d, s.evening_start, s.sleep.start)):
+        spec = specs[d]
+        split = wall_to_utc(d, s.half_day_split, tz)
+        if (
+            s.free_evenings_per_week > 0
+            and spec.rest_evening_ok
+            and (w := make(d, wall_to_utc(d, s.evening_start, tz), spec.sleep))
+        ):
             evenings.append(w)
-        if s.weekend_half_days > 0 and d.isoweekday() in (SATURDAY, SUNDAY):
-            if s.sleep.end < s.half_day_split and (w := make(d, s.sleep.end, s.half_day_split)):
+        if s.weekend_half_days > 0 and spec.rest_halfday_ok:
+            if spec.wake < split and (w := make(d, spec.wake, split)):
                 halves.append(w)
-            if w := make(d, s.half_day_split, s.sleep.start):
+            if w := make(d, max(split, spec.wake), spec.sleep):
                 halves.append(w)
     return evenings, halves
 
@@ -372,28 +409,39 @@ def _required(windows: Iterable[RestWindow], per_week: int) -> dict[tuple[int, i
     return {week: min(per_week, c) for week, c in count.items()}
 
 
-def _day_limits(inp: PlanInput, days: Sequence[Day]) -> dict[int, int]:
-    by_date = dict(inp.study_limits)
-    return {d.index: by_date[d.date] // inp.grid_min for d in days if d.date in by_date}
+def _day_limits(inp: PlanInput, days: Sequence[Day]) -> dict[tuple[BlockId, int], int]:
+    result: dict[tuple[BlockId, int], int] = {}
+    for b in inp.budgets:
+        by_date = dict(b.overrides)
+        for d in days:
+            if d.date in by_date:
+                result[(b.id, d.index)] = by_date[d.date] // inp.grid_min
+    return result
 
 
 def prepare(inp: PlanInput) -> Prepared:
     s, tz = inp.settings, inp.tz
     grid = Grid.build(inp.now, _horizon_end(inp), inp.grid_min)
     dates = _dates(grid, tz)
-    days = _days(grid, s, dates, tz)
-    busy = busy_slots(inp, grid, dates)
+    specs = day_specs(inp, dates)
+    days = _days(grid, specs, dates)
+    busy = busy_slots(inp, grid, dates, specs)
     base_free = subtract([(0, grid.n)], busy)
     min_part = grid.slots(s.min_part_min)
     day_starts = [d.lo for d in days]
 
-    by_windows: dict[tuple[Window, ...], list[Interval]] = {}
-    work = _work_windows(s)
+    work = work_slots(grid, specs, dates)
+    by_windows: dict[tuple[tuple[Window, ...], bool], list[Interval]] = {}
     blocks: list[PreparedBlock] = []
     for index, b in enumerate(inp.blocks):
-        windows = b.windows or work
+        windows = (b.windows, b.within_work)
         if windows not in by_windows:
-            allowed = intersect(window_slots(grid, windows, dates, tz), base_free)
+            if b.windows:
+                allowed = intersect(window_slots(grid, b.windows, dates, tz), base_free)
+                if b.within_work:
+                    allowed = intersect(allowed, work)
+            else:
+                allowed = intersect(work, base_free)
             by_windows[windows] = _split_by_days(allowed, days)
         dur = max(1, grid.slots(b.duration_min))
         overdue = b.deadline is not None and b.deadline <= grid.t0
@@ -431,7 +479,7 @@ def prepare(inp: PlanInput) -> Prepared:
 
     fixed = [(grid.outer(f.start, f.end), f) for f in inp.fixed]
     fixed_in = [iv for iv, _ in fixed if iv[0] < iv[1]]
-    evenings, halves = _rest_windows(inp, grid, dates, fixed_in)
+    evenings, halves = _rest_windows(inp, grid, specs, dates, fixed_in)
     prepared = Prepared(
         inp=inp,
         grid=grid,
@@ -443,24 +491,37 @@ def prepare(inp: PlanInput) -> Prepared:
         evenings_required=_required(evenings, s.free_evenings_per_week),
         halves_required=_required(halves, s.weekend_half_days),
         min_part=min_part,
-        study_limit=s.study_limit_min_per_day // grid.step_min,
-        study_limit_by_day=_day_limits(inp, days),
+        budget_limit={b.id: b.minutes_per_day // grid.step_min for b in inp.budgets},
+        budget_limit_by_day=_day_limits(inp, days),
         max_per_group=s.max_subtasks_per_task_per_day,
     )
     # Закреплённое и сделанное сегодня до `now` тоже считается в лимиты сегодняшнего дня
-    day0_start = grid.ceil(wall_to_utc(days[0].date, s.sleep.end, tz)) if days else 0
+    day0_start = grid.ceil(specs[days[0].date].wake) if days else 0
     for f in inp.fixed:
         lo, hi = grid.floor(f.start), grid.ceil(f.end)
         if lo >= grid.n or lo < day0_start or hi <= lo:
             continue
         day = max(prepared.day_of(lo), 0)
-        if f.counts_as_study:
-            prepared.fixed_study[day] = prepared.fixed_study.get(day, 0) + hi - lo
+        _count_budgets(prepared, f.budgets, day, hi - lo)
         if f.group_id is not None:
             key = (f.group_id, day)
             prepared.fixed_per_group[key] = prepared.fixed_per_group.get(key, 0) + 1
+    # Жёсткое — в лимиты по своему типу занятости (`Busy.budgets`)
+    for hard in inp.busy:
+        if not hard.budgets:
+            continue
+        lo, hi = grid.floor(hard.start), grid.ceil(hard.end)
+        if lo >= grid.n or lo < day0_start or hi <= lo:
+            continue
+        _count_budgets(prepared, hard.budgets, max(prepared.day_of(lo), 0), hi - lo)
     prepared.quotas = _quotas(inp, grid, prepared)
     return prepared
+
+
+def _count_budgets(prep: Prepared, budgets: frozenset[BlockId], day: int, slots: int) -> None:
+    for budget in prep.budgets_of(budgets):
+        key = (budget, day)
+        prep.fixed_budget[key] = prep.fixed_budget.get(key, 0) + slots
 
 
 def _quotas(inp: PlanInput, grid: Grid, prep: Prepared) -> list[PreparedQuota]:

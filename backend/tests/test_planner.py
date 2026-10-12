@@ -1,20 +1,23 @@
 """M8.2–M8.5: сценарии планировщика (`solve`)."""
 
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 
 import pytest
 
 from app.core.time import get_tz, wall_to_utc
+from app.domain import dayprofile
 from app.domain.planner import (
     Block,
+    Budget,
     Busy,
+    DaySpec,
     FixedBlock,
     Placement,
     PlanInput,
     PlanResult,
     PlanSettings,
     RiskReason,
-    TimeRange,
     Window,
     solve,
 )
@@ -30,10 +33,22 @@ WEEKDAYS = frozenset({1, 2, 3, 4, 5})
 PEOPLE = (Window(WEEKDAYS, time(9), time(19)),)
 STUDY = (Window(frozenset(range(1, 8)), time(7), time(1)),)
 NO_REST = PlanSettings(free_evenings_per_week=0, weekend_half_days=0)
+STUDY_LIMIT = frozenset({"study"})
 
 
 def at(d: date, h: int, m: int = 0) -> datetime:
     return wall_to_utc(d, time(h, m), TZ)
+
+
+def days_like(
+    tz=TZ, first: date = MON - timedelta(days=7), n: int = 90, **changes
+) -> tuple[DaySpec, ...]:
+    """Сутки по встроенным режимам (будни / выходные) с правками: `lunch=None`,
+    `wake=time(9)`, `sleep=time(1, 30)`…"""
+    return tuple(
+        dayprofile.day_spec(d, replace(dayprofile.fallback(d), **changes), tz)
+        for d in (first + timedelta(days=i) for i in range(n))
+    )
 
 
 def plan(*blocks: Block, now: datetime | None = None, **kw) -> PlanResult:
@@ -95,10 +110,12 @@ def test_late_evening_goes_to_next_morning():
     assert start(result, "a") == at(TUE, 9)
 
 
-def test_class_day_with_travel_buffer():
+def test_merged_day_with_travel_buffer():
     busy = (
-        Busy(at(MON, 9), at(MON, 10, 35), is_class=True),
-        Busy(at(MON, 10, 45), at(MON, 12, 20), is_class=True),
+        Busy(at(MON, 9), at(MON, 10, 35), buffer_before=60, buffer_after=60, merge_key="class"),
+        Busy(
+            at(MON, 10, 45), at(MON, 12, 20), buffer_before=60, buffer_after=60, merge_key="class"
+        ),
     )
     # после пар 12:20 + дорога 60 = 13:20 → обед до 14:00
     assert start(plan(Block("a", 60), busy=busy), "a") == at(MON, 14)
@@ -244,39 +261,67 @@ def test_priority_wins_single_slot():
 # ---------- дневные ограничения ----------
 
 
-def test_daily_study_limit():
-    settings = PlanSettings(study_limit_min_per_day=120)
-    result = plan(*(Block(f"b{i}", 60) for i in range(3)), settings=settings)
+def test_daily_budget():
+    budgets = (Budget("study", 120),)
+    result = plan(*(Block(f"b{i}", 60, budgets=STUDY_LIMIT) for i in range(3)), budgets=budgets)
     days = sorted(start(result, f"b{i}").date() for i in range(3))
     assert days == [MON, MON, TUE]
 
 
-def test_study_limit_override_for_one_day():
-    settings = PlanSettings(study_limit_min_per_day=120)
-    result = plan(
-        *(Block(f"b{i}", 60) for i in range(4)),
-        settings=settings,
-        study_limits=((MON, 240),),
-    )
+def test_budget_override_for_one_day():
+    budgets = (Budget("study", 120, overrides=((MON, 240),)),)
+    result = plan(*(Block(f"b{i}", 60, budgets=STUDY_LIMIT) for i in range(4)), budgets=budgets)
     assert {start(result, f"b{i}").date() for i in range(4)} == {MON}
 
 
-def test_study_limit_override_can_lower_limit():
-    settings = PlanSettings(study_limit_min_per_day=120)
-    result = plan(Block("a", 60), settings=settings, study_limits=((MON, 0),))
+def test_budget_override_can_lower_limit():
+    budgets = (Budget("study", 120, overrides=((MON, 0),)),)
+    result = plan(Block("a", 60, budgets=STUDY_LIMIT), budgets=budgets)
     assert start(result, "a").date() == TUE
 
 
-def test_non_study_blocks_ignore_limit():
-    settings = PlanSettings(study_limit_min_per_day=60)
-    result = plan(*(Block(f"b{i}", 60, counts_as_study=False) for i in range(3)), settings=settings)
+def test_blocks_outside_budget_ignore_limit():
+    budgets = (Budget("study", 60),)
+    result = plan(*(Block(f"b{i}", 60) for i in range(3)), budgets=budgets)
     assert {start(result, f"b{i}").date() for i in range(3)} == {MON}
 
 
-def test_pinned_study_counts_in_limit():
-    settings = PlanSettings(study_limit_min_per_day=120)
-    fixed = (FixedBlock("f", at(MON, 8), at(MON, 9, 30)),)  # уже сделано сегодня
-    result = plan(Block("a", 60), fixed=fixed, now=at(MON, 9, 30), settings=settings)
+def test_no_budgets_no_limit():
+    """Без лимитов ограничений нет, даже если блок ссылается на лимит."""
+    result = plan(*(Block(f"b{i}", 60, budgets=STUDY_LIMIT) for i in range(4)))
+    assert {start(result, f"b{i}").date() for i in range(4)} == {MON}
+
+
+@pytest.mark.parametrize("limit", [0, 0.5])
+def test_block_in_two_budgets_counts_in_both(limit):
+    budgets = (Budget("study", 120), Budget("screen", 60))
+    both = frozenset({"study", "screen"})
+    result = plan(
+        Block("a", 60, budgets=both),
+        Block("b", 60, budgets=frozenset({"screen"})),
+        Block("c", 60, budgets=STUDY_LIMIT),
+        budgets=budgets,
+        time_limit_s=limit,
+    )
+    # «Экран» — час в день: a и b в разные дни; c делит «учёбу» с a
+    assert start(result, "a").date() != start(result, "b").date()
+    assert {start(result, x).date() for x in "abc"} <= {MON, TUE}
+
+
+def test_pinned_counts_in_budget():
+    budgets = (Budget("study", 120),)
+    fixed = (FixedBlock("f", at(MON, 8), at(MON, 9, 30), budgets=STUDY_LIMIT),)  # сделано сегодня
+    result = plan(
+        Block("a", 60, budgets=STUDY_LIMIT), fixed=fixed, now=at(MON, 9, 30), budgets=budgets
+    )
+    assert start(result, "a").date() == TUE
+
+
+def test_hard_event_counts_in_budget():
+    """Жёсткое событие с лимитом (тип занятости в лимите, M17) уменьшает остаток дня."""
+    budgets = (Budget("work", 120),)
+    busy = (Busy(at(MON, 9), at(MON, 10, 30), budgets=frozenset({"work"})),)
+    result = plan(Block("a", 60, budgets=frozenset({"work"})), busy=busy, budgets=budgets)
     assert start(result, "a").date() == TUE
 
 
@@ -302,15 +347,14 @@ def test_pinned_subtasks_count_in_task_limit():
 
 def test_night_block_counts_for_previous_day():
     """Учёба в 00:00 вторника — это ещё вечер понедельника (день начинается с подъёма)."""
-    settings = PlanSettings(
-        sleep=TimeRange(time(1, 30), time(9)),
-        study_limit_min_per_day=60,
-        free_evenings_per_week=0,
-        weekend_half_days=0,
-    )
     night = (Window(frozenset({2}), time(0), time(1, 30)),)
     result = plan(
-        Block("night", 60, windows=night), Block("day", 60), now=at(MON, 23), settings=settings
+        Block("night", 60, windows=night, budgets=STUDY_LIMIT),
+        Block("day", 60, budgets=STUDY_LIMIT),
+        now=at(MON, 23),
+        settings=NO_REST,
+        days=days_like(sleep=time(1, 30), wake=time(9)),
+        budgets=(Budget("study", 60),),
     )
     assert start(result, "night") == at(TUE, 0)
     assert start(result, "day") == at(TUE, 9)
@@ -424,7 +468,7 @@ def _flex_overlaps(result: PlanResult, lo: datetime, hi: datetime) -> bool:
 
 
 def test_rest_keeps_free_evenings_and_half_day():
-    blocks = [Block(f"b{i}", 120, windows=STUDY, deadline=at(SUN, 23)) for i in range(30)]
+    blocks = [Block(f"b{i}", 120, windows=STUDY, deadline=at(SUN, 23)) for i in range(50)]
     result = plan(*blocks, settings=PlanSettings(deadline_buffer_days=0))
     evenings = sum(
         not _flex_overlaps(result, at(d, 18), at(d, 23, 30))
@@ -442,7 +486,7 @@ def test_rest_keeps_free_evenings_and_half_day():
 
 def test_rest_disabled_uses_evenings():
     blocks = [Block(f"b{i}", 120, windows=STUDY, deadline=at(SUN, 23)) for i in range(60)]
-    base = dict(deadline_buffer_days=0, study_limit_min_per_day=960)
+    base = dict(deadline_buffer_days=0)
     with_rest = plan(*blocks, settings=PlanSettings(**base))
     without = plan(
         *blocks, settings=PlanSettings(**base, free_evenings_per_week=0, weekend_half_days=0)
@@ -463,7 +507,8 @@ def test_greedy_fallback_without_time():
 @pytest.mark.parametrize("limit", [0, 0.5])
 def test_engines_agree_on_feasibility(limit):
     busy = tuple(
-        Busy(at(d, 10, 45), at(d, 14, 35), is_class=True) for d in (MON, TUE, WED, THU, FRI)
+        Busy(at(d, 10, 45), at(d, 14, 35), buffer_before=60, buffer_after=60, merge_key="class")
+        for d in (MON, TUE, WED, THU, FRI)
     )
     blocks = [
         Block(
