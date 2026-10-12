@@ -55,7 +55,7 @@ export function AtRiskDialog({ risk, onOpenChange }: Props) {
           <BacklogOptions risk={risk} onDone={close} />
         ) : risk?.group_kind === 'project' ? (
           <ProjectOptions risk={risk} onDone={close} />
-        ) : risk?.group_kind === 'exam' ? (
+        ) : risk?.group_kind === 'prep' ? (
           <div className="flex flex-col gap-4">
             {risk.reason === 'rest' && <RestNote />}
             <DayLimitSection deadline={risk.deadline} onDone={close} />

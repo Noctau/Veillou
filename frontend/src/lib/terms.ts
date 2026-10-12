@@ -428,7 +428,7 @@ export const REASON_LABEL: Record<Schemas['PlanReason'], string> = {
   missed: 'Переносим невыполненное',
   nightly: 'Пересчитали план за ночь',
   weekly: 'Дела из ящика на неделю',
-  exam: 'План подготовки к экзамену',
+  prep: 'План подготовки к событию',
 }
 
 // ---------- конспекты ----------
@@ -672,4 +672,84 @@ export const PROPOSALS_UI = {
   hint: 'Автозадачи с подтверждением: взять в план или пропустить.',
   take: 'Взять',
   skip: 'Не надо',
+}
+
+export const PREP_UI = {
+  planReady: 'План подготовки готов — проверьте превью внизу и примените',
+  empty: 'Добавьте событие или дату и пункты — подготовка распределится по дням.',
+  add: 'Подготовка',
+  addMore: 'Ещё подготовка',
+  newTitle: 'Новая подготовка',
+  editTitle: 'Подготовка',
+  // к чему
+  target: 'К чему готовимся',
+  targets: { new: 'Новое событие', existing: 'Событие из календаря', date: 'К дате' } as Record<
+    'new' | 'existing' | 'date',
+    string
+  >,
+  eventType: 'Тип события',
+  noPrepTypes: 'Нет типов занятости с подготовкой — событие будет без типа.',
+  event: 'Событие',
+  noEvents: 'Нет будущих событий с подготовкой у этой сферы.',
+  date: 'Дата',
+  time: 'Начало',
+  location: 'Место',
+  duration: 'Длится, мин',
+  title: 'Название',
+  titlePlaceholder: 'По событию или сфере',
+  // как
+  strategy: 'Как готовиться',
+  strategies: { spaced: 'С повторениями', even: 'Равномерно' } as Record<'spaced' | 'even', string>,
+  strategyHints: {
+    spaced: 'Выучить, повторить через 1, 3 и 7 дней, накануне — общий прогон.',
+    even: 'Пункты поровну по дням, без повторов; накануне — прогон, если задано время.',
+  } as Record<'spaced' | 'even', string>,
+  daysBefore: 'Начать готовиться за, дней',
+  perItem: 'Минут на пункт',
+  learn: 'Пройти',
+  review: 'Повторить',
+  run: 'Прогон',
+  runHint: 'Прогон 0 — без прогона накануне.',
+  timeChip: (learn: number, review: number, run: number) => `На пункт: ${learn} / ${review} / ${run} мин`,
+  save: 'Сохранить',
+  deleteTitle: 'Удалить подготовку?',
+  deleteDescription: 'Пункты и план подготовки удалятся. Событие останется в календаре.',
+  deleteWithEvent: 'Удалить и событие',
+  deleteLabel: 'Удалить',
+  // пункты
+  items: 'Пункты',
+  more: 'Ещё',
+  itemsHint: 'Вставьте список — нумерованный или по одному в строке.',
+  itemsPlaceholder: '1. Первая тема\n2. Вторая тема\n…',
+  itemsLabel: 'Пункты списком',
+  addItems: 'Добавить пункты',
+  cancel: 'Отмена',
+  statusHint: 'Нажмите на статус: не начат → пройден → повторить.',
+  status: { not_started: 'не начат', learned: 'пройден', review: 'повторить' } as Record<
+    'not_started' | 'learned' | 'review',
+    string
+  >,
+  statusLabel: (now: string, next: string) => `Статус: ${now}. Сменить на «${next}»`,
+  // план
+  sessionKind: { learn: 'Пройти', review: 'Повторить', run: 'Общий прогон' } as Record<
+    'learn' | 'review' | 'run',
+    string
+  >,
+  build: 'Построить план подготовки',
+  buildHint: (days: number, strategy: string) =>
+    `${strategy} Начнём за ${days} дн., блоки встанут в свободные окна.`,
+  plan: 'План подготовки',
+  remove: 'Убрать',
+  removeTitle: 'Убрать план подготовки?',
+  removeDescription: 'Будущие блоки подготовки уйдут из календаря после применения превью.',
+  nothingLeft: 'Готовиться больше нечего — удачи!',
+  done: 'сделано',
+  missed: 'пропущено',
+  edit: 'Изменить',
+  progress: 'Пройдено',
+  of: (done: number, total: number) => `${done} из ${total}`,
+  inDays: (n: number) => `через ${n} дн.`,
+  today: 'сегодня',
+  past: 'прошло',
+  noTarget: 'событие отменено',
 }

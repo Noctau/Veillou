@@ -1,4 +1,5 @@
-"""Вопросы к экзамену из вставленного текста (M12.1).
+"""Пункты подготовки из вставленного текста (M12.1, M20: билеты, темы, части
+выступления) и названия дней подготовки.
 
 Понимает «1. …», «1) …», «1 - …», «№ 1 …», «Вопрос 1: …», «Билет 1. …». Если
 нумерованных строк нет — каждая непустая строка становится вопросом
@@ -9,7 +10,7 @@
 import re
 from dataclasses import dataclass
 
-from app.domain.enums import ExamSessionKind
+from app.domain.enums import PrepSessionKind
 
 MAX_TEXT = 2000
 
@@ -26,7 +27,7 @@ _BULLET = re.compile(r"^\s*(?:[-•*·–—]\s+)")
 
 
 @dataclass(frozen=True)
-class ParsedQuestion:
+class ParsedItem:
     number: int
     text: str
 
@@ -35,18 +36,18 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()[:MAX_TEXT]
 
 
-def parse_questions(raw: str, start_number: int = 1) -> list[ParsedQuestion]:
-    """Список вопросов. `start_number` — с какого номера считать ненумерованные."""
+def parse_items(raw: str, start_number: int = 1) -> list[ParsedItem]:
+    """Список пунктов. `start_number` — с какого номера считать ненумерованные."""
     lines = [line for line in raw.splitlines() if line.strip()]
     matches = [_NUMBERED.match(line) for line in lines]
     if any(m and m.group(3).strip() for m in matches):
-        result: list[ParsedQuestion] = []
+        result: list[ParsedItem] = []
         for line, m in zip(lines, matches, strict=True):
             if m and m.group(3).strip():
-                result.append(ParsedQuestion(int(m.group(2)), _clean(m.group(3))))
+                result.append(ParsedItem(int(m.group(2)), _clean(m.group(3))))
             elif result:
                 last = result[-1]
-                result[-1] = ParsedQuestion(last.number, _clean(f"{last.text} {line}"))
+                result[-1] = ParsedItem(last.number, _clean(f"{last.text} {line}"))
             # строки до первого номера («Вопросы к экзамену:») — заголовок, пропускаем
         return [q for q in result if q.text]
 
@@ -54,15 +55,15 @@ def parse_questions(raw: str, start_number: int = 1) -> list[ParsedQuestion]:
     for line in lines:
         text = _clean(_BULLET.sub("", line))
         if text:
-            result.append(ParsedQuestion(start_number + len(result), text))
+            result.append(ParsedItem(start_number + len(result), text))
     return result
 
 
 # ---------- названия ----------
 
 SESSION_VERB = {
-    ExamSessionKind.learn: "выучить",
-    ExamSessionKind.review: "повторить",
+    PrepSessionKind.learn: "выучить",
+    PrepSessionKind.review: "повторить",
 }
 
 
@@ -80,11 +81,13 @@ def numbers_text(numbers: list[int]) -> str:
     return "№" + ", ".join(parts) if parts else ""
 
 
-def session_title(kind: ExamSessionKind, subject: str, numbers: list[int]) -> str:
-    if kind == ExamSessionKind.run:
-        return f"{subject}: общий прогон билетов"
-    return f"{subject}: {SESSION_VERB[kind]} {numbers_text(numbers)}".rstrip()
+def session_title(kind: PrepSessionKind, name: str, numbers: list[int]) -> str:
+    """«Климатология: выучить №1–4». Прогон — без номеров (все пункты)."""
+    if kind == PrepSessionKind.run:
+        return f"{name}: общий прогон билетов"
+    return f"{name}: {SESSION_VERB[kind]} {numbers_text(numbers)}".rstrip()
 
 
-def exam_title(title: str, subject: str | None) -> str:
-    return title.strip() or (f"Экзамен: {subject}" if subject else "Экзамен")
+def plan_title(title: str, event: str | None, area: str | None) -> str:
+    """Название плана: своё → событие → сфера → «Подготовка»."""
+    return title.strip() or event or (f"Подготовка: {area}" if area else "Подготовка")

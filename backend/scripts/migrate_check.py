@@ -146,6 +146,18 @@ INVARIANTS = (
         "SELECT count(*) FROM users WHERE settings ?| array['sleep', 'lunch', 'work_hours']",
     ),
     Invariant(
+        "событие плана подготовки — того же пользователя и жёсткое",
+        frozenset({"prep_plans", "events"}),
+        "SELECT count(*) FROM prep_plans p JOIN events e ON e.id = p.event_id "
+        "WHERE e.user_id <> p.user_id OR e.kind <> 'busy'",
+    ),
+    Invariant(
+        "у плана подготовки есть событие или дата",
+        frozenset({"prep_plans"}),
+        "SELECT count(*) FROM prep_plans WHERE deleted_at IS NULL AND event_id IS NULL "
+        "AND date IS NULL",
+    ),
+    Invariant(
         "подзадача — в задании того же пользователя",
         frozenset({"subtasks", "tasks"}),
         "SELECT count(*) FROM subtasks s JOIN tasks t ON t.id = s.task_id "

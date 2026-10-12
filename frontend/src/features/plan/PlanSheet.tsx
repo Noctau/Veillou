@@ -141,7 +141,7 @@ export function PlanSheet() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setRisk(proposal.at_risk.find((r) => r.group_kind === 'task' || r.group_kind === 'exam') ?? proposal.at_risk[0])}
+                onClick={() => setRisk(proposal.at_risk.find((r) => r.group_kind === 'task' || r.group_kind === 'prep') ?? proposal.at_risk[0])}
               >
                 <AlertTriangleIcon /> Варианты
               </Button>

@@ -39,7 +39,7 @@ class PlanRisk(ReadModel):
     Группа — к чему относится блок: задание, дело из ящика (не влезло в неделю),
     экзамен (день подготовки) или проект (норма недели)."""
 
-    group_kind: Literal["task", "backlog", "exam", "project"]
+    group_kind: Literal["task", "backlog", "prep", "project"]
     group_id: uuid.UUID
     group_title: str
     task_id: uuid.UUID | None

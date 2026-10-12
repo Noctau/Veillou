@@ -178,8 +178,7 @@ class SourceType(StrEnum):
     subtask = "subtask"
     task = "task"  # задание без подзадач — одним блоком
     backlog_item = "backlog_item"
-    exam_session = "exam_session"  # день подготовки к экзамену (M12)
-    exam = "exam"  # жёсткое событие самого экзамена
+    prep_session = "prep_session"  # день подготовки к событию (M20, бывший exam_session)
     project = "project"  # резерв недельной нормы проекта (M13.1)
 
 
@@ -328,7 +327,7 @@ class PlanReason(StrEnum):
     missed = "missed"  # «не сделано»
     nightly = "nightly"  # ночная джоба: прошедшее неотмеченное → missed
     weekly = "weekly"  # недельный разбор: дела из ящика на неделю
-    exam = "exam"  # план подготовки к экзамену
+    prep = "prep"  # план подготовки к событию
 
 
 # ---------- ИИ (M10) ----------
@@ -350,22 +349,27 @@ class AIOrigin(StrEnum):
     telegram = "telegram"  # воркер сам отвечает в чат
 
 
-# ---------- экзамены (M12) ----------
+# ---------- подготовка (M20, бывшие экзамены M12) ----------
 
 
-class ExamQuestionStatus(StrEnum):
+class PrepStrategy(StrEnum):
+    spaced = "spaced"  # выучить, повторить через +1 / +3 / +7, накануне прогон (domain/srs.py)
+    even = "even"  # поровну по дням, без повторов; прогон накануне — если run_min > 0
+
+
+class PrepItemStatus(StrEnum):
     not_started = "not_started"
     learned = "learned"
-    review = "review"  # «повторить»: вопрос возвращается в цикл повторений
+    review = "review"  # «повторить»: пункт возвращается в цикл повторений
 
 
-class ExamSessionKind(StrEnum):
-    learn = "learn"  # выучить новые вопросы
+class PrepSessionKind(StrEnum):
+    learn = "learn"  # выучить / пройти новые пункты
     review = "review"  # повторить (+1 / +3 / +7 дней)
-    run = "run"  # общий прогон накануне экзамена
+    run = "run"  # общий прогон накануне
 
 
-class ExamSessionStatus(StrEnum):
+class PrepSessionStatus(StrEnum):
     planned = "planned"
     done = "done"
     missed = "missed"

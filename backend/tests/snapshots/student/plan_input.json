@@ -523,9 +523,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 05.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 05.01›",
    "duration_min": 90,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-06 00:00",
    "priority": 3,
    "windows": [
@@ -549,9 +549,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 06.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 06.01›",
    "duration_min": 90,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-07 00:00",
    "priority": 3,
    "windows": [
@@ -575,9 +575,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / review 06.01›",
+   "id": "prep_session:‹Экзамен Климатология / review 06.01›",
    "duration_min": 30,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-07 00:00",
    "priority": 3,
    "windows": [
@@ -601,9 +601,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 07.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 07.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-08 00:00",
    "priority": 3,
    "windows": [
@@ -627,9 +627,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / review 07.01›",
+   "id": "prep_session:‹Экзамен Климатология / review 07.01›",
    "duration_min": 30,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-08 00:00",
    "priority": 3,
    "windows": [
@@ -653,9 +653,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 08.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 08.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-09 00:00",
    "priority": 3,
    "windows": [
@@ -679,9 +679,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / review 08.01›",
+   "id": "prep_session:‹Экзамен Климатология / review 08.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-09 00:00",
    "priority": 3,
    "windows": [
@@ -705,9 +705,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 09.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 09.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-10 00:00",
    "priority": 3,
    "windows": [
@@ -731,9 +731,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / review 09.01›",
+   "id": "prep_session:‹Экзамен Климатология / review 09.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-10 00:00",
    "priority": 3,
    "windows": [
@@ -757,9 +757,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / learn 10.01›",
+   "id": "prep_session:‹Экзамен Климатология / learn 10.01›",
    "duration_min": 45,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-11 00:00",
    "priority": 3,
    "windows": [
@@ -783,9 +783,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / review 10.01›",
+   "id": "prep_session:‹Экзамен Климатология / review 10.01›",
    "duration_min": 30,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-11 00:00",
    "priority": 3,
    "windows": [
@@ -809,9 +809,9 @@
    "reserve": false
   },
   {
-   "id": "exam_session:‹Экзамен Климатология / run 11.01›",
+   "id": "prep_session:‹Экзамен Климатология / run 11.01›",
    "duration_min": 40,
-   "group_id": "exam:‹Экзамен Климатология›",
+   "group_id": "prep:‹Экзамен Климатология›",
    "deadline": "2027-01-12 00:00",
    "priority": 3,
    "windows": [

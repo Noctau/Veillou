@@ -109,25 +109,25 @@
    "end": "2026-12-31 10:00"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 05.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 05.01›",
    "part": 0,
    "start": "2027-01-05 08:00",
    "end": "2027-01-05 09:30"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 06.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 06.01›",
    "part": 0,
    "start": "2027-01-06 08:00",
    "end": "2027-01-06 09:30"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / review 06.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / review 06.01›",
    "part": 0,
    "start": "2027-01-06 09:45",
    "end": "2027-01-06 10:15"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 07.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 07.01›",
    "part": 0,
    "start": "2027-01-07 08:00",
    "end": "2027-01-07 08:45"
@@ -139,49 +139,49 @@
    "end": "2027-01-07 10:00"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / review 07.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / review 07.01›",
    "part": 0,
    "start": "2027-01-07 10:00",
    "end": "2027-01-07 10:30"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 08.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 08.01›",
    "part": 0,
    "start": "2027-01-08 08:00",
    "end": "2027-01-08 08:45"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / review 08.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / review 08.01›",
    "part": 0,
    "start": "2027-01-08 08:45",
    "end": "2027-01-08 09:30"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 09.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 09.01›",
    "part": 0,
    "start": "2027-01-09 08:00",
    "end": "2027-01-09 08:45"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / review 09.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / review 09.01›",
    "part": 0,
    "start": "2027-01-09 08:45",
    "end": "2027-01-09 09:30"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / learn 10.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / learn 10.01›",
    "part": 0,
    "start": "2027-01-10 08:00",
    "end": "2027-01-10 08:45"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / review 10.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / review 10.01›",
    "part": 0,
    "start": "2027-01-10 08:45",
    "end": "2027-01-10 09:15"
   },
   {
-   "block_id": "exam_session:‹Экзамен Климатология / run 11.01›",
+   "block_id": "prep_session:‹Экзамен Климатология / run 11.01›",
    "part": 0,
    "start": "2027-01-11 08:00",
    "end": "2027-01-11 08:40"

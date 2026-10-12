@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ExamPanel } from '@/features/exams/ExamPanel'
+import { PrepPanel } from '@/features/prep/PrepPanel'
 import { NoteList } from '@/features/notes/NoteList'
 import { ProjectList } from '@/features/projects/ProjectList'
 import { usePeriods } from '@/features/schedule/useSchedule'
@@ -65,7 +65,7 @@ function SectionContent({ section, area }: { section: AreaSection; area: Area })
     case 'materials':
       return <SourceList areaId={area.id} />
     case 'prep':
-      return <ExamPanel areaId={area.id} />
+      return <PrepPanel areaId={area.id} />
     case 'projects':
       return <ProjectList areaId={area.id} />
   }

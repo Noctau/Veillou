@@ -6,7 +6,7 @@
 - вхождение регулярного задания — только в свой день, без разрезания;
 - дела из ящика, взятые на неделю (M11.2): только в оставшееся после основных
   блоков время своей недели, в окна по условиям (`domain/backlog.py`);
-- дни подготовки к экзамену (M12.2): каждый — в свой день, до начала экзамена;
+- дни подготовки к событию (M12.2, M20): каждый — в свой день, до срока плана;
 - недельная норма проекта (M13.1) на текущую и следующую неделю: шаги заданий
   проекта засчитываются в норму, на недостающее — резервные блоки «работа над
   проектом» (ставятся, только если без них норма не набирается).
@@ -17,7 +17,7 @@
 
 Справочники → поля контракта (M15): лимиты нагрузки блока — по его типу действия
 (свой, задачи или тип по умолчанию из настроек), утро — флаг `prefer_morning`
-типа. Подготовка к экзамену и резерв нормы проекта идут по типу по умолчанию.
+типа. Подготовка к событию и резерв нормы проекта идут по типу по умолчанию.
 Незакреплённые будущие блоки — это «прошлый план»: планировщик старается
 их не двигать. Неотмеченные блоки прошлых дней в превью становятся `missed`.
 
@@ -51,17 +51,16 @@ from app.domain.enums import (
     BacklogStatus,
     EventKind,
     EventStatus,
-    ExamSessionKind,
-    ExamSessionStatus,
     PlanReason,
     PlanRevisionStatus,
+    PrepSessionKind,
+    PrepSessionStatus,
     Priority,
     ProjectStatus,
     SourceType,
     SubtaskStatus,
     TaskStatus,
 )
-from app.domain.exams import exam_title, session_title
 from app.domain.planner import (
     Block,
     Busy,
@@ -74,6 +73,7 @@ from app.domain.planner import (
     Window,
     solve,
 )
+from app.domain.prep import plan_title, session_title
 from app.models import (
     ActionType,
     Area,
@@ -81,11 +81,11 @@ from app.models import (
     Category,
     Event,
     EventType,
-    Exam,
-    ExamQuestion,
-    ExamSession,
     Job,
     PlanRevision,
+    PrepItem,
+    PrepPlan,
+    PrepSession,
     Project,
     Subtask,
     Task,
@@ -94,7 +94,7 @@ from app.models import (
 from app.models.base import UserOwnedMixin
 from app.schemas.plan import PlanRevisionRead, PlanState
 from app.schemas.settings import UserSettings
-from app.services import exams
+from app.services import prep
 from app.services.budgets import BudgetIndex, budget_index
 from app.services.calibration import coefficients
 from app.services.day_profiles import load_days
@@ -111,12 +111,12 @@ PLANNED_SOURCES = (
     SourceType.subtask,
     SourceType.task,
     SourceType.backlog_item,
-    SourceType.exam_session,
+    SourceType.prep_session,
     SourceType.project,
 )
-# Подготовка к экзамену: день не сдвинуть — важнее обычных шагов
-EXAM_PRIORITY = 3
-SESSION_ORDER = {ExamSessionKind.learn: 0, ExamSessionKind.review: 1, ExamSessionKind.run: 2}
+# Подготовка к событию: день не сдвинуть — важнее обычных шагов
+PREP_PRIORITY = 3
+SESSION_ORDER = {PrepSessionKind.learn: 0, PrepSessionKind.review: 1, PrepSessionKind.run: 2}
 MAX_HORIZON_DAYS = 60
 # Остаток короче — блок не нужен
 MIN_BLOCK_MIN = 15
@@ -324,24 +324,40 @@ class _Builder:
             order_by=[BacklogItem.created_at, BacklogItem.id],
         )
         item_by_id = {i.id: i for i in items}
-        exams = await self._scalars(
-            Exam, Exam.plan_enabled.is_(True), Exam.starts_at > self.now, order_by=[Exam.starts_at]
-        )
-        exam_by_id = {e.id: e for e in exams}
+        # Планы подготовки: срок — начало живого события или начало даты
+        prep_plans = await self._scalars(PrepPlan, PrepPlan.enabled.is_(True))
+        prep_events = {
+            e.id: e
+            for e in await self._scalars(
+                Event, Event.id.in_([p.event_id for p in prep_plans if p.event_id])
+            )
+        }
+        plan_target: dict[uuid.UUID, datetime] = {}
+        for p in prep_plans:
+            if p.event_id is not None:
+                ev = prep.live(prep_events.get(p.event_id))
+                prep_at = ev.start if ev else None
+            else:
+                prep_at = wall_to_utc(p.date, time(0), self.tz) if p.date else None
+            if prep_at is not None and prep_at > self.now:
+                plan_target[p.id] = prep_at
+        plan_by_id = {p.id: p for p in prep_plans if p.id in plan_target}
         sessions = await self._scalars(
-            ExamSession,
-            ExamSession.exam_id.in_(exam_by_id),
-            ExamSession.status == ExamSessionStatus.planned,
-            ExamSession.date >= self.today,
-            order_by=[ExamSession.date, ExamSession.kind, ExamSession.id],
+            PrepSession,
+            PrepSession.plan_id.in_(plan_by_id),
+            PrepSession.status == PrepSessionStatus.planned,
+            PrepSession.date >= self.today,
+            order_by=[PrepSession.date, PrepSession.kind, PrepSession.id],
         )
         session_by_id = {x.id: x for x in sessions}
         numbers = {
             str(q.id): q.number
-            for q in await self._scalars(ExamQuestion, ExamQuestion.exam_id.in_(exam_by_id))
+            for q in await self._scalars(PrepItem, PrepItem.plan_id.in_(plan_by_id))
         }
-        subjects = {
-            x.id: x for x in await self._scalars(Area) if x.id in {e.area_id for e in exams}
+        plan_areas = {
+            x.id: x
+            for x in await self._scalars(Area)
+            if x.id in {p.area_id for p in plan_by_id.values()}
         }
         # Проекты с недельной нормой (итоговый срок ещё не прошёл)
         projects = {
@@ -398,9 +414,9 @@ class _Builder:
                 task = task_by_id.get(st.task_id) if st else None
             elif e.source_type == SourceType.task:
                 task, st = task_by_id.get(e.source_id), None
-            elif e.source_type == SourceType.exam_session:
+            elif e.source_type == SourceType.prep_session:
                 sess = session_by_id.get(e.source_id)
-                return (f"exam:{sess.exam_id}" if sess else None), default_budgets, None
+                return (f"prep:{sess.plan_id}" if sess else None), default_budgets, None
             elif e.source_type == SourceType.backlog_item:
                 item = item_by_id.get(e.source_id)
                 if item is None:
@@ -623,49 +639,54 @@ class _Builder:
                 ),
             )
 
-        # Подготовка к экзаменам: каждый день плана — в свой день, до экзамена;
-        # окна и лимиты — типа действия по умолчанию (до планов подготовки, M20)
+        # Подготовка к событию: каждый день плана — в свой день, до срока плана;
+        # окна и лимиты — типа действия по умолчанию
         default_windows = type_windows(default_type)
         for sess in sessions:
-            exam = exam_by_id[sess.exam_id]
-            key = block_id(SourceType.exam_session, sess.id)
+            plan = plan_by_id[sess.plan_id]
+            prep_at = plan_target[plan.id]
+            key = block_id(SourceType.prep_session, sess.id)
             remaining = sess.minutes - consumed.get(key, 0)
             if remaining < MIN_BLOCK_MIN:
                 continue
-            subject = subjects.get(exam.area_id)
-            name = subject.short_name or subject.name if subject else "экзамен"
+            area = plan_areas.get(plan.area_id) if plan.area_id else None
+            event = prep_events.get(plan.event_id) if plan.event_id else None
+            title = plan_title(
+                plan.title, event.title if event else None, area.name if area else None
+            )
+            name = (area.short_name or area.name) if area else title
             day_end = wall_to_utc(sess.date + timedelta(days=1), time(0), self.tz)
             add(
                 Block(
                     id=key,
                     duration_min=remaining,
-                    group_id=f"exam:{exam.id}",
-                    deadline=min(day_end, exam.starts_at),
+                    group_id=f"prep:{plan.id}",
+                    deadline=min(day_end, prep_at),
                     earliest=wall_to_utc(sess.date, time(0), self.tz),
                     buffer_days=0,
-                    priority=EXAM_PRIORITY,
+                    priority=PREP_PRIORITY,
                     windows=default_windows,
                     splittable=True,
                     budgets=default_budgets,
                     # Сквозной порядок по дням: в день — сначала выучить, потом повторить
                     sequence=sess.date.toordinal() * 3
-                    + SESSION_ORDER.get(ExamSessionKind(sess.kind), 0),
+                    + SESSION_ORDER.get(PrepSessionKind(sess.kind), 0),
                 ),
                 Source(
-                    SourceType.exam_session,
+                    SourceType.prep_session,
                     sess.id,
                     EventKind.prep,
                     session_title(
-                        ExamSessionKind(sess.kind),
+                        PrepSessionKind(sess.kind),
                         name,
-                        [numbers[q] for q in sess.question_ids if q in numbers],
+                        [numbers[q] for q in sess.item_ids if q in numbers],
                     ),
                     None,  # цвет слоя подготовки, чтобы не путать с занятостью
-                    "exam",
-                    exam.id,
-                    exam_title(exam.title, subject.name if subject else None),
-                    deadline=exam.starts_at,
-                    area_id=exam.area_id,
+                    "prep",
+                    plan.id,
+                    title,
+                    deadline=prep_at,
+                    area_id=plan.area_id,
                 ),
             )
 
@@ -1275,7 +1296,7 @@ async def handle_preview_job(db: AsyncSession, job: Job) -> None:
 
 
 async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
-    """3:00: неотмеченное за прошлые дни → missed, план подготовки к экзаменам
+    """3:00: неотмеченное за прошлые дни → missed, планы подготовки
     пересобран, превью плана готово к утру.
 
     Сегодняшнее не трогаем: его отмечают на вечернем разборе (и воркер, перезапущенный
@@ -1291,7 +1312,7 @@ async def nightly_replan(db: AsyncSession, now: datetime | None = None) -> int:
                 continue
             tz = get_tz(user.timezone)
             await mark_missed(db, user.id, wall_to_utc(local_date(now, tz), time(0), tz))
-            await exams.sync_all(db, user, now)
+            await prep.sync_all(db, user, now)
             await ReplanService(db, user, now).preview([PlanReason.nightly])
         except Exception:
             # Один пользователь не должен оставить остальных без плана к утру

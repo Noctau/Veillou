@@ -19,7 +19,7 @@
 - задания с шагами разных типов действий, зависимостями, закреплённым шагом и
   калибровкой; задание без шагов; «задание с работы»; регулярное задание;
 - ящик: дела с чипом «в дни пар» и «в часы учреждений», взятые на неделю, и старое;
-- экзамен с билетами и планом подготовки;
+- экзамен (событие типа «Экзамен») с планом подготовки по билетам;
 - проект с недельной нормой (ВКР) и проект для заданий с работы;
 - лимит «Учёба» (5 ч) с разовым лимитом дня (M15.3); режимы дня «Будни» и
   «Выходные» с поздним сном (M18).
@@ -726,14 +726,13 @@ async def build_student(client: AsyncClient) -> Student:
         await put(f"/backlog/{item['id']}/week")
 
     # ---------- экзамен ----------
+    # Экзамен — событие типа «Экзамен» и план подготовки к нему (M20)
     exam = await post(
-        "/exams",
+        "/prep-plans",
         {
             "area_id": clim,
-            "starts_at": at(date(2027, 1, 12), 10),
-            "duration_min": 180,
-            "location": "1801",
-            "prep_days": 7,
+            "event": {"start": at(date(2027, 1, 12), 10), "duration_min": 180, "location": "1801"},
+            "start_days_before": 7,
         },
         "exam",
     )
@@ -753,8 +752,8 @@ async def build_student(client: AsyncClient) -> Student:
             1,
         )
     )
-    await _ok(await c.post(f"{API}/exams/{exam['id']}/questions/import", json={"text": questions}))
-    await _ok(await c.post(f"{API}/exams/{exam['id']}/plan"))
+    await _ok(await c.post(f"{API}/prep-plans/{exam['id']}/items/import", json={"text": questions}))
+    await _ok(await c.post(f"{API}/prep-plans/{exam['id']}/enable"))
 
     # ---------- разовый лимит дня ----------
     await put(f"/load-budgets/{budget['id']}/overrides/{day(3).isoformat()}", {"minutes": 480})

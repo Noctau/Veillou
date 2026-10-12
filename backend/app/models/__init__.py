@@ -9,10 +9,10 @@ from app.models.catalog import ActionType, Category, TaskType
 from app.models.day_profile import DayProfile, DayProfileRule
 from app.models.event import Event
 from app.models.event_rule import EventRule
-from app.models.exam import Exam, ExamQuestion, ExamSession
 from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
 from app.models.plan import Calibration, PlanRevision
+from app.models.prep import PrepItem, PrepPlan, PrepSession
 from app.models.project import Milestone, Project
 from app.models.schedule import DayOff, EventType, Period, ScheduleRule, SlotGrid
 from app.models.session import LoginFailure, UserSession
@@ -38,9 +38,6 @@ __all__ = [
     "Event",
     "EventRule",
     "EventType",
-    "Exam",
-    "ExamQuestion",
-    "ExamSession",
     "Job",
     "LoadBudget",
     "LoadBudgetMember",
@@ -49,6 +46,9 @@ __all__ = [
     "Note",
     "Period",
     "PlanRevision",
+    "PrepItem",
+    "PrepPlan",
+    "PrepSession",
     "Project",
     "PushSubscription",
     "Reminder",

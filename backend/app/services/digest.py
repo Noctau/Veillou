@@ -213,36 +213,29 @@ class Digest:
             sections.append(Section("В календаре", lines))
         return sections, bool(box)
 
-    async def _exam_section(self, start: datetime, end: datetime) -> list[Section]:
-        from app.services.exams import days_until, upcoming_exams
+    async def _prep_section(self, start: datetime, end: datetime) -> list[Section]:
+        """Ближайшие события с планом подготовки (и планы к дате). Заголовок — тип
+        занятости во множественном числе («Экзамены»), без типа — «Подготовка»."""
+        from app.services.prep import days_until, upcoming
 
-        exams = await upcoming_exams(self.db, self.user, start, end)
-        if not exams:
+        plans = await upcoming(self.db, self.user, start, end)
+        if not plans:
             return []
-        # Подпись места — по типу занятости события экзамена
         types = await self.types()
-        labels = {
-            source_id: types[type_id].location_label
-            for source_id, type_id in await self.db.execute(
-                select(Event.source_id, Event.event_type_id).where(
-                    Event.user_id == self.user.id,
-                    Event.deleted_at.is_(None),
-                    Event.source_type == SourceType.exam,
-                    Event.source_id.in_([exam.id for exam, _ in exams]),
-                )
-            )
-            if type_id in types
-        }
-        lines = []
-        for exam, title in exams:
-            n = days_until(exam, self.today, self.tz)
-            when = fmt_day(local_date(exam.starts_at, self.tz), self.today)
+        sections: dict[str, list[str]] = {}
+        for _, title, target, event in plans:
+            event_type = types.get(event.event_type_id) if event and event.event_type_id else None
+            n = days_until(target, self.today, self.tz)
+            when = fmt_day(local_date(target, self.tz), self.today)
             left = f" · через {n} {plural(n, 'день', 'дня', 'дней')}" if n > 1 else ""
-            label = labels.get(exam.id)
-            room = f" · {label} {exam.location}" if label else f" · {exam.location}"
-            room = room if exam.location else ""
-            lines.append(f"{when} {exam.starts_at.astimezone(self.tz):%H:%M} — {title}{room}{left}")
-        return [Section("Экзамены", tuple(lines))]
+            room = ""
+            if event is not None and event.location:
+                label = event_type.location_label if event_type else ""
+                room = f" · {label} {event.location}" if label else f" · {event.location}"
+            clock = f" {target.astimezone(self.tz):%H:%M}" if event is not None else ""
+            heading = event_type.name_plural if event_type else "Подготовка"
+            sections.setdefault(heading, []).append(f"{when}{clock} — {title}{room}{left}")
+        return [Section(h, tuple(lines)) for h, lines in sections.items()]
 
     async def _pending_plan(self) -> list[Section]:
         rev = await self.db.scalar(
@@ -273,7 +266,7 @@ class Digest:
         sections += await self._deadline_section(
             max(start, self.now), start + timedelta(days=7), "Дедлайны недели"
         )
-        sections += await self._exam_section(max(start, self.now), start + timedelta(days=8))
+        sections += await self._prep_section(max(start, self.now), start + timedelta(days=8))
         if not has_box and (item := await self._oldest_backlog()):
             waiting = (self.today - local_date(item.created_at, self.tz)).days
             age = f" — ждёт {waiting} {plural(waiting, 'день', 'дня', 'дней')}" if waiting else ""

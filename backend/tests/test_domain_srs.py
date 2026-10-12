@@ -1,25 +1,26 @@
-"""M12.2: интервальные повторения билетов."""
+"""M12.2, M20.1: стратегии подготовки — интервальные повторения (spaced) и равномерно (even)."""
 
 from datetime import date, timedelta
 
-from app.domain.enums import ExamQuestionStatus as S
-from app.domain.enums import ExamSessionKind as K
-from app.domain.srs import DayPlan, Params, Question, build, prep_start, review_dates
+from app.domain.enums import PrepItemStatus as S
+from app.domain.enums import PrepSessionKind as K
+from app.domain.enums import PrepStrategy
+from app.domain.srs import DayPlan, Item, Params, build, build_even, plan, prep_start, review_dates
 
 TODAY = date(2026, 12, 1)
-P = Params(learn_min=45, review_min=15, run_min=5, prep_days=7)
+P = Params(learn_min=45, review_min=15, run_min=5, start_days_before=7)
 
 
 def day(n: int) -> date:
     return TODAY + timedelta(days=n)
 
 
-def qs(n: int) -> list[Question]:
-    return [Question(f"q{i}", i, S.not_started) for i in range(1, n + 1)]
+def qs(n: int) -> list[Item]:
+    return [Item(f"q{i}", i, S.not_started) for i in range(1, n + 1)]
 
 
 def by_kind(plans: list[DayPlan], kind: K) -> dict[date, tuple[str, ...]]:
-    return {p.date: p.question_ids for p in plans if p.kind == kind}
+    return {p.date: p.item_ids for p in plans if p.kind == kind}
 
 
 def test_prep_start():
@@ -77,16 +78,16 @@ def test_one_day_left_learn_without_run():
 
 
 def test_one_day_left_all_learned_is_run():
-    learned = [Question(f"q{i}", i, S.learned, learned_on=day(-3)) for i in range(1, 4)]
+    learned = [Item(f"q{i}", i, S.learned, learned_on=day(-3)) for i in range(1, 4)]
     plans = build(learned, TODAY, day(1), P)
     assert [(p.date, p.kind) for p in plans] == [(TODAY, K.run)]
 
 
 def test_learned_questions_only_get_reviews():
     questions = [
-        Question("a", 1, S.learned, learned_on=day(-1), reviews_done=0),
-        Question("b", 2, S.learned, learned_on=day(-3), reviews_done=1),
-        Question("c", 3, S.not_started),
+        Item("a", 1, S.learned, learned_on=day(-1), reviews_done=0),
+        Item("b", 2, S.learned, learned_on=day(-3), reviews_done=1),
+        Item("c", 3, S.not_started),
     ]
     plans = build(questions, TODAY, day(10), P)
     learn = by_kind(plans, K.learn)
@@ -98,19 +99,19 @@ def test_learned_questions_only_get_reviews():
 
 
 def test_review_status_restarts_cycle_from_mark_day():
-    q = Question("a", 1, S.review, learned_on=TODAY, reviews_done=0)
+    q = Item("a", 1, S.review, learned_on=TODAY, reviews_done=0)
     reviews = by_kind(build([q], TODAY, day(10), P), K.review)
     assert sorted(reviews) == [day(1), day(3), day(7)]
 
 
 def test_overdue_review_moves_to_today():
-    q = Question("a", 1, S.learned, learned_on=day(-10), reviews_done=1)
+    q = Item("a", 1, S.learned, learned_on=day(-10), reviews_done=1)
     reviews = by_kind(build([q], TODAY, day(10), P), K.review)
     assert sorted(reviews) == [TODAY, day(1)]
 
 
 def test_deterministic_order_by_number():
-    questions = [Question("x", 2, S.not_started), Question("y", 1, S.not_started)]
+    questions = [Item("x", 2, S.not_started), Item("y", 1, S.not_started)]
     learn = by_kind(build(questions, TODAY, day(3), P), K.learn)
     assert learn[TODAY] == ("y",)
     assert learn[day(1)] == ("x",)
@@ -124,7 +125,7 @@ def test_closed_learn_day_moves_learning_to_tomorrow():
 
 
 def test_closed_review_day_shifts_reviews():
-    q = Question("a", 1, S.learned, learned_on=day(-1))
+    q = Item("a", 1, S.learned, learned_on=day(-1))
     closed = frozenset({(TODAY, K.review)})
     reviews = by_kind(build([q], TODAY, day(10), P, closed), K.review)
     assert TODAY not in reviews
@@ -132,6 +133,46 @@ def test_closed_review_day_shifts_reviews():
 
 
 def test_closed_run_is_not_planned_again():
-    learned = [Question("a", 1, S.learned, learned_on=day(-5), reviews_done=3)]
+    learned = [Item("a", 1, S.learned, learned_on=day(-5), reviews_done=3)]
     closed = frozenset({(TODAY, K.run)})
     assert build(learned, TODAY, day(1), P, closed) == []
+
+
+# ---------- even ----------
+
+
+def test_even_spreads_items_and_runs_on_eve():
+    plans = build_even(qs(5), TODAY, day(4), P)
+    learn = by_kind(plans, K.learn)
+    assert learn == {day(0): ("q1", "q2"), day(1): ("q3", "q4"), day(2): ("q5",)}
+    assert by_kind(plans, K.run) == {day(3): ("q1", "q2", "q3", "q4", "q5")}
+    assert not by_kind(plans, K.review)
+    assert {p.minutes for p in plans if p.kind == K.run} == {25}
+
+
+def test_even_without_run():
+    plans = build_even(qs(4), TODAY, day(4), Params(learn_min=20, run_min=0, start_days_before=7))
+    assert by_kind(plans, K.learn) == {d: (f"q{i + 1}",) for i, d in enumerate(map(day, range(4)))}
+    assert not by_kind(plans, K.run)
+
+
+def test_even_skips_learned_and_closed_days():
+    items = [Item("q1", 1, S.learned, learned_on=day(-1)), *qs(3)[1:]]
+    plans = build_even(items, TODAY, day(3), P, frozenset({(day(0), K.learn)}))
+    assert by_kind(plans, K.learn) == {day(1): ("q2", "q3")}
+    assert by_kind(plans, K.run) == {day(2): ("q1", "q2", "q3")}
+
+
+def test_even_starts_days_before():
+    plans = build_even(qs(2), TODAY, day(20), P)
+    assert min(p.date for p in plans) == day(13)
+
+
+def test_even_one_day_left_learns_without_run():
+    plans = build_even(qs(3), TODAY, day(1), P)
+    assert [(p.date, p.kind) for p in plans] == [(TODAY, K.learn)]
+
+
+def test_plan_dispatches_strategy():
+    assert plan(PrepStrategy.even, qs(3), TODAY, day(4), P) == build_even(qs(3), TODAY, day(4), P)
+    assert plan(PrepStrategy.spaced, qs(3), TODAY, day(4), P) == build(qs(3), TODAY, day(4), P)

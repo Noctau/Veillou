@@ -34,13 +34,13 @@ from app.models import (
     DayOff,
     Event,
     EventType,
-    Exam,
-    ExamQuestion,
-    ExamSession,
     LoadBudget,
     Milestone,
     Note,
     Period,
+    PrepItem,
+    PrepPlan,
+    PrepSession,
     Project,
     ScheduleRule,
     SlotGrid,
@@ -119,7 +119,7 @@ class Labels:
 
         areas = {a.id: a.name for a in await rows(Area)}
         tasks = {t.id: t.title for t in await rows(Task)}
-        exams = {e.id: f"Экзамен {areas.get(e.area_id, '?')}" for e in await rows(Exam)}
+        exams = {e.id: f"Экзамен {areas.get(e.area_id, '?')}" for e in await rows(PrepPlan)}
         simple: list[tuple[Iterable[Any], str]] = [
             (await rows(Period), "name"),
             (await rows(AreaType), "name"),
@@ -159,10 +159,10 @@ class Labels:
         for st in await rows(Subtask):
             occ = f" {st.occurrence_date:%d.%m}" if st.occurrence_date else ""
             self._add(st.id, f"{tasks.get(st.task_id)} / {st.title}{occ}")
-        for q in await rows(ExamQuestion):
-            self._add(q.id, f"{exams.get(q.exam_id)} / вопрос {q.number}")
-        for x in await rows(ExamSession):
-            self._add(x.id, f"{exams.get(x.exam_id)} / {x.kind} {x.date:%d.%m}")
+        for q in await rows(PrepItem):
+            self._add(q.id, f"{exams.get(q.plan_id)} / вопрос {q.number}")
+        for x in await rows(PrepSession):
+            self._add(x.id, f"{exams.get(x.plan_id)} / {x.kind} {x.date:%d.%m}")
         for e in await rows(Event):
             self._add(e.id, f"{e.title} {e.start.astimezone(self.tz):%d.%m %H:%M}")
 

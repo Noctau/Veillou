@@ -33,7 +33,7 @@ export function usePlanState() {
 function useInvalidatePlanned() {
   const queryClient = useQueryClient()
   return () => {
-    for (const queryKey of [queryKeys.calendarAll, queryKeys.tasks, queryKeys.examsAll, queryKeys.review]) {
+    for (const queryKey of [queryKeys.calendarAll, queryKeys.tasks, queryKeys.prepAll, queryKeys.review]) {
       queryClient.invalidateQueries({ queryKey })
     }
   }

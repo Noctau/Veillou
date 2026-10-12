@@ -52,7 +52,8 @@ export const queryKeys = {
   eveningReview: (day: string) => ['review', 'evening', day] as const,
   weeklyReview: ['review', 'week'] as const,
   free: (minutes: number) => ['free', minutes] as const,
-  examsAll: ['exams'] as const,
-  exams: (areaId: string) => ['exams', 'list', areaId] as const,
-  exam: (id: string) => ['exams', 'detail', id] as const,
+  prepAll: ['prep'] as const,
+  prepList: ['prep', 'list'] as const,
+  prepPlans: (filter: object) => ['prep', 'list', filter] as const,
+  prepPlan: (id: string) => ['prep', 'detail', id] as const,
 }

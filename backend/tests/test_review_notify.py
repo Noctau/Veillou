@@ -205,7 +205,7 @@ async def test_morning_digest_mentions_pending_plan_and_exams(auth_client, user)
 
 
 async def test_today_digest_shows_upcoming_exam(auth_client, user):
-    from .test_exams import make_exam, subject
+    from .test_prep import make_exam, subject
 
     subj = await subject(auth_client)
     await make_exam(auth_client, subj["id"], days=3, location="1801")

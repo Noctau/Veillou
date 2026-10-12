@@ -378,6 +378,10 @@ async def handle_sync_job(db: AsyncSession, job: Job) -> None:
     if user is None or user.deleted_at is not None:
         return
     await sync_user(db, user)
+    # Событие плана подготовки перенесли или отменили — дни плана следуют за ним
+    from app.services import prep
+
+    await prep.sync_user(db, user)
     await db.commit()
 
 

@@ -15,7 +15,7 @@ from app.models import Area, DayOff, Event, EventType, User
 from app.schemas.event import EventCreate, EventUpdate, check_event_bounds
 from app.services.backlog import on_backlog_event_status
 from app.services.base import UserScopedRepository
-from app.services.exams import ExamService
+from app.services.prep import PrepService
 from app.services.schedule_sync import SeriesSync
 from app.services.tasks import on_subtask_event_status
 
@@ -175,5 +175,5 @@ async def on_event_status(db: AsyncSession, user: User, event: Event) -> None:
         await on_subtask_event_status(db, user.id, event.source_id, event.status)
     elif event.source_type == SourceType.backlog_item:
         await on_backlog_event_status(db, user.id, event.source_id, event.status)
-    elif event.source_type == SourceType.exam_session:
-        await ExamService(db, user).on_session_status(event.source_id, event.status)
+    elif event.source_type == SourceType.prep_session:
+        await PrepService(db, user).on_session_status(event.source_id, event.status)

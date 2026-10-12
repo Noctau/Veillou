@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
   BanIcon,
   CheckIcon,
+  ClipboardCheckIcon,
   ExternalLinkIcon,
   PencilIcon,
   PinOffIcon,
@@ -30,7 +31,8 @@ import { paletteColor } from '@/lib/colors'
 import { FieldValuesView } from '@/features/areas/FieldValuesView'
 import { ScheduleRuleDialog } from '@/features/schedule/ScheduleRuleDialog'
 import { useScheduleRules } from '@/features/schedule/useSchedule'
-import { EVENT_UI as E, KIND_SINGLE } from '@/lib/terms'
+import { PrepPanel } from '@/features/prep/PrepPanel'
+import { EVENT_UI as E, KIND_SINGLE, PREP_UI } from '@/lib/terms'
 import { addDaysIso, formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
@@ -124,16 +126,17 @@ function EventDetails({
   const preview = usePreviewPlan()
   const askFeel = useAskFeel()
   const [editing, setEditing] = useState(false)
+  const [prepOpen, setPrepOpen] = useState(false)
 
   const view = useEventView()
   const type = view.typeOf(event)
   const isDoable = view.isDoable(event)
   // Вхождение правила со сферой: название — от сферы, правится место и время
   const isClass = event.kind === 'busy' && !!event.template_id && !!event.area_id
-  // Сам экзамен правится на его карточке (раздел «Подготовка» сферы)
-  const isExam = event.source_type === 'exam'
+  // Событие типа с подготовкой: план подготовки — прямо из карточки (M20.2)
   const fromTemplate = !!event.template_id
   const cancelled = event.status === 'cancelled'
+  const canPrep = event.kind === 'busy' && !!type?.supports_prep && !cancelled
   const done = event.status === 'done'
   const missed = event.status === 'missed'
   // Гибкий блок (подзадача и т. п.): его двигает планировщик
@@ -268,7 +271,7 @@ function EventDetails({
               <PinOffIcon /> Открепить
             </Button>
           )}
-          {!cancelled && !isExam && (
+          {!cancelled && (
             <Button variant="outline" onClick={() => setEditing(true)}>
               <PencilIcon /> {fromTemplate ? E.move : E.edit}
             </Button>
@@ -291,10 +294,15 @@ function EventDetails({
           {event.source_type === 'subtask' && event.source_id && (
             <OpenTaskButton subtaskId={event.source_id} />
           )}
-          {(event.source_type === 'exam' || event.source_type === 'exam_session') && event.area_id && (
+          {canPrep && (
+            <Button variant="ghost" onClick={() => setPrepOpen(true)}>
+              <ClipboardCheckIcon /> {PREP_UI.add}
+            </Button>
+          )}
+          {event.source_type === 'prep_session' && event.area_id && (
             <Button variant="ghost" asChild>
-              <Link to={`/areas/${event.area_id}?tab=exam`}>
-                <ExternalLinkIcon /> Экзамен
+              <Link to={`/areas/${event.area_id}?tab=prep`}>
+                <ExternalLinkIcon /> {PREP_UI.add}
               </Link>
             </Button>
           )}
@@ -320,7 +328,7 @@ function EventDetails({
             </Button>
           )}
           {event.kind === 'busy' && !!event.area_id && !cancelled && <NoteForEventButton eventId={event.id} variant="ghost" size="default" onDone={onClose} />}
-          {!fromTemplate && !isExam && (
+          {!fromTemplate && (
             <ConfirmButton title="Удалить событие?" onConfirm={() => remove.mutate(event.id, { onSuccess: onClose })}>
               <Button variant="ghost" className="text-destructive">
                 <Trash2Icon /> Удалить
@@ -329,6 +337,15 @@ function EventDetails({
           )}
         </div>
       )}
+      <Dialog open={prepOpen} onOpenChange={setPrepOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{PREP_UI.editTitle}</DialogTitle>
+            <DialogDescription>{event.title}</DialogDescription>
+          </DialogHeader>
+          {prepOpen && <PrepPanel eventId={event.id} areaId={event.area_id ?? undefined} />}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

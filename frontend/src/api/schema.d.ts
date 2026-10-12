@@ -1549,7 +1549,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams": {
+    "/api/v1/prep-plans": {
         parameters: {
             query?: never;
             header?: never;
@@ -1557,45 +1557,45 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Exams
-         * @description Экзамены (ближайшие первыми); с area_id — только по сфере.
+         * List Plans
+         * @description Планы подготовки сферы или события; ближайшие — первыми.
          */
-        get: operations["list_exams"];
+        get: operations["list_plans"];
         put?: never;
         /**
-         * Create Exam
-         * @description Экзамен сразу появляется в календаре жёстким событием.
+         * Create Plan
+         * @description План к событию (существующему или новому) или к дате.
          */
-        post: operations["create_exam"];
+        post: operations["create_plan"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}": {
+    "/api/v1/prep-plans/{plan_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Read Exam
-         * @description Вопросы со статусами и план подготовки по дням (с сегодняшнего).
-         */
-        get: operations["read_exam"];
+        /** Read Plan */
+        get: operations["read_plan"];
         put?: never;
         post?: never;
-        /** Delete Exam */
-        delete: operations["delete_exam"];
+        /**
+         * Delete Plan
+         * @description Удаляет план (пункты и дни); `with_event` — и само событие.
+         */
+        delete: operations["delete_plan"];
         options?: never;
         head?: never;
-        /** Update Exam */
-        patch: operations["update_exam"];
+        /** Update Plan */
+        patch: operations["update_plan"];
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/questions/import": {
+    "/api/v1/prep-plans/{plan_id}/items/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -1605,17 +1605,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Import Questions
-         * @description Вставка списком: «1. …», «1) …» или по одному в строке — добавляются в конец.
+         * Import Items
+         * @description Пункты списком: нумерация «1. …», «1) …», «Билет 1 …» или по одному в строке.
          */
-        post: operations["import_questions"];
+        post: operations["import_items"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/questions": {
+    "/api/v1/prep-plans/{plan_id}/items": {
         parameters: {
             query?: never;
             header?: never;
@@ -1624,15 +1624,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Question */
-        post: operations["add_question"];
+        /** Add Item */
+        post: operations["add_item"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exams/{exam_id}/plan": {
+    "/api/v1/prep-plans/{plan_id}/enable": {
         parameters: {
             query?: never;
             header?: never;
@@ -1642,21 +1642,34 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Enable Exam Plan
-         * @description «Построить план подготовки»: дни по билетам + превью плана (GET /plan).
+         * Enable Plan
+         * @description Построить план: дни подготовки + превью плана (применяет пользователь).
          */
-        post: operations["enable_exam_plan"];
-        /**
-         * Disable Exam Plan
-         * @description Убрать план подготовки: будущие дни удаляются, их блоки уберёт превью.
-         */
-        delete: operations["disable_exam_plan"];
+        post: operations["enable_plan"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/exam-questions/{question_id}": {
+    "/api/v1/prep-plans/{plan_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Plan */
+        post: operations["disable_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prep-items/{item_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1666,15 +1679,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Question */
-        delete: operations["delete_question"];
+        /** Delete Item */
+        delete: operations["delete_item"];
         options?: never;
         head?: never;
-        /**
-         * Update Question
-         * @description Статус «повторить» возвращает вопрос в цикл повторений; план пересобирается.
-         */
-        patch: operations["update_question"];
+        /** Update Item */
+        patch: operations["update_item"];
         trace?: never;
     };
     "/api/v1/review/evening": {
@@ -3615,275 +3625,6 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** ExamCreate */
-        ExamCreate: {
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
-            /**
-             * Title
-             * @description Пусто — «Экзамен: <сфера>»
-             * @default
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /**
-             * Duration Min
-             * @description Длительность экзамена, мин
-             * @default 180
-             */
-            duration_min: number;
-            /** Location */
-            location?: string | null;
-            /**
-             * Note
-             * @default
-             */
-            note: string;
-            /**
-             * Prep Days
-             * @description Начать подготовку за N дней
-             * @default 7
-             */
-            prep_days: number;
-            /**
-             * Learn Min
-             * @description Выучить вопрос, мин
-             * @default 45
-             */
-            learn_min: number;
-            /**
-             * Review Min
-             * @description Повторить вопрос, мин
-             * @default 15
-             */
-            review_min: number;
-            /**
-             * Run Min
-             * @description Общий прогон, мин на вопрос
-             * @default 5
-             */
-            run_min: number;
-        };
-        /** ExamDetail */
-        ExamDetail: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
-            /**
-             * Title
-             * @description Готовое название (со сферой, если своё не задано)
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /** Duration Min */
-            duration_min: number;
-            /** Location */
-            location: string | null;
-            /** Note */
-            note: string;
-            /** Prep Days */
-            prep_days: number;
-            /** Learn Min */
-            learn_min: number;
-            /** Review Min */
-            review_min: number;
-            /** Run Min */
-            run_min: number;
-            /** Plan Enabled */
-            plan_enabled: boolean;
-            /**
-             * Questions Total
-             * @default 0
-             */
-            questions_total: number;
-            /**
-             * Questions Learned
-             * @default 0
-             */
-            questions_learned: number;
-            /** Questions */
-            questions: components["schemas"]["ExamQuestionRead"][];
-            /** Sessions */
-            sessions: components["schemas"]["ExamSessionRead"][];
-        };
-        /** ExamQuestionCreate */
-        ExamQuestionCreate: {
-            /** Text */
-            text: string;
-            /**
-             * Number
-             * @description Пусто — следующий
-             */
-            number?: number | null;
-        };
-        /** ExamQuestionRead */
-        ExamQuestionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Number */
-            number: number;
-            /** Text */
-            text: string;
-            status: components["schemas"]["ExamQuestionStatus"];
-            /** Learned On */
-            learned_on: string | null;
-            /** Reviews Done */
-            reviews_done: number;
-        };
-        /**
-         * ExamQuestionStatus
-         * @enum {string}
-         */
-        ExamQuestionStatus: "not_started" | "learned" | "review";
-        /**
-         * ExamQuestionUpdate
-         * @description status: learned — выучен (повторения от сегодня), review — «повторить»
-         *     (цикл повторений заново), not_started — сбросить.
-         */
-        ExamQuestionUpdate: {
-            /** Number */
-            number?: number | null;
-            /** Text */
-            text?: string | null;
-            status?: components["schemas"]["ExamQuestionStatus"] | null;
-        };
-        /** ExamQuestionsImport */
-        ExamQuestionsImport: {
-            /**
-             * Text
-             * @description Список вопросов: «1. …», «1) …» или по одному в строке
-             */
-            text: string;
-        };
-        /** ExamRead */
-        ExamRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Area Id
-             * Format: uuid
-             */
-            area_id: string;
-            /**
-             * Title
-             * @description Готовое название (со сферой, если своё не задано)
-             */
-            title: string;
-            /**
-             * Starts At
-             * Format: date-time
-             */
-            starts_at: string;
-            /** Duration Min */
-            duration_min: number;
-            /** Location */
-            location: string | null;
-            /** Note */
-            note: string;
-            /** Prep Days */
-            prep_days: number;
-            /** Learn Min */
-            learn_min: number;
-            /** Review Min */
-            review_min: number;
-            /** Run Min */
-            run_min: number;
-            /** Plan Enabled */
-            plan_enabled: boolean;
-            /**
-             * Questions Total
-             * @default 0
-             */
-            questions_total: number;
-            /**
-             * Questions Learned
-             * @default 0
-             */
-            questions_learned: number;
-        };
-        /**
-         * ExamSessionKind
-         * @enum {string}
-         */
-        ExamSessionKind: "learn" | "review" | "run";
-        /**
-         * ExamSessionRead
-         * @description День плана подготовки и где он стоит в календаре (если уже стоит).
-         */
-        ExamSessionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            kind: components["schemas"]["ExamSessionKind"];
-            /** Title */
-            title: string;
-            /** Numbers */
-            numbers: number[];
-            /** Minutes */
-            minutes: number;
-            status: components["schemas"]["ExamSessionStatus"];
-            /** Start */
-            start: string | null;
-            /** End */
-            end: string | null;
-        };
-        /**
-         * ExamSessionStatus
-         * @enum {string}
-         */
-        ExamSessionStatus: "planned" | "done" | "missed";
-        /** ExamUpdate */
-        ExamUpdate: {
-            /** Title */
-            title?: string | null;
-            /** Starts At */
-            starts_at?: string | null;
-            /** Duration Min */
-            duration_min?: number | null;
-            /** Location */
-            location?: string | null;
-            /** Note */
-            note?: string | null;
-            /** Prep Days */
-            prep_days?: number | null;
-            /** Learn Min */
-            learn_min?: number | null;
-            /** Review Min */
-            review_min?: number | null;
-            /** Run Min */
-            run_min?: number | null;
-        };
         /**
          * Feel
          * @description Как прошло по сравнению с оценкой — для калибровки (M9.4).
@@ -4703,7 +4444,7 @@ export interface components {
          * @description Почему пересчитали план.
          * @enum {string}
          */
-        PlanReason: "manual" | "changes" | "missed" | "nightly" | "weekly" | "exam";
+        PlanReason: "manual" | "changes" | "missed" | "nightly" | "weekly" | "prep";
         /** PlanRevisionRead */
         PlanRevisionRead: {
             /**
@@ -4766,7 +4507,7 @@ export interface components {
              * Group Kind
              * @enum {string}
              */
-            group_kind: "task" | "backlog" | "exam" | "project";
+            group_kind: "task" | "backlog" | "prep" | "project";
             /**
              * Group Id
              * Format: uuid
@@ -4820,6 +4561,332 @@ export interface components {
              */
             skipped: number;
         };
+        /**
+         * PrepEventIn
+         * @description Событие, к которому готовимся, — создаётся вместе с планом.
+         */
+        PrepEventIn: {
+            /**
+             * Event Type Id
+             * @description Тип занятости; null — первый тип с подготовкой
+             */
+            event_type_id?: string | null;
+            /**
+             * Title
+             * @description Пусто — «<тип>: <сфера>»
+             * @default
+             */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Duration Min
+             * @description Длительность события, мин
+             * @default 180
+             */
+            duration_min: number;
+            /** Location */
+            location?: string | null;
+        };
+        /** PrepEventRead */
+        PrepEventRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Location */
+            location: string | null;
+            status: components["schemas"]["EventStatus"];
+            /** Event Type Id */
+            event_type_id: string | null;
+        };
+        /** PrepItemCreate */
+        PrepItemCreate: {
+            /** Text */
+            text: string;
+            /**
+             * Number
+             * @description Пусто — следующий
+             */
+            number?: number | null;
+        };
+        /** PrepItemRead */
+        PrepItemRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+            status: components["schemas"]["PrepItemStatus"];
+            /** Learned On */
+            learned_on: string | null;
+            /** Reviews Done */
+            reviews_done: number;
+        };
+        /**
+         * PrepItemStatus
+         * @enum {string}
+         */
+        PrepItemStatus: "not_started" | "learned" | "review";
+        /**
+         * PrepItemUpdate
+         * @description status: learned — пройден (повторения от сегодня), review — «повторить» (цикл
+         *     повторений заново), not_started — сбросить.
+         */
+        PrepItemUpdate: {
+            /** Number */
+            number?: number | null;
+            /** Text */
+            text?: string | null;
+            status?: components["schemas"]["PrepItemStatus"] | null;
+        };
+        /** PrepItemsImport */
+        PrepItemsImport: {
+            /**
+             * Text
+             * @description Список пунктов: «1. …», «1) …» или по одному в строке
+             */
+            text: string;
+        };
+        /** PrepPlanCreate */
+        PrepPlanCreate: {
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Event Id
+             * @description Готовиться к этому событию
+             */
+            event_id?: string | null;
+            /** @description …или создать событие */
+            event?: components["schemas"]["PrepEventIn"] | null;
+            /**
+             * Date
+             * @description …или к дате (без события)
+             */
+            date?: string | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** @default spaced */
+            strategy: components["schemas"]["PrepStrategy"];
+            /**
+             * Start Days Before
+             * @description Начать подготовку за N дней
+             * @default 7
+             */
+            start_days_before: number;
+            /**
+             * Learn Min
+             * @description Выучить / пройти пункт, мин
+             * @default 45
+             */
+            learn_min: number;
+            /**
+             * Review Min
+             * @description Повторить пункт, мин
+             * @default 15
+             */
+            review_min: number;
+            /**
+             * Run Min
+             * @description Прогон накануне, мин на пункт; 0 — без
+             * @default 5
+             */
+            run_min: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** PrepPlanDetail */
+        PrepPlanDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Id */
+            event_id: string | null;
+            /** Area Id */
+            area_id: string | null;
+            /** Date */
+            date: string | null;
+            /**
+             * Title
+             * @description Готовое название (своё → событие → сфера)
+             */
+            title: string;
+            strategy: components["schemas"]["PrepStrategy"];
+            /** Start Days Before */
+            start_days_before: number;
+            /** Learn Min */
+            learn_min: number;
+            /** Review Min */
+            review_min: number;
+            /** Run Min */
+            run_min: number;
+            /** Note */
+            note: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Target
+             * @description К какому моменту готовиться: начало события или дата
+             */
+            target: string | null;
+            event: components["schemas"]["PrepEventRead"] | null;
+            /**
+             * Items Total
+             * @default 0
+             */
+            items_total: number;
+            /**
+             * Items Learned
+             * @default 0
+             */
+            items_learned: number;
+            /** Items */
+            items: components["schemas"]["PrepItemRead"][];
+            /** Sessions */
+            sessions: components["schemas"]["PrepSessionRead"][];
+        };
+        /** PrepPlanRead */
+        PrepPlanRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Id */
+            event_id: string | null;
+            /** Area Id */
+            area_id: string | null;
+            /** Date */
+            date: string | null;
+            /**
+             * Title
+             * @description Готовое название (своё → событие → сфера)
+             */
+            title: string;
+            strategy: components["schemas"]["PrepStrategy"];
+            /** Start Days Before */
+            start_days_before: number;
+            /** Learn Min */
+            learn_min: number;
+            /** Review Min */
+            review_min: number;
+            /** Run Min */
+            run_min: number;
+            /** Note */
+            note: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Target
+             * @description К какому моменту готовиться: начало события или дата
+             */
+            target: string | null;
+            event: components["schemas"]["PrepEventRead"] | null;
+            /**
+             * Items Total
+             * @default 0
+             */
+            items_total: number;
+            /**
+             * Items Learned
+             * @default 0
+             */
+            items_learned: number;
+        };
+        /** PrepPlanUpdate */
+        PrepPlanUpdate: {
+            /** Area Id */
+            area_id?: string | null;
+            /**
+             * Date
+             * @description Только у плана без события
+             */
+            date?: string | null;
+            /** Title */
+            title?: string | null;
+            strategy?: components["schemas"]["PrepStrategy"] | null;
+            /** Start Days Before */
+            start_days_before?: number | null;
+            /** Learn Min */
+            learn_min?: number | null;
+            /** Review Min */
+            review_min?: number | null;
+            /** Run Min */
+            run_min?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * PrepSessionKind
+         * @enum {string}
+         */
+        PrepSessionKind: "learn" | "review" | "run";
+        /**
+         * PrepSessionRead
+         * @description День плана и где он стоит в календаре (если уже стоит).
+         */
+        PrepSessionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            kind: components["schemas"]["PrepSessionKind"];
+            /** Title */
+            title: string;
+            /** Numbers */
+            numbers: number[];
+            /** Minutes */
+            minutes: number;
+            status: components["schemas"]["PrepSessionStatus"];
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+        };
+        /**
+         * PrepSessionStatus
+         * @enum {string}
+         */
+        PrepSessionStatus: "planned" | "done" | "missed";
+        /**
+         * PrepStrategy
+         * @enum {string}
+         */
+        PrepStrategy: "spaced" | "even";
         /**
          * Priority
          * @enum {string}
@@ -18709,10 +18776,11 @@ export interface operations {
             };
         };
     };
-    list_exams: {
+    list_plans: {
         parameters: {
             query?: {
                 area_id?: string | null;
+                event_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -18726,7 +18794,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamRead"][];
+                    "application/json": components["schemas"]["PrepPlanRead"][];
                 };
             };
             /** @description Bad Request */
@@ -18803,7 +18871,7 @@ export interface operations {
             };
         };
     };
-    create_exam: {
+    create_plan: {
         parameters: {
             query?: never;
             header?: never;
@@ -18812,7 +18880,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamCreate"];
+                "application/json": components["schemas"]["PrepPlanCreate"];
             };
         };
         responses: {
@@ -18822,7 +18890,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -18899,12 +18967,12 @@ export interface operations {
             };
         };
     };
-    read_exam: {
+    read_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -18916,7 +18984,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -18993,12 +19061,14 @@ export interface operations {
             };
         };
     };
-    delete_exam: {
+    delete_plan: {
         parameters: {
-            query?: never;
+            query?: {
+                with_event?: boolean;
+            };
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -19085,18 +19155,18 @@ export interface operations {
             };
         };
     };
-    update_exam: {
+    update_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamUpdate"];
+                "application/json": components["schemas"]["PrepPlanUpdate"];
             };
         };
         responses: {
@@ -19106,7 +19176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -19183,18 +19253,18 @@ export interface operations {
             };
         };
     };
-    import_questions: {
+    import_items: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionsImport"];
+                "application/json": components["schemas"]["PrepItemsImport"];
             };
         };
         responses: {
@@ -19204,7 +19274,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -19281,18 +19351,18 @@ export interface operations {
             };
         };
     };
-    add_question: {
+    add_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionCreate"];
+                "application/json": components["schemas"]["PrepItemCreate"];
             };
         };
         responses: {
@@ -19302,7 +19372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -19379,12 +19449,12 @@ export interface operations {
             };
         };
     };
-    enable_exam_plan: {
+    enable_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -19396,7 +19466,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -19473,12 +19543,12 @@ export interface operations {
             };
         };
     };
-    disable_exam_plan: {
+    disable_plan: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                exam_id: string;
+                plan_id: string;
             };
             cookie?: never;
         };
@@ -19490,7 +19560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamDetail"];
+                    "application/json": components["schemas"]["PrepPlanDetail"];
                 };
             };
             /** @description Bad Request */
@@ -19567,12 +19637,12 @@ export interface operations {
             };
         };
     };
-    delete_question: {
+    delete_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: string;
+                item_id: string;
             };
             cookie?: never;
         };
@@ -19659,18 +19729,18 @@ export interface operations {
             };
         };
     };
-    update_question: {
+    update_item: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                question_id: string;
+                item_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExamQuestionUpdate"];
+                "application/json": components["schemas"]["PrepItemUpdate"];
             };
         };
         responses: {
@@ -19680,7 +19750,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExamQuestionRead"];
+                    "application/json": components["schemas"]["PrepItemRead"];
                 };
             };
             /** @description Bad Request */

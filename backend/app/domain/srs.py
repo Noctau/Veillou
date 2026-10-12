@@ -1,13 +1,15 @@
-"""Интервальные повторения для билетов (M12.2). Детерминированно, без ИИ.
+"""Стратегии подготовки к событию (M12.2, M20). Детерминированно, без ИИ.
 
-Вопрос: выучить → повторить через +1, +3, +7 дней от дня, когда выучен.
-Подготовка идёт с `start` (за N дней до экзамена, но не раньше сегодня) до
-накануне экзамена. Последний день — общий прогон всех вопросов; повторения,
-которые попадают на него или позже, не нужны (прогон их покрывает).
-
-Невыученные вопросы распределяются по дням учёбы поровну (раньше — больше, если
-не делится). Просроченное повторение (день прошёл, не сделано) переносится на
+`spaced` — интервальные повторения. Пункт: выучить → повторить через +1, +3, +7
+дней от дня, когда выучен. Подготовка идёт с `start` (за N дней до события, но не
+раньше сегодня) до накануне. Последний день — общий прогон всех пунктов;
+повторения, которые попадают на него или позже, не нужны (прогон их покрывает).
+Невыученные пункты распределяются по дням поровну (раньше — больше, если не
+делится). Просроченное повторение (день прошёл, не сделано) переносится на
 сегодня. «Повторить» (статус review) — цикл начинается заново с дня отметки.
+
+`even` — равномерно: непройденные пункты поровну по дням, без повторов; накануне —
+прогон, если у плана есть минуты на прогон (`run_min > 0`).
 
 Дни, где этот вид уже закрыт (сделан или пропущен), заново не планируются:
 учёба начинается со следующего дня, повторения сдвигаются на день.
@@ -20,16 +22,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from app.domain.enums import ExamQuestionStatus, ExamSessionKind
+from app.domain.enums import PrepItemStatus, PrepSessionKind, PrepStrategy
 
 OFFSETS = (1, 3, 7)
 
 
 @dataclass(frozen=True)
-class Question:
+class Item:
     id: str
     number: int
-    status: ExamQuestionStatus
+    status: PrepItemStatus
     # Выучен (или отмечен «повторить») в этот день; None — ещё не выучен
     learned_on: date | None = None
     reviews_done: int = 0
@@ -40,7 +42,7 @@ class Params:
     learn_min: int = 45
     review_min: int = 15
     run_min: int = 5
-    prep_days: int = 7
+    start_days_before: int = 7
 
 
 DEFAULT_PARAMS = Params()
@@ -49,13 +51,13 @@ DEFAULT_PARAMS = Params()
 @dataclass(frozen=True)
 class DayPlan:
     date: date
-    kind: ExamSessionKind
-    question_ids: tuple[str, ...]
+    kind: PrepSessionKind
+    item_ids: tuple[str, ...]
     minutes: int
 
 
-def prep_start(today: date, exam_day: date, prep_days: int) -> date:
-    return max(today, exam_day - timedelta(days=prep_days))
+def prep_start(today: date, target_day: date, days_before: int) -> date:
+    return max(today, target_day - timedelta(days=days_before))
 
 
 def review_dates(learned_on: date, reviews_done: int, today: date) -> list[date]:
@@ -84,34 +86,37 @@ def _spread(items: Sequence[str], days: Sequence[date]) -> dict[date, list[str]]
     return result
 
 
+Closed = frozenset[tuple[date, PrepSessionKind]]
+
+
 def build(
-    questions: Sequence[Question],
+    items: Sequence[Item],
     today: date,
-    exam_day: date,
+    target_day: date,
     params: Params = DEFAULT_PARAMS,
-    closed: frozenset[tuple[date, ExamSessionKind]] = frozenset(),
+    closed: Closed = frozenset(),
 ) -> list[DayPlan]:
-    """План подготовки с сегодняшнего дня. Пусто, если экзамен сегодня или прошёл.
+    """`spaced`: план с сегодняшнего дня. Пусто, если событие сегодня или прошло.
 
     `closed` — (день, вид), которые уже сделаны или пропущены."""
-    if exam_day <= today or not questions:
+    if target_day <= today or not items:
         return []
-    start = prep_start(today, exam_day, params.prep_days)
-    run_day = exam_day - timedelta(days=1)
-    ordered = sorted(questions, key=lambda q: (q.number, q.id))
+    start = prep_start(today, target_day, params.start_days_before)
+    run_day = target_day - timedelta(days=1)
+    ordered = sorted(items, key=lambda q: (q.number, q.id))
     learned_on: dict[str, date] = {}
     to_learn: list[str] = []
     for q in ordered:
-        if q.status == ExamQuestionStatus.not_started or q.learned_on is None:
+        if q.status == PrepItemStatus.not_started or q.learned_on is None:
             to_learn.append(q.id)
         else:
             learned_on[q.id] = q.learned_on
 
     # Дни учёбы — до прогона; если день один, учим в него же (без прогона)
     all_days = [start + timedelta(days=i) for i in range((run_day - start).days)]
-    learn_days = [d for d in all_days if (d, ExamSessionKind.learn) not in closed]
-    with_run = bool(all_days) or not to_learn
-    if not learn_days and (run_day, ExamSessionKind.learn) not in closed:
+    learn_days = [d for d in all_days if (d, PrepSessionKind.learn) not in closed]
+    with_run = params.run_min > 0 and (bool(all_days) or not to_learn)
+    if not learn_days and (run_day, PrepSessionKind.learn) not in closed:
         learn_days = [run_day]
     learn = _spread(to_learn, learn_days)
     for d, ids in learn.items():
@@ -123,7 +128,7 @@ def build(
     for q in ordered:
         first = learned_on[q.id]
         for d in review_dates(first, 0 if q.id in to_learn else done[q.id], today):
-            while (d, ExamSessionKind.review) in closed:
+            while (d, PrepSessionKind.review) in closed:
                 d += timedelta(days=1)
             if d >= run_day:
                 break
@@ -132,14 +137,57 @@ def build(
     plans: list[DayPlan] = []
     for d in sorted(set(learn) | set(reviews)):
         if new := learn.get(d):
-            plans.append(DayPlan(d, ExamSessionKind.learn, tuple(new), len(new) * params.learn_min))
+            plans.append(DayPlan(d, PrepSessionKind.learn, tuple(new), len(new) * params.learn_min))
         if repeat := reviews.get(d):
             plans.append(
-                DayPlan(d, ExamSessionKind.review, tuple(repeat), len(repeat) * params.review_min)
+                DayPlan(d, PrepSessionKind.review, tuple(repeat), len(repeat) * params.review_min)
             )
-    if with_run and run_day >= today and (run_day, ExamSessionKind.run) not in closed:
+    if with_run and run_day >= today and (run_day, PrepSessionKind.run) not in closed:
         everything = tuple(q.id for q in ordered)
         plans.append(
-            DayPlan(run_day, ExamSessionKind.run, everything, len(everything) * params.run_min)
+            DayPlan(run_day, PrepSessionKind.run, everything, len(everything) * params.run_min)
         )
     return plans
+
+
+def build_even(
+    items: Sequence[Item],
+    today: date,
+    target_day: date,
+    params: Params = DEFAULT_PARAMS,
+    closed: Closed = frozenset(),
+) -> list[DayPlan]:
+    """`even`: непройденные пункты поровну по дням до накануне, без повторов; накануне —
+    прогон всех пунктов, если `run_min > 0` и дней больше одного."""
+    if target_day <= today or not items:
+        return []
+    start = prep_start(today, target_day, params.start_days_before)
+    run_day = target_day - timedelta(days=1)
+    ordered = sorted(items, key=lambda q: (q.number, q.id))
+    to_learn = [q.id for q in ordered if q.status == PrepItemStatus.not_started]
+    all_days = [start + timedelta(days=i) for i in range((target_day - start).days)]
+    with_run = params.run_min > 0 and (len(all_days) > 1 or not to_learn)
+    days = all_days[:-1] if with_run and len(all_days) > 1 else all_days
+    learn_days = [d for d in days if (d, PrepSessionKind.learn) not in closed]
+    plans = [
+        DayPlan(d, PrepSessionKind.learn, tuple(ids), len(ids) * params.learn_min)
+        for d, ids in sorted(_spread(to_learn, learn_days).items())
+    ]
+    if with_run and run_day >= today and (run_day, PrepSessionKind.run) not in closed:
+        everything = tuple(q.id for q in ordered)
+        plans.append(
+            DayPlan(run_day, PrepSessionKind.run, everything, len(everything) * params.run_min)
+        )
+    return plans
+
+
+def plan(
+    strategy: PrepStrategy,
+    items: Sequence[Item],
+    today: date,
+    target_day: date,
+    params: Params = DEFAULT_PARAMS,
+    closed: Closed = frozenset(),
+) -> list[DayPlan]:
+    builder = build_even if strategy == PrepStrategy.even else build
+    return builder(items, today, target_day, params, closed)

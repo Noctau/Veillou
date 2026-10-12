@@ -117,7 +117,7 @@ export function useUpdateEvent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendarAll })
       // «Сделано» на блоке закрывает и источник: подзадачу, дело из ящика, день подготовки
       if (body.status) {
-        for (const queryKey of [queryKeys.tasks, queryKeys.backlogAll, queryKeys.examsAll, queryKeys.review]) {
+        for (const queryKey of [queryKeys.tasks, queryKeys.backlogAll, queryKeys.prepAll, queryKeys.review]) {
           queryClient.invalidateQueries({ queryKey })
         }
       }

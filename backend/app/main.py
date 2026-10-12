@@ -15,13 +15,13 @@ from app.api import (
     day_profiles,
     event_rules,
     events,
-    exams,
     free,
     health,
     me,
     notes,
     notify,
     plan,
+    prep,
     projects,
     quickadd,
     review,
@@ -85,8 +85,8 @@ def create_app() -> FastAPI:
     api.include_router(notify.actions_router)
     api.include_router(plan.router)
     api.include_router(plan.calibration_router)
-    api.include_router(exams.router)
-    api.include_router(exams.questions_router)
+    api.include_router(prep.router)
+    api.include_router(prep.items_router)
     api.include_router(review.router)
     api.include_router(free.router)
     api.include_router(attachments.router)
