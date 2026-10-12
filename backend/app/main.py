@@ -13,6 +13,7 @@ from app.api import (
     budgets,
     catalog,
     day_profiles,
+    event_rules,
     events,
     exams,
     free,
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     api.include_router(catalog.router)
     api.include_router(budgets.router)
     api.include_router(day_profiles.router)
+    api.include_router(event_rules.router)
     api.include_router(tasks.router)
     api.include_router(quickadd.router)
     api.include_router(backlog.router)

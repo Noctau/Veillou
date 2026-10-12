@@ -185,11 +185,28 @@ class TaskRead(ReadModel):
     milestone_id: uuid.UUID | None
     recurrence: str | None
     recurrence_start: date | None
+    earliest: UTCMoment | None = Field(description="Не раньше (окно автозадачи)")
+    deadline_auto: bool = Field(
+        description="Срок «к следующему вхождению» — следует за расписанием"
+    )
+    origin_event_id: uuid.UUID | None = Field(description="Автозадача: вхождение-источник")
+    origin_rule_id: uuid.UUID | None = Field(description="Автозадача: правило")
     created_at: UTCMoment
     subtasks_total: int = 0
     subtasks_done: int = 0
     progress: float = Field(default=0.0, description="Доля сделанных подзадач, 0…1")
 
 
+class OriginEvent(ReadModel):
+    """Событие, от которого создана автозадача (для ссылки «к событию»)."""
+
+    id: uuid.UUID
+    title: str
+    start: UTCMoment
+    end: UTCMoment
+    status: EventStatus
+
+
 class TaskDetail(TaskRead):
     subtasks: list[SubtaskRead]
+    origin_event: OriginEvent | None = None

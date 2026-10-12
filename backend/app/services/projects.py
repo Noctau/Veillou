@@ -88,7 +88,7 @@ class ProjectService:
                 Task.user_id == self.user_id,
                 Task.deleted_at.is_(None),
                 Task.project_id.in_(ids),
-                Task.status != TaskStatus.cancelled,
+                Task.status.in_([TaskStatus.active, TaskStatus.done]),
                 Task.recurrence.is_(None),
             )
             .group_by(Task.project_id)

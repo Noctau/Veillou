@@ -48,9 +48,9 @@ import { ActionTypeSelect, CategorySelect, TaskTypeSelect } from '@/features/cat
 import { byId, useTaskTypes } from '@/features/catalog/useCatalog'
 import { useProject, useProjects } from '@/features/projects/useProjects'
 import { AreaSelect } from '@/features/areas/AreaSelect'
-import { AREAS_UI } from '@/lib/terms'
+import { AREAS_UI, ORIGIN_UI } from '@/lib/terms'
 import { errorMessage } from '@/lib/errors'
-import { wallDate, wallTime, wallToUtc } from '@/lib/time'
+import { formatDay, wallDate, wallTime, wallToUtc } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
@@ -306,6 +306,13 @@ export function TaskView({ taskId }: { taskId: string }) {
             {taskType && <span>{taskType.name}</span>}
             {due && <span className={cn(due.tone === 'overdue' && !done && 'text-destructive')}>{due.text}</span>}
             {estimate > 0 && !task.recurrence && <span>осталось ~{formatMinutes(estimate)}</span>}
+            {task.origin_event && (
+              <Link to="/calendar" className="underline-offset-4 hover:underline">
+                {ORIGIN_UI.from}: {task.origin_event.title}, {formatDay(wallDate(task.origin_event.start, tz))}{' '}
+                {wallTime(task.origin_event.start, tz)}
+                {task.origin_event.status === 'cancelled' && ` (${ORIGIN_UI.cancelled})`}
+              </Link>
+            )}
             {task.recurrence && (
               <span className="flex items-center gap-1">
                 <RepeatIcon className="size-3.5" /> {describeRrule(task.recurrence)}

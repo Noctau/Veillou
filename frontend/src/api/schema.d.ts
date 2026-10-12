@@ -807,6 +807,51 @@ export interface paths {
         patch: operations["update_rule"];
         trace?: never;
     };
+    "/api/v1/event-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Event Rules
+         * @description Автозадачи типа занятости или правила расписания (без фильтра — все).
+         */
+        get: operations["list_event_rules"];
+        put?: never;
+        /**
+         * Create Event Rule
+         * @description Создаёт правило и сразу задачи на горизонт вхождений.
+         */
+        post: operations["create_event_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Event Rule
+         * @description Удаляет правило и его будущие несделанные задачи.
+         */
+        delete: operations["delete_event_rule"];
+        options?: never;
+        head?: never;
+        /** Update Event Rule */
+        patch: operations["update_event_rule"];
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -1641,7 +1686,8 @@ export interface paths {
         };
         /**
          * Read Evening Review
-         * @description Вечерний разбор: начатые и прошедшие блоки дня без отметки.
+         * @description Вечерний разбор: начатые и прошедшие блоки дня без отметки и предложения
+         *     автозадач.
          */
         get: operations["read_evening_review"];
         put?: never;
@@ -3090,6 +3136,19 @@ export interface components {
             days: number;
         };
         /**
+         * DeadlineNextOccurrence
+         * @description Срок = начало ближайшего будущего вхождения правила расписания той же сферы
+         *     («к следующему уроку»); пересчитывается при изменении расписания.
+         */
+        DeadlineNextOccurrence: {
+            /**
+             * Kind
+             * @default next_occurrence
+             * @constant
+             */
+            kind: "next_occurrence";
+        };
+        /**
          * DeadlineRule
          * @description Приходит во время утренней сводки (и склеивается с ней).
          */
@@ -3147,6 +3206,11 @@ export interface components {
              * @description Сколько блоков дня уже отмечено «сделано»
              */
             done: number;
+            /**
+             * Proposals
+             * @description Предложения автозадач: «Взять» — status active, «Не надо» — cancelled
+             */
+            proposals: components["schemas"]["TaskRead"][];
         };
         /**
          * EventCreate
@@ -3249,6 +3313,117 @@ export interface components {
             /** Slot */
             slot: number | null;
         };
+        /** EventRuleCreate */
+        EventRuleCreate: {
+            /**
+             * Event Type Id
+             * @description Все события типа
+             */
+            event_type_id?: string | null;
+            /**
+             * Schedule Rule Id
+             * @description Вхождения одного правила расписания
+             */
+            schedule_rule_id?: string | null;
+            /** @default before */
+            when: components["schemas"]["EventRuleWhen"];
+            /**
+             * Title Template
+             * @description Подстановки: {area}, {event}, {field:<id или подпись поля>}
+             */
+            title_template: string;
+            /**
+             * Estimate Min
+             * @default 30
+             */
+            estimate_min: number;
+            /** Action Type Id */
+            action_type_id?: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /**
+             * Offset Min
+             * @description «До»: закончить за N минут
+             * @default 0
+             */
+            offset_min: number;
+            /**
+             * Within Days
+             * @description «После»: не позже конца + N дней
+             */
+            within_days?: number | null;
+            /**
+             * Until Next
+             * @description «После»: до следующего вхождения
+             * @default false
+             */
+            until_next: boolean;
+            /**
+             * Confirm
+             * @description Предлагать в вечернем разборе
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** EventRuleRead */
+        EventRuleRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Event Type Id */
+            event_type_id: string | null;
+            /** Schedule Rule Id */
+            schedule_rule_id: string | null;
+            when: components["schemas"]["EventRuleWhen"];
+            /** Title Template */
+            title_template: string;
+            /** Estimate Min */
+            estimate_min: number;
+            /** Action Type Id */
+            action_type_id: string | null;
+            /** Task Type Id */
+            task_type_id: string | null;
+            /** Offset Min */
+            offset_min: number;
+            /** Within Days */
+            within_days: number | null;
+            /** Until Next */
+            until_next: boolean;
+            /** Confirm */
+            confirm: boolean;
+            /** Position */
+            position: number;
+        };
+        /** EventRuleUpdate */
+        EventRuleUpdate: {
+            when?: components["schemas"]["EventRuleWhen"] | null;
+            /** Title Template */
+            title_template?: string | null;
+            /** Estimate Min */
+            estimate_min?: number | null;
+            /** Action Type Id */
+            action_type_id?: string | null;
+            /** Task Type Id */
+            task_type_id?: string | null;
+            /** Offset Min */
+            offset_min?: number | null;
+            /** Within Days */
+            within_days?: number | null;
+            /** Until Next */
+            until_next?: boolean | null;
+            /** Confirm */
+            confirm?: boolean | null;
+            /** Position */
+            position?: number | null;
+        };
+        /**
+         * EventRuleWhen
+         * @description Автозадача (M19): до или после вхождения события.
+         * @enum {string}
+         */
+        EventRuleWhen: "before" | "after";
         /**
          * EventStatus
          * @enum {string}
@@ -4308,6 +4483,30 @@ export interface components {
              * Format: date
              */
             date: string;
+        };
+        /**
+         * OriginEvent
+         * @description Событие, от которого создана автозадача (для ссылки «к событию»).
+         */
+        OriginEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            status: components["schemas"]["EventStatus"];
         };
         /**
          * ParseDraft
@@ -5737,6 +5936,26 @@ export interface components {
             /** Recurrence Start */
             recurrence_start: string | null;
             /**
+             * Earliest
+             * @description Не раньше (окно автозадачи)
+             */
+            earliest: string | null;
+            /**
+             * Deadline Auto
+             * @description Срок «к следующему вхождению» — следует за расписанием
+             */
+            deadline_auto: boolean;
+            /**
+             * Origin Event Id
+             * @description Автозадача: вхождение-источник
+             */
+            origin_event_id: string | null;
+            /**
+             * Origin Rule Id
+             * @description Автозадача: правило
+             */
+            origin_rule_id: string | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -5759,6 +5978,7 @@ export interface components {
             progress: number;
             /** Subtasks */
             subtasks: components["schemas"]["SubtaskRead"][];
+            origin_event: components["schemas"]["OriginEvent"] | null;
         };
         /** TaskRead */
         TaskRead: {
@@ -5805,6 +6025,26 @@ export interface components {
             /** Recurrence Start */
             recurrence_start: string | null;
             /**
+             * Earliest
+             * @description Не раньше (окно автозадачи)
+             */
+            earliest: string | null;
+            /**
+             * Deadline Auto
+             * @description Срок «к следующему вхождению» — следует за расписанием
+             */
+            deadline_auto: boolean;
+            /**
+             * Origin Event Id
+             * @description Автозадача: вхождение-источник
+             */
+            origin_event_id: string | null;
+            /**
+             * Origin Rule Id
+             * @description Автозадача: правило
+             */
+            origin_rule_id: string | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -5830,7 +6070,7 @@ export interface components {
          * TaskStatus
          * @enum {string}
          */
-        TaskStatus: "active" | "done" | "cancelled";
+        TaskStatus: "active" | "done" | "cancelled" | "proposed";
         /** TaskTypeCreate */
         TaskTypeCreate: {
             /** Name */
@@ -5845,8 +6085,11 @@ export interface components {
             default_category_id?: string | null;
             /** Default Estimate Min */
             default_estimate_min?: number | null;
-            /** @description Как вывести срок; тип с правилом — «быстрый тип» в ＋ */
-            deadline_rule?: components["schemas"]["DeadlineDays"] | null;
+            /**
+             * Deadline Rule
+             * @description Как вывести срок; тип с правилом — «быстрый тип» в ＋
+             */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
             /** Default Project Id */
             default_project_id?: string | null;
             /** Default Template Id */
@@ -5870,7 +6113,8 @@ export interface components {
             default_category_id: string | null;
             /** Default Estimate Min */
             default_estimate_min: number | null;
-            deadline_rule: components["schemas"]["DeadlineDays"] | null;
+            /** Deadline Rule */
+            deadline_rule: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
             /** Default Project Id */
             default_project_id: string | null;
             /** Default Template Id */
@@ -5891,7 +6135,8 @@ export interface components {
             default_category_id?: string | null;
             /** Default Estimate Min */
             default_estimate_min?: number | null;
-            deadline_rule?: components["schemas"]["DeadlineDays"] | null;
+            /** Deadline Rule */
+            deadline_rule?: (components["schemas"]["DeadlineDays"] | components["schemas"]["DeadlineNextOccurrence"]) | null;
             /** Default Project Id */
             default_project_id?: string | null;
             /** Default Template Id */
@@ -12981,6 +13226,387 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DayProfileRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_event_rules: {
+        parameters: {
+            query?: {
+                event_type_id?: string | null;
+                schedule_rule_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRuleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_event_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRuleRead"];
                 };
             };
             /** @description Bad Request */

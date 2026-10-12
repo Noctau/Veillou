@@ -523,9 +523,12 @@ class _Builder:
                 remaining = calibrated(estimate, coef) - consumed.get(key, 0)
                 if remaining < MIN_BLOCK_MIN:
                     continue
-                deadline, earliest, buffer = task.deadline, None, task.deadline_buffer_days
+                deadline, earliest, buffer = task.deadline, task.earliest, task.deadline_buffer_days
+                if earliest is not None and earliest >= self.horizon_end:
+                    continue  # окно автозадачи ещё не открылось в пределах плана
                 if occurrence is not None:
-                    earliest = wall_to_utc(occurrence, time(0), self.tz)
+                    day_start = wall_to_utc(occurrence, time(0), self.tz)
+                    earliest = max(earliest, day_start) if earliest else day_start
                     day_end = wall_to_utc(occurrence + timedelta(days=1), time(0), self.tz)
                     deadline = min(deadline, day_end) if deadline else day_end
                     buffer = 0

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRightIcon, CheckCircle2Icon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { useState } from 'react'
 
@@ -9,9 +10,12 @@ import { timeRange, useEventView } from '@/features/calendar/eventUtils'
 import { type CalendarEvent, useUpdateEvent } from '@/features/calendar/useCalendar'
 import { useAskFeel } from '@/features/plan/useAskFeel'
 import { plural } from '@/features/plan/labels'
+import { type Task, useUpdateTask } from '@/features/tasks/useTasks'
 import { paletteColor } from '@/lib/colors'
 import { errorMessage } from '@/lib/errors'
-import { formatDay } from '@/lib/time'
+import { queryKeys } from '@/lib/queryKeys'
+import { PROPOSALS_UI as P } from '@/lib/terms'
+import { formatDay, wallDate, wallTime } from '@/lib/time'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +51,47 @@ function Row({
         </Button>
       )}
     </li>
+  )
+}
+
+/** Предложения автозадач с подтверждением: «Взять» — в план, «Не надо» — отменить. */
+function Proposals({ tasks, tz }: { tasks: Task[]; tz: string }) {
+  const update = useUpdateTask()
+  const queryClient = useQueryClient()
+  const decide = (task: Task, status: 'active' | 'cancelled') =>
+    update.mutate(
+      { id: task.id, body: { status } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.review }) },
+    )
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-2 py-4">
+        <div>
+          <div className="text-sm font-medium">{P.title}</div>
+          <p className="text-xs text-muted-foreground">{P.hint}</p>
+        </div>
+        <ul className="flex flex-col">
+          {tasks.map((t) => (
+            <li key={t.id} className="flex items-center gap-2 py-1">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm">{t.title}</div>
+                {t.deadline && (
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    до {formatDay(wallDate(t.deadline, tz))} {wallTime(t.deadline, tz)}
+                  </div>
+                )}
+              </div>
+              <Button size="sm" disabled={update.isPending} onClick={() => decide(t, 'active')}>
+                {P.take}
+              </Button>
+              <Button size="sm" variant="ghost" disabled={update.isPending} onClick={() => decide(t, 'cancelled')}>
+                {P.skip}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -92,6 +137,8 @@ export function EveningReview() {
         {formatDay(data.date, { weekday: 'long', month: 'long' })}
         {data.done + marked.size > 0 && ` · сделано ${data.done + marked.size}`}
       </p>
+
+      {data.proposals.length > 0 && <Proposals tasks={data.proposals} tz={tz} />}
 
       {left.length === 0 ? (
         <Card>

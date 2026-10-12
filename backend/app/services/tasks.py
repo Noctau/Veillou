@@ -38,6 +38,7 @@ from app.models import (
     User,
 )
 from app.schemas.task import (
+    OriginEvent,
     SubtaskCreate,
     SubtaskEvent,
     SubtaskRead,
@@ -52,6 +53,7 @@ from app.services.attachments import delete_for_owners
 from app.services.base import UserScopedRepository
 from app.services.calibration import recalibrate
 from app.services.catalog import default_action_type
+from app.services.event_tasks import next_occurrence
 from app.services.recurring_tasks import ensure_has_occurrences, sync_recurring_task
 
 
@@ -175,6 +177,9 @@ class TaskService:
         where: list[ColumnElement[bool]] = []
         if statuses:
             where.append(Task.status.in_(statuses))
+        else:
+            # Предложения автозадач — только в вечернем разборе
+            where.append(Task.status != TaskStatus.proposed)
         if area_id:
             where.append(Task.area_id == area_id)
         if project_id:
@@ -199,9 +204,17 @@ class TaskService:
         )
         done = sum(s.status == SubtaskStatus.done for s in subtasks)
         events = await self._events_by_subtask([s.id for s in subtasks])
+        origin = (
+            await self.db.scalar(
+                select(Event).where(Event.id == task.origin_event_id, Event.user_id == self.user_id)
+            )
+            if task.origin_event_id
+            else None
+        )
         return TaskDetail(
             **self._read(task, (len(subtasks), done)).model_dump(),
             subtasks=[self._subtask_read(s, events.get(s.id, [])) for s in subtasks],
+            origin_event=OriginEvent.model_validate(origin) if origin else None,
         )
 
     async def get_subtask(self, id: uuid.UUID) -> SubtaskRead:
@@ -294,9 +307,17 @@ class TaskService:
         if fields["deadline"] is None and (rule := task_type.deadline_rule):
             issued = data.issued_at or self._today()
             fields["issued_at"] = issued
-            fields["deadline"] = wall_to_utc(
-                issued + timedelta(days=int(rule["days"])), END_OF_DAY, self.tz
-            )
+            if rule.get("kind") == "next_occurrence":
+                # «К следующему занятию сферы» — и дальше следует за расписанием
+                if fields["area_id"] is not None:
+                    fields["deadline"] = await next_occurrence(
+                        self.db, self.user_id, fields["area_id"], now_utc()
+                    )
+                    fields["deadline_auto"] = True
+            else:
+                fields["deadline"] = wall_to_utc(
+                    issued + timedelta(days=int(rule["days"])), END_OF_DAY, self.tz
+                )
         template = None
         if not steps and task_type.default_template_id:
             template = await self.templates.get(task_type.default_template_id)
@@ -387,6 +408,12 @@ class TaskService:
             changes["time_window"] = patch.model_dump(mode="json")["time_window"]
         if "status" in changes and changes["status"] != task.status:
             changes["done_at"] = now_utc() if changes["status"] == TaskStatus.done else None
+        if "deadline" in changes:
+            changes["deadline_auto"] = False  # поправили руками — больше не следует за расписанием
+        elif task.deadline_auto and changes.get("area_id"):
+            changes["deadline"] = await next_occurrence(
+                self.db, self.user_id, changes["area_id"], task.created_at
+            )
         if changes.get("recurrence") and not (
             changes.get("recurrence_start") or task.recurrence_start
         ):

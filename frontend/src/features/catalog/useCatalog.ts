@@ -64,7 +64,7 @@ export function useTaskTypes() {
 
 /** «Быстрые типы»: типы с правилом срока — кнопками в ＋ и проектах. */
 export function quickTypes(types: TaskType[] | undefined): TaskType[] {
-  return (types ?? []).filter((t) => t.deadline_rule)
+  return (types ?? []).filter((t) => t.deadline_rule?.kind === 'days')
 }
 
 export function useBudgets() {

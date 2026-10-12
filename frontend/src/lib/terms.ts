@@ -508,8 +508,18 @@ export const TASK_TYPES_UI = {
   actionType: 'Тип действия',
   category: 'Категория',
   estimate: 'Оценка, мин',
-  deadlineDays: 'Срок через, дн.',
-  deadlineHint: 'Пусто — срок не подставляется. С числом тип становится быстрой кнопкой.',
+  deadline: 'Срок по умолчанию',
+  deadlineDays: 'Дней от выдачи',
+  deadlineKinds: { none: 'Без срока', days: 'Через N дней', next_occurrence: 'К следующему занятию' } as Record<
+    'none' | 'days' | 'next_occurrence',
+    string
+  >,
+  deadlineHints: {
+    none: 'Срок не подставляется.',
+    days: 'Срок = выдача + N дней; тип становится быстрой кнопкой.',
+    next_occurrence: 'Срок — ближайшее занятие сферы задачи по расписанию; следует за переносами и каникулами.',
+  } as Record<'none' | 'days' | 'next_occurrence', string>,
+  deadlineNextChip: 'к следующему',
   project: 'Проект',
   template: 'Шаблон шагов',
   none: 'Не задан',
@@ -612,4 +622,54 @@ export const DIGEST_TIMING_UI = {
   review: 'Вечерний разбор',
   reviewHint: 'Минут до отбоя (по режиму дня).',
   minutes: 'мин',
+}
+
+export const EVENT_RULES_UI = {
+  title: 'Автозадачи',
+  hint: 'Задача до или после каждого события: подготовиться, проверить, отчитаться.',
+  empty: 'Автозадач нет.',
+  add: 'Автозадача',
+  newTitle: 'Новая автозадача',
+  editTitle: 'Автозадача',
+  saveFirst: 'Сохраните, чтобы добавить автозадачи.',
+  when: 'Когда',
+  whenOptions: { before: 'До события', after: 'После события' } as Record<'before' | 'after', string>,
+  template: 'Название задачи',
+  templatePlaceholder: 'Подготовить урок — {сфера}',
+  insert: 'Вставить:',
+  tokenArea: 'сфера',
+  tokenEvent: 'событие',
+  estimate: 'Оценка',
+  minutes: 'мин',
+  finishBefore: 'Закончить за',
+  units: { min: 'мин', h: 'ч', d: 'дн.' } as Record<'min' | 'h' | 'd', string>,
+  withinDays: 'Не позже чем через',
+  days: 'дн. после конца',
+  untilNext: 'До следующего такого события',
+  confirm: 'Спрашивать в вечернем разборе',
+  confirmHint: 'Задача появится предложением — «Взять» или «Не надо».',
+  taskType: 'Тип задачи',
+  noTaskType: 'Без типа',
+  summaryBefore: (offset: string) => (offset ? `до · за ${offset}` : 'до начала'),
+  summaryAfter: (parts: string[]) => ['после', ...parts].join(' · '),
+  withinChip: (d: number) => `≤ ${d} дн.`,
+  untilNextChip: 'до следующего',
+  confirmChip: 'с подтверждением',
+  deleteTitle: 'Удалить автозадачу?',
+  deleteDescription: 'Её будущие несделанные задачи тоже удалятся.',
+  deleteLabel: 'Удалить автозадачу',
+  save: 'Сохранить',
+  saving: 'Сохраняем…',
+}
+
+export const ORIGIN_UI = {
+  from: 'От события',
+  cancelled: 'отменено',
+}
+
+export const PROPOSALS_UI = {
+  title: 'Предлагаю задачи',
+  hint: 'Автозадачи с подтверждением: взять в план или пропустить.',
+  take: 'Взять',
+  skip: 'Не надо',
 }

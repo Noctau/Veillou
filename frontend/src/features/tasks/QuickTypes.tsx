@@ -56,7 +56,7 @@ function QuickTypeForm({ taskType, projectId, onDone }: { taskType: TaskType; pr
   const { data: projects } = useProjects()
   const create = useCreateTask()
   const today = todayIn(tz)
-  const days = taskType.deadline_rule?.days ?? 0
+  const days = taskType.deadline_rule?.kind === 'days' ? taskType.deadline_rule.days : 0
   const fallbackProject = projectId ?? taskType.default_project_id ?? NONE
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')

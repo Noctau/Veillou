@@ -11,6 +11,7 @@ from app.schemas.review import (
     WeekConfirm,
     WeeklyReview,
 )
+from app.schemas.task import TaskRead
 from app.services.replan import ReplanService, plan_state
 from app.services.review import ReviewService
 
@@ -21,11 +22,15 @@ router = APIRouter(prefix="/review", tags=["review"])
 async def read_evening_review(
     db: SessionDep, user: CurrentUser, day: date | None = None
 ) -> EveningReview:
-    """Вечерний разбор: начатые и прошедшие блоки дня без отметки."""
+    """Вечерний разбор: начатые и прошедшие блоки дня без отметки и предложения
+    автозадач."""
     svc = ReviewService(db, user)
     items, done = await svc.evening_items(day)
     return EveningReview(
-        date=day or svc.today, items=[EventRead.model_validate(e) for e in items], done=done
+        date=day or svc.today,
+        items=[EventRead.model_validate(e) for e in items],
+        done=done,
+        proposals=[TaskRead.model_validate(t) for t in await svc.proposals()],
     )
 
 

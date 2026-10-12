@@ -20,6 +20,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { compactValues } from '@/features/areas/fields'
 import { FieldValuesForm } from '@/features/areas/FieldValuesForm'
 import { type Area, type FieldValues, selectableAreas, useAreas, useAreaTypes, useCreateArea } from '@/features/areas/useAreas'
+import { EventRulesEditor } from '@/features/eventrules/EventRulesEditor'
 import { PALETTE, paletteColor } from '@/lib/colors'
 import { PATTERN_LABEL, SCHEDULE_UI as T } from '@/lib/terms'
 import { WEEKDAYS_FULL, WEEKDAYS_SHORT } from '@/lib/time'
@@ -460,6 +461,12 @@ function RuleForm({ periodId, rule, draft, viewCycleWeek, onEditRule, onDone }: 
         </Field>
         {eventType && eventType.fields.length > 0 && (
           <FieldValuesForm defs={eventType.fields} value={fields} onChange={setFields} areas={allAreas} idPrefix="rule-field" />
+        )}
+        {rule && (
+          <EventRulesEditor
+            owner={{ schedule_rule_id: rule.id }}
+            fieldLabels={eventType?.fields.map((f) => f.label) ?? []}
+          />
         )}
 
         <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setMore(!more)}>

@@ -8,6 +8,7 @@ from app.models.budget import BudgetDayOverride, LoadBudget, LoadBudgetMember
 from app.models.catalog import ActionType, Category, TaskType
 from app.models.day_profile import DayProfile, DayProfileRule
 from app.models.event import Event
+from app.models.event_rule import EventRule
 from app.models.exam import Exam, ExamQuestion, ExamSession
 from app.models.note import Note
 from app.models.notify import Job, PushSubscription, Reminder
@@ -35,6 +36,7 @@ __all__ = [
     "DayProfile",
     "DayProfileRule",
     "Event",
+    "EventRule",
     "EventType",
     "Exam",
     "ExamQuestion",
@@ -63,7 +65,8 @@ __all__ = [
 
 # Пересчёт напоминаний и превью плана при изменениях — во всех процессах (api, worker, bot, тесты)
 from app.notify import triggers
-from app.services import plan_triggers
+from app.services import event_task_triggers, plan_triggers
 
 triggers.install()
 plan_triggers.install()
+event_task_triggers.install()

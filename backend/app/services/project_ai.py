@@ -76,7 +76,7 @@ class ProjectAIService:
                 Task.user_id == self.user_id,
                 Task.deleted_at.is_(None),
                 Task.project_id == project.id,
-                Task.status != TaskStatus.cancelled,
+                Task.status.in_([TaskStatus.active, TaskStatus.done]),
                 Task.recurrence.is_(None),
             )
             .order_by(Task.deadline.asc().nulls_last(), Task.created_at)

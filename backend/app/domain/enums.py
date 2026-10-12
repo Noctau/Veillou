@@ -148,6 +148,15 @@ class TaskStatus(StrEnum):
     active = "active"
     done = "done"
     cancelled = "cancelled"
+    # Предложение автозадачи с подтверждением: не планируется, ждёт вечернего разбора
+    proposed = "proposed"
+
+
+class EventRuleWhen(StrEnum):
+    """Автозадача (M19): до или после вхождения события."""
+
+    before = "before"  # закончить за N минут до начала
+    after = "after"  # не раньше конца; не позже чем через N дней / до следующего вхождения
 
 
 class SubtaskStatus(StrEnum):
@@ -263,6 +272,7 @@ class JobKind(StrEnum):
     ai_parse = "ai.parse"  # разобрать свободный текст (бот, ＋)
     ai_photo = "ai.photo"  # распознать фото задания
     ai_milestones = "ai.milestones"  # предложить этапы проекта (черновик)
+    event_tasks_sync = "event_tasks.sync"  # автозадачи от событий и сроки «к следующему»
 
 
 # ИИ-джобы идут своей очередью: по одной, по порядку постановки, и ждут, если ИИ недоступен

@@ -49,6 +49,7 @@ TASK_FIELDS = {
     "task_type_id",
     "deadline_buffer_days",
     "project_id",
+    "earliest",
     "deleted_at",
 }
 SUBTASK_FIELDS = {"estimate_min", "depends_on", "time_window", "action_type_id", "deleted_at"}

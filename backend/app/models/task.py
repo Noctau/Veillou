@@ -12,7 +12,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Date, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,7 +23,17 @@ from app.models.base import UserOwnedMixin, UTCDateTime
 
 class Task(UserOwnedMixin, Base):
     __tablename__ = "tasks"
-    __table_args__ = (Index("ix_tasks_user_status_deadline", "user_id", "status", "deadline"),)
+    __table_args__ = (
+        Index("ix_tasks_user_status_deadline", "user_id", "status", "deadline"),
+        # Одна живая автозадача на (правило, вхождение)
+        Index(
+            "uq_tasks_origin",
+            "origin_rule_id",
+            "origin_event_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL AND origin_rule_id IS NOT NULL"),
+        ),
+    )
 
     title: Mapped[str] = mapped_column(String(300))
     # NULL — без типа
@@ -62,6 +72,18 @@ class Task(UserOwnedMixin, Base):
     # Регулярное задание («встреча с научруком по чт»): вхождения — подзадачи с датой
     recurrence: Mapped[str | None] = mapped_column(String(500))
     recurrence_start: Mapped[date | None] = mapped_column(Date)
+    # Не раньше этого момента (окно автозадачи «после события»)
+    earliest: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Срок посчитан по правилу типа «к следующему вхождению» — пересчитывается сам,
+    # пока его не поправили руками
+    deadline_auto: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Автозадача (M19): от какого вхождения и по какому правилу
+    origin_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("events.id", ondelete="SET NULL"), index=True
+    )
+    origin_rule_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("event_rules.id", ondelete="SET NULL"), index=True
+    )
 
 
 class Subtask(UserOwnedMixin, Base):

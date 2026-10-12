@@ -175,24 +175,36 @@ def _minutes(total: int) -> str:
 
 
 async def _evening(db: AsyncSession, user: User, r: Reminder, now: datetime) -> Message | None:
-    """Вечерний разбор. Всё отмечено — не присылаем."""
+    """Вечерний разбор: неотмеченные блоки и предложения автозадач. Нечего — не присылаем."""
     from app.services.review import ReviewService
 
     day = date.fromisoformat(r.payload["date"])
-    items, done = await ReviewService(db, user, now).evening_items(day)
-    if not items:
+    svc = ReviewService(db, user, now)
+    items, done = await svc.evening_items(day)
+    proposals = await svc.proposals()
+    if not items and not proposals:
         return None
     tz = get_tz(user.timezone)
-    head = f"Сделано: {done}. " if done else ""
-    hint = "Перенести невыполненное? Остальное сдвинется, предупрежу, если дедлайн под угрозой."
-    return Message(
-        title=f"Вечерний разбор: не отмечено {len(items)}",
-        sections=(
+    sections = []
+    if items:
+        head = f"Сделано: {done}. " if done else ""
+        hint = "Перенести невыполненное? Остальное сдвинется, предупрежу, если дедлайн под угрозой."
+        sections += [
             Section(None, tuple(f"{fmt_range(e.start, e.end, tz)} {e.title}" for e in items)),
             Section(None, (head + hint,)),
-        ),
+        ]
+    if proposals:
+        sections.append(Section("Предлагаю задачи", tuple(t.title for t in proposals)))
+    title = (
+        f"Вечерний разбор: не отмечено {len(items)}"
+        if items
+        else f"Вечерний разбор: предложено задач — {len(proposals)}"
+    )
+    return Message(
+        title=title,
+        sections=tuple(sections),
         url="/review",
-        actions=(ReminderAction.reschedule, ReminderAction.pick),
+        actions=(ReminderAction.reschedule, ReminderAction.pick) if items else (),
         kind=ReminderKind.evening_review,
         tag=f"evening-{day.isoformat()}",
     )

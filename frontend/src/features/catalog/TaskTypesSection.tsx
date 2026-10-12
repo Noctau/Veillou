@@ -27,6 +27,8 @@ import {
 
 const NONE = 'none'
 
+type DeadlineKind = 'none' | 'days' | 'next_occurrence'
+
 type Editing = { taskType?: TaskType } | null
 
 export function TaskTypesSection() {
@@ -63,7 +65,9 @@ export function TaskTypesSection() {
                   )}
                 </div>
                 {t.deadline_rule && (
-                  <span className="shrink-0 text-xs text-muted-foreground">{T.deadlineChip(t.deadline_rule.days)}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {t.deadline_rule.kind === 'days' ? T.deadlineChip(t.deadline_rule.days) : T.deadlineNextChip}
+                  </span>
                 )}
               </button>
             </li>
@@ -102,18 +106,20 @@ function TaskTypeForm({ taskType, onDone }: { taskType?: TaskType; onDone: () =>
   const [actionTypeId, setActionTypeId] = useState(taskType?.default_action_type_id ?? null)
   const [categoryId, setCategoryId] = useState(taskType?.default_category_id ?? null)
   const [estimate, setEstimate] = useState(taskType?.default_estimate_min ? String(taskType.default_estimate_min) : '')
-  const [days, setDays] = useState(taskType?.deadline_rule ? String(taskType.deadline_rule.days) : '')
+  const rule = taskType?.deadline_rule ?? null
+  const [deadlineKind, setDeadlineKind] = useState<DeadlineKind>(rule?.kind ?? 'none')
+  const [days, setDays] = useState(rule?.kind === 'days' ? String(rule.days) : '7')
   const [projectId, setProjectId] = useState(taskType?.default_project_id ?? NONE)
   const [templateId, setTemplateId] = useState(taskType?.default_template_id ?? NONE)
   // Базовые поля сразу, остальное — под «Подробнее» (у нового типа)
   const [more, setMore] = useState(!!taskType)
   const saving = create.isPending || update.isPending
   const estimateNum = estimate ? Number(estimate) : null
-  const daysNum = days ? Number(days) : null
+  const daysNum = Number(days)
   const valid =
     name.trim() !== '' &&
     (estimateNum === null || (Number.isInteger(estimateNum) && estimateNum >= 5 && estimateNum <= 10_000)) &&
-    (daysNum === null || (Number.isInteger(daysNum) && daysNum >= 1 && daysNum <= 365))
+    (deadlineKind !== 'days' || (Number.isInteger(daysNum) && daysNum >= 1 && daysNum <= 365))
 
   const save = () => {
     const body = {
@@ -123,7 +129,12 @@ function TaskTypeForm({ taskType, onDone }: { taskType?: TaskType; onDone: () =>
       default_action_type_id: actionTypeId,
       default_category_id: categoryId,
       default_estimate_min: estimateNum,
-      deadline_rule: daysNum ? { kind: 'days' as const, days: daysNum } : null,
+      deadline_rule:
+        deadlineKind === 'days'
+          ? { kind: 'days' as const, days: daysNum }
+          : deadlineKind === 'next_occurrence'
+            ? { kind: 'next_occurrence' as const }
+            : null,
       default_project_id: projectId === NONE ? null : projectId,
       default_template_id: templateId === NONE ? null : templateId,
     }
@@ -153,18 +164,35 @@ function TaskTypeForm({ taskType, onDone }: { taskType?: TaskType; onDone: () =>
         <FieldDescription>{T.synonymsHint}</FieldDescription>
       </Field>
       <Field>
-        <FieldLabel htmlFor="tt-days">{T.deadlineDays}</FieldLabel>
-        <Input
-          id="tt-days"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={365}
-          value={days}
-          onChange={(e) => setDays(e.target.value)}
-          className="w-28"
-        />
-        <FieldDescription>{T.deadlineHint}</FieldDescription>
+        <FieldLabel htmlFor="tt-deadline">{T.deadline}</FieldLabel>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={deadlineKind} onValueChange={(v) => setDeadlineKind(v as DeadlineKind)}>
+            <SelectTrigger id="tt-deadline" className="w-auto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(['none', 'days', 'next_occurrence'] as const).map((k) => (
+                <SelectItem key={k} value={k}>
+                  {T.deadlineKinds[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {deadlineKind === 'days' && (
+            <Input
+              id="tt-days"
+              aria-label={T.deadlineDays}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={365}
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+              className="w-24"
+            />
+          )}
+        </div>
+        <FieldDescription>{T.deadlineHints[deadlineKind]}</FieldDescription>
       </Field>
 
       <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setMore((v) => !v)}>

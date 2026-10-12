@@ -17,8 +17,9 @@ import { FieldDefsEditor } from '@/features/areas/FieldDefsEditor'
 import { CategoryIcon } from '@/features/catalog/CategoryIcon'
 import { IconPicker } from '@/features/catalog/IconPicker'
 import { type CategoryIconName, useBudgets, useUpdateBudget } from '@/features/catalog/useCatalog'
+import { EventRulesEditor } from '@/features/eventrules/EventRulesEditor'
 import { paletteColor } from '@/lib/colors'
-import { CHANNEL_LABEL, EVENT_TYPES_UI as T } from '@/lib/terms'
+import { CHANNEL_LABEL, EVENT_RULES_UI, EVENT_TYPES_UI as T } from '@/lib/terms'
 import { cn } from '@/lib/utils'
 
 import {
@@ -253,6 +254,11 @@ function EventTypeForm({ eventType, onDone }: { eventType?: EventType; onDone: (
             <FieldDescription>{T.locationLabelHint}</FieldDescription>
           </Field>
           <FieldDefsEditor value={fields} onChange={setFields} legend={T.fields} hint={T.fieldsHint} />
+          {eventType ? (
+            <EventRulesEditor owner={{ event_type_id: eventType.id }} fieldLabels={eventType.fields.map((f) => f.label)} />
+          ) : (
+            <FieldDescription>{EVENT_RULES_UI.saveFirst}</FieldDescription>
+          )}
         </div>
       )}
 

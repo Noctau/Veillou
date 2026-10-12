@@ -20,6 +20,8 @@ export const queryKeys = {
   actionTypes: ['action-types'] as const,
   taskTypes: ['task-types'] as const,
   budgets: ['load-budgets'] as const,
+  eventRulesAll: ['event-rules'] as const,
+  eventRules: (owner: object) => ['event-rules', owner] as const,
   dayProfilesAll: ['day-profiles'] as const,
   dayProfiles: ['day-profiles', 'list'] as const,
   dayProfileRules: ['day-profiles', 'rules'] as const,

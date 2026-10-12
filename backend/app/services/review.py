@@ -64,6 +64,20 @@ class ReviewService:
         items = [e for e in rows if e.status == EventStatus.planned and e.start < self.now]
         return items, sum(e.status == EventStatus.done for e in rows)
 
+    async def proposals(self) -> list[Task]:
+        """Предложения автозадач (правила с подтверждением), ближайшие — первыми."""
+        return list(
+            await self.db.scalars(
+                select(Task)
+                .where(
+                    Task.user_id == self.user_id,
+                    Task.deleted_at.is_(None),
+                    Task.status == TaskStatus.proposed,
+                )
+                .order_by(Task.deadline.asc().nulls_last(), Task.created_at)
+            )
+        )
+
     async def reschedule(
         self, event_ids: list[uuid.UUID] | None = None, day: date | None = None
     ) -> tuple[int, PlanRevision | None]:
