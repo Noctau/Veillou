@@ -176,7 +176,14 @@ class TaskRead(ReadModel):
     priority: Priority
     status: TaskStatus
     done_at: UTCMoment | None
-    estimate_min: int | None
+    estimate_min: int | None = Field(
+        description="Своё время задания (минуты); у задания с шагами не используется"
+    )
+    total_estimate_min: int | None = Field(
+        default=None,
+        description="Время задания: сумма шагов, если они есть, иначе своё время. "
+        "У регулярного — время одного вхождения",
+    )
     deadline_buffer_days: int | None = Field(
         description="Свой «закончить за N дней до дедлайна»; null — из настроек"
     )

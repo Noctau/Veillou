@@ -9,7 +9,7 @@ export function SetupPage() {
   return (
     <>
       <PageHeader title={SETUP_UI.title} />
-      <SetupFlow onApplied={() => navigate('/settings')} />
+      <SetupFlow onApplied={() => navigate('/settings?tab=catalog')} />
     </>
   )
 }

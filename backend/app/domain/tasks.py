@@ -1,4 +1,4 @@
-"""Чистая логика заданий: прогресс и зависимости подзадач."""
+"""Чистая логика заданий: прогресс, время и зависимости подзадач."""
 
 from collections.abc import Hashable, Mapping, Sequence
 
@@ -11,6 +11,17 @@ def progress(done: int, total: int, *, task_done: bool = False) -> float:
     if total <= 0:
         return 1.0 if task_done else 0.0
     return min(done, total) / total
+
+
+def total_estimate(
+    own: int | None, steps_sum: int | None, steps: int, *, recurring: bool = False
+) -> int | None:
+    """Время задания. С шагами — сумма их оценок (планировщик ставит шаги, а не
+    задание); без шагов — своё время (им планировщик ставит само задание).
+    У регулярного задания шаги — вхождения: время — одно вхождение (своё)."""
+    if recurring or steps <= 0:
+        return own
+    return steps_sum or 0
 
 
 def find_cycle[K: Hashable](depends_on: Mapping[K, Sequence[K]]) -> list[K] | None:

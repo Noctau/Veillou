@@ -38,8 +38,11 @@ def _id(value: object) -> uuid.UUID | None:
     return value if isinstance(value, uuid.UUID) else None
 
 
-async def parse_text(db: AsyncSession, user: User, text: str) -> QuickParse:
-    now = now_utc().astimezone(get_tz(user.timezone))
+async def parse_text(
+    db: AsyncSession, user: User, text: str, *, now: datetime | None = None
+) -> QuickParse:
+    """`now` — от какого момента считать «завтра» и время без даты (по умолчанию — сейчас)."""
+    now = (now or now_utc()).astimezone(get_tz(user.timezone))
     if await ensure_defaults(db, user.id):
         await db.flush()
     words = await vocabulary(db, user.id)
@@ -93,15 +96,27 @@ def resolve_kind(p: ParseResult, kind: KindHint | None) -> KindHint:
     return kind
 
 
+def _task_estimate(minutes: int | None) -> int | None:
+    """Длительность из строки → время задания в границах схемы (5 мин … ~166 ч)."""
+    if minutes is None:
+        return None
+    return min(max(minutes, 5), 10_000)
+
+
 async def create_from_text(
-    db: AsyncSession, user: User, text: str, kind: KindHint | None = None
+    db: AsyncSession,
+    user: User,
+    text: str,
+    kind: KindHint | None = None,
+    *,
+    now: datetime | None = None,
 ) -> Created:
     """Создаёт задание / дело в ящике / событие по строке быстрого ввода.
 
     `kind` — явный выбор («Изменить» в боте); без него — подсказка разбора.
     """
     text = text.strip()[:500]
-    parsed = await parse_text(db, user, text)
+    parsed = await parse_text(db, user, text, now=now)
     p = parsed.result
     if kind == KindHint.event and (p.date is None or p.time is None):
         raise NeedsTimeError()
@@ -141,6 +156,8 @@ async def create_from_text(
             area_id=area_id,
             action_type_id=action_type_id,
             deadline=deadline,
+            # «на 2 часа» — время задания (без шагов его ставит планировщик)
+            estimate_min=_task_estimate(p.duration_min),
         )
     )
     return Created(kind, task.id, title, deadline=deadline, area=area.name if area else None)

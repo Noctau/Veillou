@@ -24,10 +24,22 @@ async def heartbeat_loop() -> None:
 
 
 COMMANDS = [
+    BotCommand(command="menu", description="Меню: всё управление кнопками"),
     BotCommand(command="today", description="План на сегодня"),
     BotCommand(command="week", description="План на неделю"),
-    BotCommand(command="add", description="Добавить дело: /add текст"),
+    BotCommand(command="tasks", description="Задания"),
+    BotCommand(command="day", description="Календарь по дням: /day завтра"),
+    BotCommand(command="inbox", description="Долгий ящик"),
+    BotCommand(command="projects", description="Проекты"),
+    BotCommand(command="notes", description="Заметки"),
+    BotCommand(command="note", description="Новая заметка: /note текст"),
+    BotCommand(command="search", description="Поиск: /search слова"),
+    BotCommand(command="plan", description="Превью плана"),
+    BotCommand(command="review", description="Разбор дня"),
     BotCommand(command="free", description="Есть N минут — что успеть"),
+    BotCommand(command="add", description="Добавить дело: /add текст"),
+    BotCommand(command="settings", description="Напоминания"),
+    BotCommand(command="cancel", description="Отменить ввод"),
     BotCommand(command="help", description="Что я умею"),
 ]
 

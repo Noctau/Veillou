@@ -23,7 +23,7 @@ from app.domain.enums import (
     SubtaskStatus,
     TaskStatus,
 )
-from app.domain.tasks import find_cycle, progress
+from app.domain.tasks import find_cycle, progress, total_estimate
 from app.models import (
     ActionType,
     Area,
@@ -139,7 +139,8 @@ class TaskService:
 
     # ---------- чтение ----------
 
-    async def _counts(self, task_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int]]:
+    async def _counts(self, task_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[int, int, int]]:
+        """Шагов всего, сделано, сумма оценок — по заданиям."""
         if not task_ids:
             return {}
         rows = await self.db.execute(
@@ -147,6 +148,7 @@ class TaskService:
                 Subtask.task_id,
                 func.count(),
                 func.count().filter(Subtask.status == SubtaskStatus.done),
+                func.coalesce(func.sum(Subtask.estimate_min), 0),
             )
             .where(
                 Subtask.user_id == self.user_id,
@@ -155,15 +157,20 @@ class TaskService:
             )
             .group_by(Subtask.task_id)
         )
-        return {task_id: (total, done) for task_id, total, done in rows.all()}
+        return {
+            task_id: (total, done, int(minutes)) for task_id, total, done, minutes in rows.all()
+        }
 
     @staticmethod
-    def _read(task: Task, counts: tuple[int, int] | None) -> TaskRead:
-        total, done = counts or (0, 0)
+    def _read(task: Task, counts: tuple[int, int, int] | None) -> TaskRead:
+        total, done, minutes = counts or (0, 0, 0)
         read = TaskRead.model_validate(task)
         read.subtasks_total = total
         read.subtasks_done = done
         read.progress = progress(done, total, task_done=task.status == TaskStatus.done)
+        read.total_estimate_min = total_estimate(
+            task.estimate_min, minutes, total, recurring=task.recurrence is not None
+        )
         return read
 
     async def list_tasks(
@@ -211,8 +218,9 @@ class TaskService:
             if task.origin_event_id
             else None
         )
+        minutes = sum(s.estimate_min for s in subtasks)
         return TaskDetail(
-            **self._read(task, (len(subtasks), done)).model_dump(),
+            **self._read(task, (len(subtasks), done, minutes)).model_dump(),
             subtasks=[self._subtask_read(s, events.get(s.id, [])) for s in subtasks],
             origin_event=OriginEvent.model_validate(origin) if origin else None,
         )
@@ -400,6 +408,8 @@ class TaskService:
         task = await self.tasks.get_or_404(id)
         changes = patch.model_dump(exclude_unset=True)
         _reject_nulls(changes, _TASK_REQUIRED)
+        if "estimate_min" in changes and not (changes.get("recurrence") or task.recurrence):
+            await self._check_own_estimate(task, changes["estimate_min"])
         if changes.get("recurrence"):
             await ensure_has_occurrences(changes["recurrence"])
         await self._check_refs(changes)
@@ -426,6 +436,20 @@ class TaskService:
             await sync_recurring_task(self.db, task, self._today())
         await self.db.commit()
         return await self.get_detail(id)
+
+    async def _check_own_estimate(self, task: Task, value: int | None) -> None:
+        """Своё время — только у задания без шагов: с шагами время = их сумма."""
+        if value is None or value == task.estimate_min:
+            return
+        has_steps = await self.db.scalar(
+            select(func.count()).where(
+                Subtask.task_id == task.id,
+                Subtask.user_id == self.user_id,
+                Subtask.deleted_at.is_(None),
+            )
+        )
+        if has_steps:
+            raise InvalidDataError("У задания есть шаги — его время считается по шагам")
 
     async def delete(self, id: uuid.UUID) -> None:
         """Задание удаляется с подзадачами; их будущие блоки исчезают из календаря."""
@@ -469,6 +493,9 @@ class TaskService:
         subtask = self._new_subtask(task, data, position=(last if last is not None else -1) + 1)
         subtask.depends_on = deps
         self.subtasks.add(subtask)
+        if last is None and not task.recurrence:
+            # Задание шло одним блоком — теперь планируются шаги, а не оно само
+            await self._drop_task_blocks(task.id)
         await self.db.commit()
         return self._subtask_read(subtask, [])
 
@@ -572,6 +599,15 @@ class TaskService:
         await self._drop_planned_events([id])
         await self.db.commit()
         return await self.get_subtask(id)
+
+    async def _drop_task_blocks(self, task_id: uuid.UUID) -> None:
+        """Запланированные блоки задания целиком (`source_type=task`)."""
+        for e in await self.events.find_all(
+            Event.source_type == SourceType.task,
+            Event.source_id == task_id,
+            Event.status == EventStatus.planned,
+        ):
+            self.events.soft_delete(e)
 
     async def _drop_planned_events(self, subtask_ids: list[uuid.UUID]) -> None:
         for e in await self._subtask_events(subtask_ids, statuses=[EventStatus.planned]):

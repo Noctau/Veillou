@@ -276,6 +276,8 @@ export function QuickAdd() {
         action_type_id: p.action_type_id,
         deadline: day ? (p.deadline ?? null) : null,
         priority: 'normal',
+        // «на 2 часа» — время задания: по нему его поставит планировщик
+        estimate_min: p.duration_min ? Math.min(Math.max(p.duration_min, 5), 10_000) : null,
         subtasks: [],
       },
       {

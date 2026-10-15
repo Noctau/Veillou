@@ -5,8 +5,8 @@ import interactionPlugin, { type DateClickArg, type EventResizeDoneArg } from '@
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { fromZonedTime } from 'date-fns-tz'
-import { ChevronLeftIcon, ChevronRightIcon, PinIcon } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon, PinIcon, ZoomInIcon, ZoomOutIcon } from 'lucide-react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -20,6 +20,7 @@ import { EventDetailsDialog } from './EventDetailsDialog'
 import { type EventDraft, EventDialog } from './EventDialog'
 import { type EventView, useEventView } from './eventUtils'
 import { type CalendarEvent, type EventKind, useCalendar, useUpdateEvent } from './useCalendar'
+import { clampZoom, isShortEvent, pinchStep, ZOOM_LEVELS } from './zoom'
 
 /*
  * FullCalendar работает в «настенном» времени пользователя: timeZone='UTC', а
@@ -38,7 +39,7 @@ const FLEX_LAYERS: EventKind[] = ['subtask', 'backlog', 'prep', 'project']
 const UNTYPED = 'untyped'
 const STORAGE_KEY = 'veillou.calendar'
 
-type Prefs = { view?: View; hidden?: string[] }
+type Prefs = { view?: View; hidden?: string[]; zoom?: number }
 
 function layerOf(e: CalendarEvent): string {
   if (e.kind !== 'busy') return e.kind
@@ -75,10 +76,22 @@ function isMovable(e: CalendarEvent): boolean {
   return !e.is_fixed && e.status === 'planned'
 }
 
-function EventContent({ arg, view }: { arg: EventContentArg; view: EventView }) {
+function EventContent({ arg, view, zoom }: { arg: EventContentArg; view: EventView; zoom: number }) {
   const event = arg.event.extendedProps.source as CalendarEvent | undefined
   if (!event) return null
   const details = view.details(event)
+  const { start, end } = arg.event
+  const minutes = start && end ? (end.getTime() - start.getTime()) / 60_000 : 60
+  if (arg.view.type.startsWith('timeGrid') && isShortEvent(minutes, zoom)) {
+    // Короткий блок — одной строкой, полный текст во всплывающей подсказке
+    return (
+      <div className="flex h-full items-center gap-1 overflow-hidden px-1 text-[11px] leading-none">
+        {!event.is_fixed && event.is_pinned && <PinIcon aria-label="Закреплено" className="size-3 shrink-0" />}
+        <span className="shrink-0 opacity-80">{arg.timeText}</span>
+        <span className="truncate font-medium">{arg.event.title}</span>
+      </div>
+    )
+  }
   return (
     <div className="flex h-full flex-col overflow-hidden px-1 py-0.5 text-xs leading-tight">
       <span className="flex items-center gap-1 truncate font-medium">
@@ -110,6 +123,10 @@ export function CalendarView() {
   const eventView = useEventView()
 
   const view = prefs.view ?? defaultView()
+  const zoom = clampZoom(prefs.zoom)
+  const zoomLevel = ZOOM_LEVELS[zoom]
+  const timeGrid = view !== 'dayGridMonth'
+  const gridRef = useRef<HTMLDivElement>(null)
   const hidden = useMemo(() => new Set(prefs.hidden ?? []), [prefs.hidden])
   const { data } = useCalendar(range?.from, range?.to)
   const { data: dayProfiles } = useDayProfileDays(range?.firstDay ?? '', range?.lastDay ?? '', !!range)
@@ -203,6 +220,60 @@ export function CalendarView() {
     api()?.changeView(v)
   }
 
+  const setZoom = (next: number) => {
+    const level = clampZoom(next)
+    if (level !== zoom) updatePrefs({ ...prefs, zoom: level })
+  }
+
+  // Высота слота — CSS-переменная: после смены FullCalendar пересчитывает позиции блоков
+  useEffect(() => {
+    api()?.updateSize()
+  }, [zoom])
+
+  // Ctrl/⌘ + колесо (и щипок на тачпаде) — масштаб; щипок двумя пальцами на телефоне
+  const zoomRef = useRef(zoom)
+  const setZoomRef = useRef(setZoom)
+  useEffect(() => {
+    zoomRef.current = zoom
+    setZoomRef.current = setZoom
+  })
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el || !timeGrid) return
+    let wheelAt = 0
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const now = Date.now()
+      if (now - wheelAt < 150) return // один шаг на жест
+      wheelAt = now
+      setZoomRef.current(zoomRef.current + (e.deltaY < 0 ? 1 : -1))
+    }
+    let pinchFrom = 0
+    const distance = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const onTouchStart = (e: TouchEvent) => {
+      pinchFrom = e.touches.length === 2 ? distance(e.touches) : 0
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !pinchFrom) return
+      e.preventDefault()
+      const now = distance(e.touches)
+      const step = pinchStep(pinchFrom, now)
+      if (step) {
+        setZoomRef.current(zoomRef.current + step)
+        pinchFrom = now
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+    }
+  }, [timeGrid])
+
   const toggleLayers = (visible: string[]) =>
     updatePrefs({ ...prefs, hidden: layers.map((l) => l.key).filter((k) => !visible.includes(k)) })
 
@@ -221,6 +292,38 @@ export function CalendarView() {
           </Button>
         </div>
         <span className="font-medium first-letter:uppercase">{range?.title}</span>
+        {timeGrid && (
+          <div className="flex items-center" role="group" aria-label="Масштаб">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Мельче"
+              title="Мельче (Ctrl/⌘ + колесо)"
+              disabled={zoom === 0}
+              onClick={() => setZoom(zoom - 1)}
+            >
+              <ZoomOutIcon />
+            </Button>
+            <button
+              type="button"
+              className="w-12 text-center text-xs text-muted-foreground tabular-nums hover:text-foreground"
+              title="Обычный масштаб"
+              onClick={() => setZoom(1)}
+            >
+              {zoomLevel.label}
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Крупнее"
+              title="Крупнее (Ctrl/⌘ + колесо)"
+              disabled={zoom === ZOOM_LEVELS.length - 1}
+              onClick={() => setZoom(zoom + 1)}
+            >
+              <ZoomInIcon />
+            </Button>
+          </div>
+        )}
         <ToggleGroup
           type="single"
           variant="outline"
@@ -253,7 +356,10 @@ export function CalendarView() {
         ))}
       </ToggleGroup>
 
-      <div className="text-sm [--fc-border-color:var(--border)] [--fc-neutral-bg-color:var(--muted)] [--fc-now-indicator-color:var(--destructive)] [--fc-page-bg-color:var(--background)] [--fc-today-bg-color:color-mix(in_oklch,var(--primary)_7%,transparent)] [&_.fc-col-header-cell-cushion]:font-medium [&_.fc-daygrid-day-number]:text-muted-foreground [&_.fc-event]:cursor-pointer [&_.fc-timegrid-slot]:h-10 [&_.fc-timegrid-slot-label]:text-xs [&_.fc-timegrid-slot-label]:text-muted-foreground">
+      <div
+        ref={gridRef}
+        style={{ '--slot-h': `${zoomLevel.heightPx}px` } as CSSProperties}
+        className="text-sm [--fc-border-color:var(--border)] [--fc-neutral-bg-color:var(--muted)] [--fc-now-indicator-color:var(--destructive)] [--fc-page-bg-color:var(--background)] [--fc-today-bg-color:color-mix(in_oklch,var(--primary)_7%,transparent)] [&_.fc-col-header-cell-cushion]:font-medium [&_.fc-daygrid-day-number]:text-muted-foreground [&_.fc-event]:cursor-pointer [&_.fc-timegrid-slot]:h-(--slot-h)! [&_.fc-timegrid-slot-label]:text-xs [&_.fc-timegrid-slot-label]:text-muted-foreground">
         <FullCalendar
           ref={calendarRef}
           plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
@@ -267,7 +373,9 @@ export function CalendarView() {
           nowIndicator
           slotMinTime="07:00:00"
           slotMaxTime="24:00:00"
-          slotDuration="00:30:00"
+          slotDuration={zoomLevel.slot}
+          slotEventOverlap={false}
+          eventMinHeight={16}
           allDayText=""
           dayMaxEvents={3}
           eventDisplay="block"
@@ -293,7 +401,13 @@ export function CalendarView() {
               </div>
             )
           }}
-          eventContent={(arg) => (arg.event.display === 'background' ? undefined : <EventContent arg={arg} view={eventView} />)}
+          eventContent={(arg) =>
+            arg.event.display === 'background' ? undefined : <EventContent arg={arg} view={eventView} zoom={zoom} />
+          }
+          eventDidMount={(arg) => {
+            // Полное название — во всплывающей подсказке (короткие блоки обрезаны)
+            if (arg.event.display !== 'background') arg.el.title = `${arg.timeText} ${arg.event.title}`.trim()
+          }}
         />
       </div>
 

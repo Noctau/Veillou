@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Field, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -126,6 +127,79 @@ function DeadlineEditor({ task, onSave }: { task: TaskDetail; onSave: (deadline:
   )
 }
 
+/** Время задания: без шагов — своё (по нему планировщик ставит задание), с шагами — их сумма. */
+function TimeEditor({ task, onSave }: { task: TaskDetail; onSave: (estimate: number | null) => void }) {
+  const fromSteps = task.subtasks.length > 0 && !task.recurrence
+  const own = task.estimate_min ?? 0
+  const [hours, setHours] = useState(own ? String(Math.floor(own / 60)) : '')
+  const [minutes, setMinutes] = useState(own ? String(own % 60) : '')
+
+  if (fromSteps) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-sm">{formatMinutes(task.total_estimate_min ?? 0)}</span>
+        <FieldDescription>Сумма времени шагов — планировщик ставит шаги, а не задание целиком.</FieldDescription>
+      </div>
+    )
+  }
+
+  const commit = () => {
+    const h = Number(hours || 0)
+    const m = Number(minutes || 0)
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || m < 0) return
+    const total = Math.round(h * 60 + m)
+    if (total === own) return
+    if (total === 0) {
+      onSave(null)
+      return
+    }
+    if (total < 5 || total > 10_000) {
+      toast.error('Время — от 5 минут до ~166 часов')
+      return
+    }
+    onSave(total)
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={166}
+          aria-label="Время: часы"
+          className="w-20"
+          value={hours}
+          placeholder="0"
+          onChange={(e) => setHours(e.target.value)}
+          onBlur={commit}
+        />
+        <span className="text-sm text-muted-foreground">ч</span>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={59}
+          step={5}
+          aria-label="Время: минуты"
+          className="w-20"
+          value={minutes}
+          placeholder="0"
+          onChange={(e) => setMinutes(e.target.value)}
+          onBlur={commit}
+        />
+        <span className="text-sm text-muted-foreground">мин</span>
+      </div>
+      <FieldDescription>
+        {task.estimate_min
+          ? 'Планировщик найдёт для задания столько времени. Появятся шаги — время станет их суммой.'
+          : 'Укажите, сколько займёт задание, — без времени планировщик его не поставит.'}
+      </FieldDescription>
+    </div>
+  )
+}
+
 function ProjectFields({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => void }) {
   const { data: projects } = useProjects(['active', 'done'])
   const { data: project } = useProject(task.project_id ?? undefined)
@@ -178,6 +252,14 @@ function Meta({ task, patch }: { task: TaskDetail; patch: (body: TaskUpdate) => 
         <Field className="sm:col-span-2">
           <FieldLabel>Дедлайн</FieldLabel>
           <DeadlineEditor task={task} onSave={(deadline) => patch({ deadline })} />
+        </Field>
+        <Field className="sm:col-span-2">
+          <FieldLabel>Время</FieldLabel>
+          <TimeEditor
+            key={`${task.estimate_min}-${task.subtasks.length}`}
+            task={task}
+            onSave={(estimate_min) => patch({ estimate_min })}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="task-area">{AREAS_UI.area}</FieldLabel>
@@ -306,6 +388,11 @@ export function TaskView({ taskId }: { taskId: string }) {
             {taskType && <span>{taskType.name}</span>}
             {due && <span className={cn(due.tone === 'overdue' && !done && 'text-destructive')}>{due.text}</span>}
             {estimate > 0 && !task.recurrence && <span>осталось ~{formatMinutes(estimate)}</span>}
+            {!task.subtasks.length && !task.recurrence && !done && (
+              <span className={cn(!task.estimate_min && 'text-amber-600 dark:text-amber-400')}>
+                {task.estimate_min ? `~${formatMinutes(task.estimate_min)}` : 'время не указано'}
+              </span>
+            )}
             {task.origin_event && (
               <Link to="/calendar" className="underline-offset-4 hover:underline">
                 {ORIGIN_UI.from}: {task.origin_event.title}, {formatDay(wallDate(task.origin_event.start, tz))}{' '}

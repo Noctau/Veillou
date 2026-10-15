@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, status
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, SessionToken
 from app.schemas.settings import UserSettings, UserSettingsPatch
-from app.schemas.user import UserRead, UserUpdate
+from app.schemas.user import PasswordChange, UserRead, UserUpdate
+from app.services import auth
 from app.services import settings as settings_service
 from app.services.users import update_me
 
@@ -18,6 +19,25 @@ async def read_me(user: CurrentUser) -> UserRead:
 async def patch_me(data: UserUpdate, user: CurrentUser, db: SessionDep) -> UserRead:
     """Часовой пояс: расписание пересобирается в новом поясе (настенное время то же)."""
     return UserRead.model_validate(await update_me(db, user, data))
+
+
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    data: PasswordChange,
+    request: Request,
+    user: CurrentUser,
+    db: SessionDep,
+    token: SessionToken = None,
+) -> None:
+    """Смена пароля: нужен текущий. Другие устройства выходят, это — остаётся."""
+    await auth.change_password(
+        db,
+        user,
+        current=data.current_password,
+        new=data.new_password,
+        keep_token=token,
+        ip=request.client.host if request.client else None,
+    )
 
 
 @router.get("/settings")

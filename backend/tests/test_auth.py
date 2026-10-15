@@ -188,3 +188,67 @@ async def test_prune_removes_old_sessions(user: User, session: AsyncSession):
     left = list(await session.scalars(select(UserSession)))
     assert len(left) == 1
     assert left[0].deleted_at is None
+
+
+# ---------- смена пароля ----------
+
+NEW_PASSWORD = "new-correct-horse-42"
+
+
+async def change(client: AsyncClient, current: str = PASSWORD, new: str = NEW_PASSWORD):
+    return await client.post(
+        f"{API}/me/password", json={"current_password": current, "new_password": new}
+    )
+
+
+async def test_change_password_requires_auth(client: AsyncClient):
+    resp = await change(client)
+    assert resp.status_code == 401
+
+
+async def test_change_password_keeps_current_session_and_closes_others(
+    client: AsyncClient, user: User, session: AsyncSession
+):
+    from httpx import ASGITransport
+
+    from app.main import app
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
+        await login(other)
+        await login(client)
+        resp = await change(client)
+        assert resp.status_code == 204
+        # Это устройство осталось в системе, другое — вышло
+        assert (await client.get(f"{API}/me")).status_code == 200
+        assert (await other.get(f"{API}/me")).status_code == 401
+
+    client.cookies.clear()
+    assert (await login(client)).status_code == 401
+    assert (await login(client, password=NEW_PASSWORD)).status_code == 200
+
+
+async def test_change_password_wrong_current(client: AsyncClient, user: User):
+    await login(client)
+    resp = await change(client, current="wrong-password")
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "wrong_password"
+    # Сессия жива, пароль прежний
+    assert (await client.get(f"{API}/me")).status_code == 200
+    client.cookies.clear()
+    assert (await login(client)).status_code == 200
+
+
+async def test_change_password_validation(client: AsyncClient, user: User):
+    await login(client)
+    assert (await change(client, new="short")).status_code == 422
+    resp = await change(client, new=PASSWORD)
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "same_password"
+
+
+async def test_change_password_bruteforce_is_limited(client: AsyncClient, user: User):
+    await login(client)
+    for _ in range(settings.LOGIN_MAX_FAILURES_PER_ACCOUNT):
+        await change(client, current="wrong-password")
+    resp = await change(client)
+    assert resp.status_code == 429

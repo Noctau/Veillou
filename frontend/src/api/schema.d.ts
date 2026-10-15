@@ -76,6 +76,26 @@ export interface paths {
         patch: operations["patch_me"];
         trace?: never;
     };
+    "/api/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Смена пароля: нужен текущий. Другие устройства выходят, это — остаётся.
+         */
+        post: operations["change_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/settings": {
         parameters: {
             query?: never;
@@ -5034,6 +5054,13 @@ export interface components {
              */
             text: string;
         };
+        /** PasswordChange */
+        PasswordChange: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
         /** Pause */
         Pause: {
             /**
@@ -6820,8 +6847,16 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Done At */
             done_at: string | null;
-            /** Estimate Min */
+            /**
+             * Estimate Min
+             * @description Своё время задания (минуты); у задания с шагами не используется
+             */
             estimate_min: number | null;
+            /**
+             * Total Estimate Min
+             * @description Время задания: сумма шагов, если они есть, иначе своё время. У регулярного — время одного вхождения
+             */
+            total_estimate_min: number | null;
             /**
              * Deadline Buffer Days
              * @description Свой «закончить за N дней до дедлайна»; null — из настроек
@@ -6909,8 +6944,16 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Done At */
             done_at: string | null;
-            /** Estimate Min */
+            /**
+             * Estimate Min
+             * @description Своё время задания (минуты); у задания с шагами не используется
+             */
             estimate_min: number | null;
+            /**
+             * Total Estimate Min
+             * @description Время задания: сумма шагов, если они есть, иначе своё время. У регулярного — время одного вхождения
+             */
+            total_estimate_min: number | null;
             /**
              * Deadline Buffer Days
              * @description Свой «закончить за N дней до дедлайна»; null — из настроек
@@ -7842,6 +7885,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserRead"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {

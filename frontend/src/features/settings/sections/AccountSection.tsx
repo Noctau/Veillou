@@ -1,9 +1,24 @@
 import { useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PasswordForm } from '@/features/auth/PasswordForm'
 import { useLogout } from '@/features/auth/useAuthMutations'
 import { useMe } from '@/features/auth/useMe'
+
+export function PasswordSection() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Пароль</CardTitle>
+        <CardDescription>После смены на других устройствах нужно будет войти заново.</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <PasswordForm />
+      </CardContent>
+    </Card>
+  )
+}
 
 export function AccountSection() {
   const { data: me } = useMe()

@@ -1,5 +1,7 @@
 """Команды и кнопки бота.
 
+- /menu и экраны управления (задания, календарь, ящик, проекты, заметки, поиск,
+  план, разбор, настройки) — bot/menu.py;
 - /today, /week — план на сегодня и неделю;
 - /add <текст> и любой текст без команды — задание / дело в ящик / событие по
   разбору quickparse, с кнопкой «Изменить» (сменить тип или удалить); если разбор
@@ -21,7 +23,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import Headers
 
-from app.bot import ai, cards, review
+from app.bot import ai, cards, menu, review
 from app.core.exceptions import AppError
 from app.core.storage import get_storage
 from app.core.time import get_tz, now_utc
@@ -41,10 +43,16 @@ HELP = (
     "• «записаться к стоматологу» — дело в долгий ящик\n"
     "• «кино в пт в 19» — событие в календаре\n"
     "• текст задания целиком или фото доски — разберу с ИИ и предложу разбить на шаги\n\n"
-    "/today — план на сегодня\n"
-    "/week — план на неделю\n"
-    "/free — что успеть, если есть свободные минуты\n"
-    "/add <текст> — быстро, без ИИ\n\n"
+    "/menu — всё управление кнопками\n"
+    "/today — план на сегодня, /week — на неделю\n"
+    "/tasks — задания: срок, время, шаги, готово\n"
+    "/day [дата] — календарь по дням: отметить, перенести, отменить\n"
+    "/inbox — долгий ящик, /projects — проекты\n"
+    "/notes — заметки, /note <текст> — новая, /search <слова> — поиск\n"
+    "/plan — превью плана: применить, пересчитать, отменить\n"
+    "/review — разбор дня, /free — что успеть за N минут\n"
+    "/settings — напоминания и запас до дедлайна\n"
+    "/add <текст> — быстро, без ИИ; /cancel — отменить ввод\n\n"
     "Напоминания и утренняя сводка тоже приходят сюда."
 )
 
@@ -271,6 +279,8 @@ def create_router() -> Router:
     router.message.register(week, Command("week"))
     router.message.register(add, Command("add"))
     router.message.register(free, Command("free"))
+    # Экраны управления, их кнопки и ввод текстом — до «неизвестной команды» и быстрого ввода
+    menu.register(router)
     router.message.register(help_, F.text.startswith("/"))  # неизвестная команда
     router.message.register(photo, F.photo)
     router.message.register(photo, F.document.mime_type.startswith("image/"))

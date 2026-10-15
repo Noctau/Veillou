@@ -92,7 +92,7 @@ function RestNote() {
       <p>
         Свободное время осталось только в защищённые вечера и полдня выходных. План их не трогает — минимум отдыха можно
         поменять в{' '}
-        <Link to="/settings" className="text-primary underline-offset-4 hover:underline">
+        <Link to="/settings?tab=planning" className="text-primary underline-offset-4 hover:underline">
           Настройках
         </Link>
         .

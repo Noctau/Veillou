@@ -5,12 +5,17 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import UnauthorizedError
-from app.core.security import hash_token, new_token, verify_password_async
+from app.core.exceptions import AppError, InvalidDataError, UnauthorizedError
+from app.core.security import (
+    hash_password_async,
+    hash_token,
+    new_token,
+    verify_password_async,
+)
 from app.core.time import now_utc
 from app.models import User, UserSession
 from app.services import login_guard
-from app.services.users import get_user_by_email
+from app.services.users import get_user_by_email, validate_password
 
 # Срок жизни сессии продлевается не чаще раза в сутки, чтобы не писать в БД на каждый запрос
 RENEW_AFTER = timedelta(days=1)
@@ -103,6 +108,52 @@ async def logout(db: AsyncSession, token: str) -> None:
         .where(UserSession.token_hash == hash_token(token), UserSession.deleted_at.is_(None))
         .values(deleted_at=now_utc())
     )
+    await db.commit()
+
+
+class WrongPasswordError(AppError):
+    # Не 401: сессия жива, просто неверный текущий пароль
+    code = "wrong_password"
+    message = "Текущий пароль неверный"
+
+
+class SamePasswordError(AppError):
+    code = "same_password"
+    message = "Новый пароль совпадает с текущим"
+
+
+async def change_password(
+    db: AsyncSession,
+    user: User,
+    *,
+    current: str,
+    new: str,
+    keep_token: str | None,
+    ip: str | None = None,
+) -> None:
+    """Смена пароля из настроек: нужен текущий пароль.
+
+    Перебор текущего пароля ограничен так же, как вход (`login_guard`). Остальные
+    сессии закрываются (пароль мог утечь), текущая — остаётся. Коммитит.
+    """
+    try:
+        validate_password(new)
+    except ValueError as exc:
+        raise InvalidDataError(str(exc)) from exc
+    await login_guard.check(db, ip=ip, email=user.email)
+    password_hash = user.password_hash
+    await db.commit()  # соединение — в пул, пока argon2 в очереди
+    if not await verify_password_async(current, password_hash):
+        await login_guard.record_failure(db, ip=ip, email=user.email)
+        raise WrongPasswordError()
+    if current == new:
+        raise SamePasswordError()
+    user.password_hash = await hash_password_async(new)
+    others = [UserSession.user_id == user.id, UserSession.deleted_at.is_(None)]
+    if keep_token:
+        others.append(UserSession.token_hash != hash_token(keep_token))
+    await db.execute(update(UserSession).where(*others).values(deleted_at=now_utc()))
+    await login_guard.clear_account(db, user.email)
     await db.commit()
 
 

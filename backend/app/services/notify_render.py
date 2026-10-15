@@ -248,7 +248,7 @@ def _test(*_: object) -> Message:
     return Message(
         title="Уведомления работают",
         sections=(Section(None, ("Так будут приходить напоминания.",)),),
-        url="/settings",
+        url="/settings?tab=notifications",
         kind=ReminderKind.test,
     )
 

@@ -35,3 +35,15 @@ export function useLogout() {
     },
   })
 }
+
+type PasswordChange = components['schemas']['PasswordChange']
+
+/** Смена пароля: другие устройства выходят, это остаётся в системе. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (body: PasswordChange) => {
+      const { error } = await api.POST('/api/v1/me/password', { body })
+      if (error) throw error
+    },
+  })
+}

@@ -7,12 +7,10 @@ from app.core.exceptions import ConflictError
 from app.core.security import MAX_PASSWORD_LENGTH, hash_password_async
 from app.core.time import get_tz, is_valid_tz, now_utc
 from app.models import ScheduleRule, User, UserSession
-from app.schemas.user import UserUpdate
+from app.schemas.user import MIN_PASSWORD_LENGTH, UserUpdate
 from app.services.catalog import ensure_defaults
 from app.services.day_profiles import ensure_day_profiles
 from app.services.schedule_sync import SeriesSync
-
-MIN_PASSWORD_LENGTH = 8
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:

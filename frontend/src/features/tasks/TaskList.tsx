@@ -13,7 +13,7 @@ import { errorMessage } from '@/lib/errors'
 import { useTimeZone } from '@/lib/useTimeZone'
 import { cn } from '@/lib/utils'
 
-import { describeDeadline } from './labels'
+import { describeDeadline, formatMinutes } from './labels'
 import { type TaskStatus, useTasks } from './useTasks'
 
 type Props = {
@@ -89,6 +89,7 @@ export function TaskList({ areaId, projectId, actions }: Props) {
                         </span>
                       </>
                     )}
+                    {!!t.total_estimate_min && <span className="tabular-nums">~{formatMinutes(t.total_estimate_min)}</span>}
                   </div>
                 </div>
                 {due && (
